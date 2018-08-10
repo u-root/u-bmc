@@ -1,0 +1,10 @@
+boot/*.img
+boot/*.dtb
+boot/zImage*
+build/*
+*.img
+.*.sw*
+root/
+initramfs.cpio
+ssh_keys.pub
+u-root
