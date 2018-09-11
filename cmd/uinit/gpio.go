@@ -5,6 +5,7 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -74,11 +75,23 @@ func (g *gpioSystem) monitorOne(line string) {
 	d := getLineValues(e)
 	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d.values[0])
 	for {
-		e := readEvent(e)
-		if e == nil {
+		ev := readEvent(e)
+		if ev == nil {
 			break
 		}
-		log.Printf("%s: event %v", e)
+
+		f := ""
+		if ev.Id == GPIOEVENT_EVENT_FALLING_EDGE {
+			f = "falling edge"
+		} else if ev.Id == GPIOEVENT_EVENT_RISING_EDGE {
+			f = "rising edge"
+		} else {
+			f = fmt.Sprintf("unknown event %v", ev)
+		}
+		// TODO(bluecmd): Just to be sure, read the value (there is a race but
+		// I just to double check that the edge detection works somewhat well)
+		log.Printf("%s: %s, value is now %d", line, f, getLineValues(e).values[0])
+
 	}
 	log.Printf("Monitoring stopped for GPIO line %s", line)
 }

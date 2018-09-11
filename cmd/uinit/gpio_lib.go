@@ -49,8 +49,8 @@ type gpioevent_request struct {
 }
 
 type gpioevent_data struct {
-	timestamp uint64
-	id        uint32
+	Timestamp uint64
+	Id        uint32
 	// Linux wants this structure to be aligned with 16 bytes
 	_ uint32
 }
@@ -72,6 +72,9 @@ const (
 	GPIOEVENT_REQUEST_RISING_EDGE  = (1 << 0)
 	GPIOEVENT_REQUEST_FALLING_EDGE = (1 << 1)
 	GPIOEVENT_REQUEST_BOTH_EDGES   = GPIOEVENT_REQUEST_RISING_EDGE | GPIOEVENT_REQUEST_FALLING_EDGE
+
+	GPIOEVENT_EVENT_RISING_EDGE    = 1
+	GPIOEVENT_EVENT_FALLING_EDGE   = 2
 )
 
 func byteStr(b []byte) string {
