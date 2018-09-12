@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/platform"
 )
 
 func main() {
@@ -27,15 +28,50 @@ func main() {
 	fmt.Printf("SCU90: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x90))
 	fmt.Printf("SCU94: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x94))
 
+	_ = platform.LinePortMap()
+
 	p := a.SnapshotGpio()
-	p.Print()
+	dir := make(map[uint32]bool)
+	for _, g := range p.List() {
+		if g.State == ast2400.LINE_STATE_OUTPUT {
+			dir[g.Port] = true
+		}
+	}
+
+	for _, g := range p.List() {
+		if g.State == ast2400.LINE_STATE_HIGH {
+			log.Printf("%-30s high (output: %v)\n", portName(g.Port), dir[g.Port])
+		} else if g.State == ast2400.LINE_STATE_LOW {
+			log.Printf("%-30s low  (output: %v)\n", portName(g.Port), dir[g.Port])
+		}
+	}
 	for {
 		s := a.SnapshotGpio()
 
 		if !p.Equals(s) {
-			s.Diff(p)
+			for _, g := range s.Diff(p) {
+				if g.State == ast2400.LINE_STATE_BECAME_INPUT {
+					log.Printf("%-30s became input\n", portName(g.Port))
+				} else if g.State == ast2400.LINE_STATE_BECAME_OUTPUT {
+					log.Printf("%-30s became output\n", portName(g.Port))
+				} else if g.State == ast2400.LINE_STATE_BECAME_HIGH {
+					log.Printf("%-30s became high\n", portName(g.Port))
+				} else if g.State == ast2400.LINE_STATE_BECAME_LOW {
+					log.Printf("%-30s became low\n", portName(g.Port))
+				}
+			}
 		}
 		p = s
 		time.Sleep(10 * time.Millisecond)
 	}
 }
+
+
+func portName(p uint32) string {
+	n, ok := platform.GpioPortToName(p)
+	if !ok {
+		n = ast2400.GpioPortToFunction(p)
+	}
+	return n
+}
+
