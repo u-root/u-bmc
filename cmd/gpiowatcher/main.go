@@ -5,18 +5,34 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/u-root/u-bmc/pkg/ast2400"
 	"github.com/u-root/u-bmc/pkg/platform"
 )
 
+var (
+	// U4 and V2 is RMII receive clock probably never really interesting
+	// V6 and O2 is the fan PWM input on the F06 Leopard
+	// TODO(bluecmd): This can be made adaptive in the future
+	ignoreLines = flag.String("ignore", "U4,V2,O0,O2", "Ignore events on the specified comma separated lines")
+)
+
 func main() {
+	flag.Parse()
+
 	a := ast2400.Open()
 	defer a.Close()
+
+	ignoredPorts := make(map[uint32]bool)
+	for _, part := range strings.Split(*ignoreLines, ",") {
+		ignoredPorts[ast2400.GpioPort(part)] = true
+	}
 
 	log.SetOutput(os.Stdout)
 
@@ -50,6 +66,9 @@ func main() {
 
 		if !p.Equal(s) {
 			for _, g := range s.Diff(p) {
+				if ignoredPorts[g.Port] {
+					continue
+				}
 				if g.State == ast2400.LINE_STATE_BECAME_INPUT {
 					log.Printf("%-30s became input\n", portName(g.Port))
 				} else if g.State == ast2400.LINE_STATE_BECAME_OUTPUT {
