@@ -347,7 +347,7 @@ func (s *state) diff(b *state) []lineState {
 	return res
 }
 
-func (s *state) Equals(b *state) bool {
+func (s *state) Equal(b *state) bool {
 	if len(b.r) != len(s.r) {
 		return false
 	}

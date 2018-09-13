@@ -48,7 +48,7 @@ func main() {
 	for {
 		s := a.SnapshotGpio()
 
-		if !p.Equals(s) {
+		if !p.Equal(s) {
 			for _, g := range s.Diff(p) {
 				if g.State == ast2400.LINE_STATE_BECAME_INPUT {
 					log.Printf("%-30s became input\n", portName(g.Port))
