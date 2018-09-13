@@ -105,6 +105,18 @@ func (g *gpioSystem) managePowerButton(line string) {
 	}
 }
 
+func (g *gpioSystem) manageClock(line string, p time.Duration) {
+	l := requestLineHandle(g.f, []uint32{linePortMap[line]}, []bool{false})
+	log.Printf("Initialized clock %s", line)
+
+	for {
+		setLineValues(l, []bool{false})
+		time.Sleep(p / 2)
+		setLineValues(l, []bool{true})
+		time.Sleep(p / 2)
+	}
+}
+
 func startGpio(c string) {
 	f, err := os.OpenFile(c, os.O_RDWR, 0600)
 	if err != nil {
@@ -168,4 +180,5 @@ func startGpio(c string) {
 	})
 
 	go g.managePowerButton("BMC_PWR_BTN_OUT_N")
+	go g.manageClock("CPLD_CLK", time.Second)
 }

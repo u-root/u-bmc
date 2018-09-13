@@ -57,6 +57,7 @@ var (
 		"CPU1_FIVR_FAULT_N"  : ast2400.GpioPort("Q7"),
 		"MB_SLOT_ID":          ast2400.GpioPort("R1"),
 		"SYS_THROTTLE":        ast2400.GpioPort("R4"),
+		"CPLD_CLK":            ast2400.GpioPort("B0"),
 	}
 
 	// Reverse map of linePortMap
