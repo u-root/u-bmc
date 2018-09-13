@@ -6,20 +6,22 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"os"
-	"syscall"
+	"time"
 
 	"github.com/u-root/u-bmc/pkg/platform"
+	pb "github.com/u-root/u-bmc/proto"
 )
 
 var (
 	linePortMap = platform.LinePortMap()
+	g = (*gpioSystem)(nil)
 )
 
 type gpioSystem struct {
-	f *os.File
+	f           *os.File
+	powerButton chan time.Duration
 }
 
 func (g *gpioSystem) monitorOne(line string) {
@@ -73,39 +75,33 @@ func (g *gpioSystem) hog(lines map[string]bool) {
 	requestLineHandle(g.f, lidx, vals)
 }
 
-func (g *gpioSystem) powerButton(line string) {
+func PressButton(b pb.Button, durMs uint32) error {
+	if durMs > 1000 * 10 {
+		return fmt.Errorf("Maximum allowed depress duration is 10 seconds")
+	}
+	if b == pb.Button_POWER {
+		g.powerButton <- time.Duration(durMs) * time.Millisecond
+	} else {
+		return fmt.Errorf("Unknown button %v", b)
+	}
+	return nil
+}
+
+func (g *gpioSystem) managePowerButton(line string) {
 	// TODO(bluecmd): Assume the line is inverted for now, probably will
 	// always be the case in all platforms though
 	l := requestLineHandle(g.f, []uint32{linePortMap[line]}, []bool{true})
 	log.Printf("Initialized power button %s", line)
 
-	// TODO(bluecmd): replace with grpc
-	syscall.Mknod("/tmp/power_btn", syscall.S_IFIFO|0600, 0)
-
-	c := make([]byte, 1)
 	for {
-		cf, err := os.OpenFile("/tmp/power_btn", os.O_RDONLY, 0600)
-		if err != nil {
-			log.Printf("Power button FIFO failed: open: %v", err)
-			break
-		}
-		_, err = cf.Read(c)
-		if err == io.EOF {
-			continue
-		}
-		if err != nil {
-			log.Printf("Power button FIFO failed: read: %v", err)
-			break
-		}
-		if c[0] == '1' {
-			log.Printf("Pressing power button")
-			setLineValues(l, []bool{false})
-		}
-		if c[0] == '0' {
-			log.Printf("Releasing power button")
-			setLineValues(l, []bool{true})
-		}
-		cf.Close()
+		dur := <-g.powerButton
+		log.Printf("Pressing power button")
+		setLineValues(l, []bool{false})
+
+		time.Sleep(dur)
+
+		log.Printf("Releasing power button")
+		setLineValues(l, []bool{true})
 	}
 }
 
@@ -115,7 +111,10 @@ func startGpio(c string) {
 		log.Fatalf("startGpio: open: %v", err)
 	}
 
-	g := gpioSystem{f}
+	g = &gpioSystem{
+		f: f,
+		powerButton: make(chan time.Duration),
+	}
 
 	// TODO(bluecmd): These are motherboard specific, figure out how
 	// to have these configurable for other boards.
@@ -168,5 +167,5 @@ func startGpio(c string) {
 		"UNKN_Q4": false,
 	})
 
-	go g.powerButton("BMC_PWR_BTN_OUT_N")
+	go g.managePowerButton("BMC_PWR_BTN_OUT_N")
 }

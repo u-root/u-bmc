@@ -5,7 +5,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
 	"io"
 	"log"
@@ -76,11 +75,6 @@ const (
 	GPIOEVENT_EVENT_RISING_EDGE    = 1
 	GPIOEVENT_EVENT_FALLING_EDGE   = 2
 )
-
-func byteStr(b []byte) string {
-	n := bytes.Index(b, []byte{0})
-	return string(b[:n])
-}
 
 func getLine(f *os.File, line uint32) *gpioline_info {
 	linfo := gpioline_info{}

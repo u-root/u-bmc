@@ -1,0 +1,29 @@
+// Copyright 2018 the u-root Authors. All rights reserved
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+package bmc;
+
+service ManagementService {
+  rpc PressButton (ButtonPressRequest) returns (ButtonPressResponse) {}
+}
+
+enum Button {
+  UNSPEC = 0;
+  POWER  = 1;
+  RESET  = 2;
+}
+
+message ButtonPressRequest {
+  // Required: which button to press
+  Button button = 1;
+
+  // Required: duration in milliseconds for how long to press the button
+  uint32 duration_ms = 2;
+}
+
+message ButtonPressResponse {
+
+}

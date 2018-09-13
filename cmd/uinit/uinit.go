@@ -138,6 +138,9 @@ func main() {
 	environ := append(os.Environ(), "USER=root")
 	environ = append(environ, "HOME=/root")
 
+	log.Printf("Starting gRPC interface\n")
+	startGrpc()
+
 	log.Printf("System startup\n")
 	for _, line := range commands {
 		log.Printf("Executing command: %v\n", line)
