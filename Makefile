@@ -4,26 +4,41 @@
 # license that can be found in the LICENSE file
 
 LEB=65408
+ARCH ?= arm
+CROSS_COMPILE ?= arm-none-eabi-
+MAKE_JOBS ?= -j8
 
 .PHONY: sim
 
 flash.img: u-boot/u-boot-512.bin ubi.img
-	( cat "$@" ; perl -e 'print chr(0xFF)x1024 while 1' ) \
-	| dd bs=1M count=32 iflag=fullblock > "$@"
+	( cat $^ ; perl -e 'print chr(0xFF)x1024 while 1' ) \
+	| dd bs=1M count=32 iflag=fullblock > $@
 
 boot/u-boot.boot.img: boot/u-boot.boot
-	mkimage -T script -C none -n 'u-boot boot script' -d boot/u-boot.boot boot/u-boot.boot.img
+	mkimage \
+		-T script \
+		-C none \
+		-n 'u-boot boot script' \
+		-d $< \
+		$@
 
-linux/.config: linux.config
-	cp -v $(<) $(@)
-
-boot/zImage: linux/.config
-	make -C linux/ CROSS_COMPILE=arm-none-eabi- ARCH=arm -j3
-	cp linux/arch/arm/boot/zImage boot/
+boot/zImage: linux.config
+	$(MAKE) $(MAKE_JOBS) \
+		-C linux/ \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		KCONFIG_CONFIG="../$<" \
+		ARCH=$(ARCH)
+	cp linux/arch/$(ARCH)/boot/zImage $@
 
 boot/f06c-leopard-ddr3.dtb: platform/f06c-leopard-ddr3.dts
-	cpp -nostdinc -I linux/arch/arm/boot/dts/ -I linux/include \
-		-undef -x assembler-with-cpp $(<) | dtc -O dtb -o $(@) -
+	cpp \
+		-nostdinc \
+		-I linux/arch/$(ARCH)/boot/dts/ \
+		-I linux/include \
+		-undef \
+		-x assembler-with-cpp \
+		$< \
+	| dtc -O dtb -o $@ -
 
 boot.ubifs.img: boot/u-boot.boot.img boot/zImage boot/f06c-leopard-ddr3.dtb boot/u-boot.env
 	mkfs.ubifs -r boot -m 1 -e ${LEB} -c 64 -o $(@)
@@ -43,22 +58,31 @@ u-boot/.config: u-boot.config
 	cp -v u-boot.config u-boot/.config
 
 u-boot/u-boot.bin: u-boot/.config
-	make -C u-boot -j8 CC=arm-linux-gnueabi-gcc LD=arm-linux-gnueabi-ld OBJCOPY=arm-linux-gnueabi-objcopy
+	$(MAKE) $(MAKE_JOBS) \
+		-C u-boot \
+		CROSS_COMPILE=$(CROSS_COMPILE)
 
 u-boot/u-boot-512.bin: u-boot/u-boot.bin
-	( cat "$@" ; perl -e 'print chr(0xFF)x1024 while 1' ) \
-	| dd bs=1K count=512 iflag=fullblock > "$@"
+	( cat $^ ; perl -e 'print chr(0xFF)x1024 while 1' ) \
+	| dd bs=1K count=512 iflag=fullblock > $@
 
 sim: flash.img
-	qemu-system-arm -m 256 -M palmetto-bmc -nographic -drive file=$(<),format=raw,if=mtd
+	qemu-system-arm \
+		-m 256 \
+		-M palmetto-bmc \
+		-nographic \
+		-drive file=$<,format=raw,if=mtd \
+	stty sane
 
 u-root:
 	go get github.com/u-root/u-root
 	go build -o u-root github.com/u-root/u-root
 
 initramfs.cpio: u-root ssh_keys.pub
-	make -C cmd/uinit ssh_keys.go
-	GOARM=5 GOARCH=arm ./u-root -build=bb -o initramfs.cpio \
+	$(MAKE) -C cmd/uinit ssh_keys.go
+	GOARM=5 GOARCH=$(ARCH) ./u-root \
+		-build=bb \
+		-o initramfs.cpio \
 		github.com/u-root/u-root/cmds/*/ \
 		github.com/u-root/elvish \
 		github.com/u-root/u-bmc/cmd/*/
