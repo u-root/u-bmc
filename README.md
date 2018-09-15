@@ -54,6 +54,14 @@ echo This is extremely likely to break things as u-bmc is still experimental
 sudo ./socflash_x64 of=bmc-backup.img if=flash.img lpcport=0x2e option=gl
 ```
 
+# Updating Dependencies
+
+```
+Latest released version of dep is required:
+curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+dep ensure
+```
+
 # Contributions
 
 See [CONTRIBUTING.md](CONTRIBUTING.md)
