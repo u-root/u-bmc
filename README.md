@@ -14,7 +14,7 @@ Quanta F06 Leopard from Open Compute Project.
 
 # Roadmap
 
-This is to give you the reader some sence of what we want to create:
+This is to give you, the reader, some sense of what we want to create:
 
  * All function exported over GRPC like:
    * Serial-over-LAN
