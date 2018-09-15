@@ -130,55 +130,57 @@ func startGpio(c string) {
 
 	// TODO(bluecmd): These are motherboard specific, figure out how
 	// to have these configurable for other boards.
-	//go g.monitor([]string{
-	//	"CPU0_FIVR_FAULT_N",
-	//	"CPU0_PROCHOT_N",
-	//	"CPU0_THERMTRIP_N",
-	//	"CPU1_FIVR_FAULT_N",
-	//	"CPU1_PROCHOT_N",
-	//	"CPU1_THERMTRIP_N",
-	//	"CPU_CATERR_N",
-	//	"MB_SLOT_ID",
-	//	"MEMAB_MEMHOT_N",
-	//	"MEMCD_MEMHOT_N",
-	//	"MEMEF_MEMHOT_N",
-	//	"MEMGH_MEMHOT_N",
-	//	"NMI_BTN_N",
-	//	"PCH_BMC_THERMTRIP_N",
-	//	"PCH_PWR_OK",
-	//	"PWR_BTN_N",
-	//	"RST_BTN_N",
-	//	"SKU0",
-	//	"SKU1",
-	//	"SKU2",
-	//	"SKU3",
-	//	"SLP_S3_N",
-	//	"SPI_SEL",
-	//	"SYS_PWR_OK",
-	//	"SYS_THROTTLE",
-	//	"UNKN_M4",
-	//	"UNKN_M5",
-	//	"UNKN_N2",
-	//	"UNKN_N6",
-	//	"UNKN_N7",
-	//	"UNKN_P4",
-	//	"UNKN_P5",
-	//})
+	g.monitor([]string{
+		"PWR_BTN_N",
+		"RST_BTN_N",
+		"HAND_SW_ID1",
+		"HAND_SW_ID2",
+		"HAND_SW_ID3",
+		"HAND_SW_ID4",
+		"DEBUG_CARD_PRESENT_N",
+		"PRESENT_SLOT1_N",
+		"PRESENT_SLOT2_N",
+		"PRESENT_SLOT3_N",
+		"PRESENT_SLOT4_N",
+		"BIC_READY_SLOT1_N",
+		"BIC_READY_SLOT2_N",
+		"BIC_READY_SLOT3_N",
+		"BIC_READY_SLOT4_N",
+	})
 
-	//g.hog(map[string]bool{
-	//	"BMC_NMI_N":         true,
-	//	"BMC_RST_BTN_OUT_N": true,
-	//	"BMC_SMI_INT_N":     true,
-	//	"UNKN_E4":           true,
-	//	"UNKN_PWR_CAP":      true,
-	//	"BAT_DETECT":        false,
-	//	"BIOS_SEL":          false,
-	//	"FAST_PROCHOT":      false,
-	//	"PWR_LED_N":         false,
-	//	// TODO(bluecmd): Figure out what this controls
-	//	"UNKN_Q4": false,
-	//})
+	g.hog(map[string]bool{
+		"BMC_READY_N":             true,
+		"BMC_PWR_BTN_SLOT2_OUT_N": true,
+		"BMC_PWR_BTN_SLOT3_OUT_N": true,
+		"BMC_PWR_BTN_SLOT4_OUT_N": true,
+		"BMC_RST_BTN_SLOT1_OUT_N": true,
+		"BMC_RST_BTN_SLOT2_OUT_N": true,
+		"BMC_RST_BTN_SLOT3_OUT_N": true,
+		"BMC_RST_BTN_SLOT4_OUT_N": true,
+		"12V_EN_SLOT1_N": false,
+		"12V_EN_SLOT2_N": true,
+		"12V_EN_SLOT3_N": true,
+		"12V_EN_SLOT4_N": true,
+		"POSTCODE_0": true,
+		"POSTCODE_1": true,
+		"POSTCODE_2": true,
+		"POSTCODE_3": true,
+		"POSTCODE_4": true,
+		"POSTCODE_5": true,
+		"POSTCODE_6": true,
+		"POSTCODE_7": true,
+	})
 
-	//go g.managePowerButton("BMC_PWR_BTN_OUT_N")
-	//go g.manageClock("CPLD_CLK", time.Second)
+	go g.managePowerButton("BMC_PWR_BTN_SLOT1_OUT_N")
+	go g.manageClock("ID_LED_SLOT1_N", time.Millisecond * time.Duration(500))
+	go g.manageClock("ID_LED_SLOT2_N", time.Millisecond * time.Duration(1000))
+	go g.manageClock("ID_LED_SLOT3_N", time.Millisecond * time.Duration(1500))
+	go g.manageClock("ID_LED_SLOT4_N", time.Millisecond * time.Duration(2000))
+
+	go g.manageClock("PWR_LED_SLOT1_N", time.Millisecond * time.Duration(500))
+	go g.manageClock("PWR_LED_SLOT2_N", time.Millisecond * time.Duration(1000))
+	go g.manageClock("PWR_LED_SLOT3_N", time.Millisecond * time.Duration(1500))
+	go g.manageClock("PWR_LED_SLOT4_N", time.Millisecond * time.Duration(2000))
+
+	go g.manageClock("HEARTBEAT_LED", time.Millisecond * time.Duration(750))
 }
