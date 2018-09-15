@@ -63,10 +63,10 @@ jobs:
       - checkout
       - run:
           name: Test all
-          command: go test -a -ldflags '-s' ./pkg/... ./cmd/...
+          command: go test -a -ldflags '-s' $(go list ./... | grep -v github.com/u-root/u-bmc/cmd/uinit)
       - run:
           name: Test coverage
-          command: go test -cover ./pkg/... ./cmd/...
+          command: go test -cover $(go list ./... | grep -v github.com/u-root/u-bmc/cmd/uinit)
   race:
     docker:
       - image: circleci/golang:1.11
@@ -77,7 +77,7 @@ jobs:
       - checkout
       - run:
           name: Race detector
-          command: go test -race ./pkg/... ./cmd/...
+          command: go test -race $(go list ./... | grep -v github.com/u-root/u-bmc/cmd/uinit)
   compile:
     docker:
       - image: circleci/golang:1.11
@@ -90,4 +90,4 @@ jobs:
           name: build all commands
           command: |
             cd cmd
-            go install -a ./...
+            go install -a $(go list ./... | grep -v github.com/u-root/u-bmc/cmd/uinit)
