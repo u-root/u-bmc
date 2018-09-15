@@ -32,11 +32,25 @@ This is to give you, the reader, some sense of what we want to create:
 
 # Usage
 
+Prerequisites:
+```
+sudo apt-get install gcc-arm-none-eabi mtd-utils u-boot-tools golang-1.10
+
+# Until u-root vendoring is working properly, also grab:
+go get -u github.com/u-root/elvish
+go get -u github.com/mdlayher/genetlink
+go get -u google.golang.org/grpc
+```
+
 Clone:
 ```
-mkdir -p ~/go/src/github.com/u-root/u-bmc
-git clone --recursive https://github.com/u-root/u-bmc ~/go/src/github.com/u-root/u-bmc
+go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
+git submodule init && git submodule update
+```
+
+Setup:
+```
 # SSH ECDSA public keys does not work for now
 cp ~/.ssh/id_rsa.pub ssh_keys.pub
 fakeroot make
