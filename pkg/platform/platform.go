@@ -58,10 +58,10 @@ var (
 		"BIC_READY_SLOT2_N":       ast2400.GpioPort("N2"),
 		"BIC_READY_SLOT3_N":       ast2400.GpioPort("N5"),
 		"BIC_READY_SLOT4_N":       ast2400.GpioPort("N4"),
-		"12V_EN_SLOT1_N":          ast2400.GpioPort("O5"),
-		"12V_EN_SLOT2_N":          ast2400.GpioPort("O4"),
-		"12V_EN_SLOT3_N":          ast2400.GpioPort("O7"),
-		"12V_EN_SLOT4_N":          ast2400.GpioPort("O6"),
+		"12V_EN_SLOT1":          ast2400.GpioPort("O5"),
+		"12V_EN_SLOT2":          ast2400.GpioPort("O4"),
+		"12V_EN_SLOT3":          ast2400.GpioPort("O7"),
+		"12V_EN_SLOT4":          ast2400.GpioPort("O6"),
 	}
 
 	// Reverse map of linePortMap
