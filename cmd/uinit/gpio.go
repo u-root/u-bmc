@@ -130,55 +130,55 @@ func startGpio(c string) {
 
 	// TODO(bluecmd): These are motherboard specific, figure out how
 	// to have these configurable for other boards.
-	go g.monitor([]string{
-		"CPU0_FIVR_FAULT_N",
-		"CPU0_PROCHOT_N",
-		"CPU0_THERMTRIP_N",
-		"CPU1_FIVR_FAULT_N",
-		"CPU1_PROCHOT_N",
-		"CPU1_THERMTRIP_N",
-		"CPU_CATERR_N",
-		"MB_SLOT_ID",
-		"MEMAB_MEMHOT_N",
-		"MEMCD_MEMHOT_N",
-		"MEMEF_MEMHOT_N",
-		"MEMGH_MEMHOT_N",
-		"NMI_BTN_N",
-		"PCH_BMC_THERMTRIP_N",
-		"PCH_PWR_OK",
-		"PWR_BTN_N",
-		"RST_BTN_N",
-		"SKU0",
-		"SKU1",
-		"SKU2",
-		"SKU3",
-		"SLP_S3_N",
-		"SPI_SEL",
-		"SYS_PWR_OK",
-		"SYS_THROTTLE",
-		"UNKN_M4",
-		"UNKN_M5",
-		"UNKN_N2",
-		"UNKN_N6",
-		"UNKN_N7",
-		"UNKN_P4",
-		"UNKN_P5",
-	})
+	//go g.monitor([]string{
+	//	"CPU0_FIVR_FAULT_N",
+	//	"CPU0_PROCHOT_N",
+	//	"CPU0_THERMTRIP_N",
+	//	"CPU1_FIVR_FAULT_N",
+	//	"CPU1_PROCHOT_N",
+	//	"CPU1_THERMTRIP_N",
+	//	"CPU_CATERR_N",
+	//	"MB_SLOT_ID",
+	//	"MEMAB_MEMHOT_N",
+	//	"MEMCD_MEMHOT_N",
+	//	"MEMEF_MEMHOT_N",
+	//	"MEMGH_MEMHOT_N",
+	//	"NMI_BTN_N",
+	//	"PCH_BMC_THERMTRIP_N",
+	//	"PCH_PWR_OK",
+	//	"PWR_BTN_N",
+	//	"RST_BTN_N",
+	//	"SKU0",
+	//	"SKU1",
+	//	"SKU2",
+	//	"SKU3",
+	//	"SLP_S3_N",
+	//	"SPI_SEL",
+	//	"SYS_PWR_OK",
+	//	"SYS_THROTTLE",
+	//	"UNKN_M4",
+	//	"UNKN_M5",
+	//	"UNKN_N2",
+	//	"UNKN_N6",
+	//	"UNKN_N7",
+	//	"UNKN_P4",
+	//	"UNKN_P5",
+	//})
 
-	g.hog(map[string]bool{
-		"BMC_NMI_N":         true,
-		"BMC_RST_BTN_OUT_N": true,
-		"BMC_SMI_INT_N":     true,
-		"UNKN_E4":           true,
-		"UNKN_PWR_CAP":      true,
-		"BAT_DETECT":        false,
-		"BIOS_SEL":          false,
-		"FAST_PROCHOT":      false,
-		"PWR_LED_N":         false,
-		// TODO(bluecmd): Figure out what this controls
-		"UNKN_Q4": false,
-	})
+	//g.hog(map[string]bool{
+	//	"BMC_NMI_N":         true,
+	//	"BMC_RST_BTN_OUT_N": true,
+	//	"BMC_SMI_INT_N":     true,
+	//	"UNKN_E4":           true,
+	//	"UNKN_PWR_CAP":      true,
+	//	"BAT_DETECT":        false,
+	//	"BIOS_SEL":          false,
+	//	"FAST_PROCHOT":      false,
+	//	"PWR_LED_N":         false,
+	//	// TODO(bluecmd): Figure out what this controls
+	//	"UNKN_Q4": false,
+	//})
 
-	go g.managePowerButton("BMC_PWR_BTN_OUT_N")
-	go g.manageClock("CPLD_CLK", time.Second)
+	//go g.managePowerButton("BMC_PWR_BTN_OUT_N")
+	//go g.manageClock("CPLD_CLK", time.Second)
 }
