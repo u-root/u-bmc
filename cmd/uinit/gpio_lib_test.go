@@ -16,12 +16,10 @@ func TestDecode(t *testing.T) {
 	f := bytes.NewBuffer(a)
 	err := binary.Read(f, binary.LittleEndian, &e)
 	if err != nil {
-		t.Errorf("Failed at decoding: %v\n")
+		t.Errorf("Failed at decoding: %v\n", err)
 	}
 
 	if e.Id != GPIOEVENT_EVENT_RISING_EDGE {
 		t.Errorf("expected %d, got %d\n", GPIOEVENT_EVENT_RISING_EDGE, e.Id)
 	}
 }
-
-

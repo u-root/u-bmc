@@ -14,7 +14,7 @@ Quanta F06 Leopard from Open Compute Project.
 
 # Roadmap
 
-This is to give you the reader some sence of what we want to create:
+This is to give you, the reader, some sense of what we want to create:
 
  * All function exported over GRPC like:
    * Serial-over-LAN
@@ -32,11 +32,13 @@ This is to give you the reader some sence of what we want to create:
 
 # Usage
 
+Clone:
 ```
+mkdir -p ~/go/src/github.com/u-root/u-bmc
+git clone --recursive https://github.com/u-root/u-bmc ~/go/src/github.com/u-root/u-bmc
+cd ~/go/src/github.com/u-root/u-bmc
 # SSH ECDSA public keys does not work for now
 cp ~/.ssh/id_rsa.pub ssh_keys.pub
-git clone https://github.com/u-root/u-bmc
-cd u-bmc
 fakeroot make
 ```
 
@@ -50,6 +52,14 @@ can use socflash\_x64 provided by ASPEED like this:
 ```
 echo This is extremely likely to break things as u-bmc is still experimental
 sudo ./socflash_x64 of=bmc-backup.img if=flash.img lpcport=0x2e option=gl
+```
+
+# Updating Dependencies
+
+```
+Latest released version of dep is required:
+curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+dep ensure
 ```
 
 # Contributions
