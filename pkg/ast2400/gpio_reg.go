@@ -385,7 +385,7 @@ func (a *Ast) SnapshotGpio() *state {
 func GpioPort(n string) uint32 {
 	n = strings.ToUpper(n)
 	idx := uint32(0)
-	off := -1
+	var off int
 	if strings.HasPrefix(n, "AA") {
 		idx = 26 * 8
 		off = 2
