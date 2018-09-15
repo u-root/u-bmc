@@ -3,4 +3,4 @@
 	url = https://github.com/bluecmd/u-boot.git
 [submodule "linux"]
 	path = linux
-	url = github.com:openbmc/linux.git
+	url = https://github.com/openbmc/linux.git
