@@ -150,15 +150,15 @@ func startGpio(c string) {
 
 	g.hog(map[string]bool{
 		"BMC_READY_N":             true,
-		"BMC_PWR_BTN_SLOT2_OUT_N": true,
+		"BMC_PWR_BTN_SLOT1_OUT_N": true,
 		"BMC_PWR_BTN_SLOT3_OUT_N": true,
 		"BMC_PWR_BTN_SLOT4_OUT_N": true,
 		"BMC_RST_BTN_SLOT1_OUT_N": true,
 		"BMC_RST_BTN_SLOT2_OUT_N": true,
 		"BMC_RST_BTN_SLOT3_OUT_N": true,
 		"BMC_RST_BTN_SLOT4_OUT_N": true,
-		"12V_EN_SLOT1": true,
-		"12V_EN_SLOT2": false,
+		"12V_EN_SLOT1": false,
+		"12V_EN_SLOT2": true,
 		"12V_EN_SLOT3": false,
 		"12V_EN_SLOT4": false,
 		"POSTCODE_0": true,
@@ -171,7 +171,7 @@ func startGpio(c string) {
 		"POSTCODE_7": true,
 	})
 
-	go g.managePowerButton("BMC_PWR_BTN_SLOT1_OUT_N")
+	go g.managePowerButton("BMC_PWR_BTN_SLOT2_OUT_N")
 	go g.manageClock("ID_LED_SLOT1_N", time.Millisecond * time.Duration(500))
 	go g.manageClock("ID_LED_SLOT2_N", time.Millisecond * time.Duration(1000))
 	go g.manageClock("ID_LED_SLOT3_N", time.Millisecond * time.Duration(1500))
