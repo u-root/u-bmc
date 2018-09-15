@@ -8,7 +8,8 @@ LEB=65408
 .PHONY: sim
 
 flash.img: u-boot/u-boot-512.bin ubi.img
-	bash -c "dd if=<(cat u-boot/u-boot-512.bin ubi.img /dev/zero) of=$(@) bs=1024 count=32768"
+	( cat "$@" ; perl -e 'print chr(0xFF)x1024 while 1' ) \
+	| dd bs=1M count=32 iflag=fullblock > "$@"
 
 boot/u-boot.boot.img: boot/u-boot.boot
 	mkimage -T script -C none -n 'u-boot boot script' -d boot/u-boot.boot boot/u-boot.boot.img
@@ -45,7 +46,8 @@ u-boot/u-boot.bin: u-boot/.config
 	make -C u-boot -j8 CC=arm-linux-gnueabi-gcc LD=arm-linux-gnueabi-ld OBJCOPY=arm-linux-gnueabi-objcopy
 
 u-boot/u-boot-512.bin: u-boot/u-boot.bin
-	bash -c "dd if=<(cat $(<) /dev/zero) of=$(@) bs=1024 count=512"
+	( cat "$@" ; perl -e 'print chr(0xFF)x1024 while 1' ) \
+	| dd bs=1K count=512 iflag=fullblock > "$@"
 
 sim: flash.img
 	qemu-system-arm -m 256 -M palmetto-bmc -nographic -drive file=$(<),format=raw,if=mtd
