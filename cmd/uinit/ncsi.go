@@ -161,6 +161,6 @@ func startNcsi(iface string) {
 		// TODO(bluecmd): We will only do this once for now
 		// The idea is to have this as a GRPC call instead.
 		break
-		time.Sleep(5 * time.Second)
+		//time.Sleep(5 * time.Second)
 	}
 }
