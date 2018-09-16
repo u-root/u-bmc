@@ -6,5 +6,6 @@ build/*
 .*.sw*
 root/
 initramfs.cpio
+initramfs.cpio.tmp
 ssh_keys.pub
 u-root
