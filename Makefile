@@ -1,5 +1,5 @@
 # Copyright 2018 u-root Authors
-# 
+#
 # Use of this source code is governed by a BSD-style
 # license that can be found in the LICENSE file
 
@@ -82,10 +82,11 @@ initramfs.cpio: u-root ssh_keys.pub
 	$(MAKE) -C cmd/uinit ssh_keys.go
 	GOARM=5 GOARCH=$(ARCH) ./u-root \
 		-build=bb \
-		-o initramfs.cpio \
+		-o "$@.tmp" \
 		github.com/u-root/u-root/cmds/*/ \
 		github.com/u-root/elvish \
 		github.com/u-root/u-bmc/cmd/*/
+	mv "$@.tmp" "$@"
 
 clean:
 	\rm -f initramfs.cpio u-root \
