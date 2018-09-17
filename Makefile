@@ -71,7 +71,7 @@ sim: flash.img
 		-m 256 \
 		-M palmetto-bmc \
 		-nographic \
-		-drive file=$<,format=raw,if=mtd \
+		-drive file=$<,format=raw,if=mtd
 	stty sane
 
 u-root:
