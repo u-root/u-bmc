@@ -28,8 +28,8 @@ func TestGpioPort(t *testing.T) {
 }
 
 func TestGpioBecomeHighChange(t *testing.T) {
-	s1 := &state{make(map[uint32]uint32)}
-	s2 := &state{make(map[uint32]uint32)}
+	s1 := &state{make(map[uint32]uint32), make(map[uint32]uint32)}
+	s2 := &state{make(map[uint32]uint32), make(map[uint32]uint32)}
 
 	// Configure port I3 as output with low output
 	s1.r[0x070] = 0
@@ -40,7 +40,7 @@ func TestGpioBecomeHighChange(t *testing.T) {
 	s2.r[0x074] = 0x8
 
 	if s1.Equal(s2) {
-		t.Fatalf("s1 should not equal s2n")
+		t.Fatalf("s1 should not equal s2")
 	}
 
 	d := s2.Diff(s1)
@@ -52,8 +52,8 @@ func TestGpioBecomeHighChange(t *testing.T) {
 }
 
 func TestGpioBecomeOutputChange(t *testing.T) {
-	s1 := &state{make(map[uint32]uint32)}
-	s2 := &state{make(map[uint32]uint32)}
+	s1 := &state{make(map[uint32]uint32), make(map[uint32]uint32)}
+	s2 := &state{make(map[uint32]uint32), make(map[uint32]uint32)}
 
 	// Configure port I3 as input with high input
 	s1.r[0x070] = 0x8
@@ -64,11 +64,31 @@ func TestGpioBecomeOutputChange(t *testing.T) {
 	s2.r[0x074] = 0x8
 
 	if s1.Equal(s2) {
-		t.Fatalf("s1 should not equal s2n")
+		t.Fatalf("s1 should not equal s2")
 	}
 
 	d := s2.Diff(s1)
 	expected := []lineState{{GpioPort("I3"), LINE_STATE_BECAME_OUTPUT}}
+
+	if !reflect.DeepEqual(d, expected) {
+		t.Errorf("Diff is not as expected, is %v, expected %v", d, expected)
+	}
+}
+
+func TestScuChange(t *testing.T) {
+	s1 := &state{make(map[uint32]uint32), make(map[uint32]uint32)}
+	s2 := &state{make(map[uint32]uint32), make(map[uint32]uint32)}
+
+	// Configure SCU 0x80 to change
+	s1.scu[0x080] = 0x8
+	s2.scu[0x080] = 0x10
+
+	if s1.Equal(s2) {
+		t.Fatalf("s1 should not equal s2")
+	}
+
+	d := s2.Diff(s1)
+	expected := []lineState{{0x80, LINE_STATE_SCU_CHANGED}}
 
 	if !reflect.DeepEqual(d, expected) {
 		t.Errorf("Diff is not as expected, is %v, expected %v", d, expected)

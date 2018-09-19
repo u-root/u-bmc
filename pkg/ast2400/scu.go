@@ -4,6 +4,59 @@
 
 package ast2400
 
+var (
+	scuRegs = map[uint32]string{
+		0x00:  "Protection Key Register",
+		0x04:  "System Reset Control Register",
+		0x08:  "Clock Selection Register",
+		0x0C:  "Clock Stop Control Register",
+		0x10:  "Frequency Counter Control Register",
+		0x14:  "Frequency Counter Measurement Register",
+		0x18:  "Interrupt Control and Status Register",
+		0x1C:  "D2-PLL Parameter Register",
+		0x20:  "M-PLL Parameter Register",
+		0x24:  "H-PLL Parameter Register",
+		0x28:  "Frequency counter comparison range",
+		0x2C:  "Misc. Control Register",
+		0x30:  "PCI Configuration Setting Register #1",
+		0x34:  "PCI Configuration Setting Register #2",
+		0x38:  "PCI Configuration Setting Register #3",
+		0x3C:  "System Reset Control/Status Register",
+		0x40:  "SOC Scratch Register #1",
+		0x44:  "SOC Scratch Register #2",
+		0x48:  "MAC Interface Clock Delay Setting",
+		0x4C:  "Misc. 2 Control Register",
+		0x50:  "VGA Scratch Register #1",
+		0x54:  "VGA Scratch Register #2",
+		0x58:  "VGA Scratch Register #3",
+		0x5C:  "VGA Scratch Register #4",
+		0x60:  "VGA Scratch Register #5",
+		0x64:  "VGA Scratch Register #6",
+		0x68:  "VGA Scratch Register #7",
+		0x6C:  "VGA Scratch Register #8",
+		0x70:  "Hardware Strapping Register",
+		0x74:  "Random Number Generator Control",
+		0x78:  "Random Number Generator Data Output",
+		0x7C:  "Silicon Revision ID Register",
+		0x80:  "Multi-function Pin Control #1",
+		0x84:  "Multi-function Pin Control #2",
+		0x88:  "Multi-function Pin Control #3",
+		0x8C:  "Multi-function Pin Control #4",
+		0x90:  "Multi-function Pin Control #5",
+		0x94:  "Multi-function Pin Control #6",
+		0x9C:  "Watchdog Reset Selection",
+		0xA0:  "Multi-function Pin Control #7",
+		0xA4:  "Multi-function Pin Control #8",
+		0xA8:  "Multi-function Pin Control #9",
+		0xC0:  "Power Saving Wakeup Enable Register",
+		0xC4:  "Power Saving Wakeup Control Register",
+		0xD0:  "Hardware Strapping Register Set 2",
+		0xE0:  "SCU Free Run Counter Read Back #4",
+		0xE4:  "SCU Free Run Counter Extended Read Back #4",
+		0x100: "Coprocessor (CPU2) Control Register",
+	}
+)
+
 const (
 	// This is a static number that acts as a password to prevent
 	// accidental memory writes that would screw up the system.
@@ -116,4 +169,8 @@ func (a *Ast) SetResetControl(v uint32) {
 	defer a.lockScuWriteAccess()
 	// SCU04: System Reset Control Register
 	a.Mem().MustWrite32(SCU_BASE+0x4, v)
+}
+
+func ScuRegisterToFunction(r uint32) string {
+	return scuRegs[r]
 }
