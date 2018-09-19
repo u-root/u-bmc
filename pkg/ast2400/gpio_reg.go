@@ -270,6 +270,14 @@ var (
 		0x1E0: {[]gpioRegSet{{"Y", 4}, {"", 4}, {"Z", 8}, {"AA", 8}, {"AB", 4}}},
 	}
 
+	// List of SCUs that could be remotely interesting for GPIO purposes
+	scuGpioRegs = []uint32{
+		0x08, 0x0c, 0x10, 0x14, 0x18, 0x1c, 0x20, 0x24, 0x28,
+		0x2c, 0x30, 0x34, 0x38, 0x3c, 0x4c, 0x70, 0x74, 0x7c,
+		0x80, 0x84, 0x88, 0x8c, 0x90, 0x94, 0x9c, 0xa0, 0xa4,
+		0xa8, 0xc0, 0xc4, 0xd0,
+	}
+
 	LINE_STATE_INPUT         = 0
 	LINE_STATE_OUTPUT        = 1
 	LINE_STATE_BECAME_INPUT  = 2
@@ -277,12 +285,16 @@ var (
 	LINE_STATE_LOW           = 4
 	LINE_STATE_HIGH          = 5
 	// Since this is a sampled system let's not call it rising edge/falling edge
-	LINE_STATE_BECAME_LOW    = 6
-	LINE_STATE_BECAME_HIGH   = 7
+	LINE_STATE_BECAME_LOW  = 6
+	LINE_STATE_BECAME_HIGH = 7
+	// SCUs control many aspects of what pins do, so track them
+	LINE_STATE_SCU         = 8
+	LINE_STATE_SCU_CHANGED = 9
 )
 
 type state struct {
-	r map[uint32]uint32
+	r   map[uint32]uint32
+	scu map[uint32]uint32
 }
 
 func (s *state) List() []lineState {
@@ -344,14 +356,50 @@ func (s *state) diff(b *state) []lineState {
 			bo += set.pins
 		}
 	}
+
+	for _, scu := range scuGpioRegs {
+		if b == nil {
+			res = append(res, lineState{scu, LINE_STATE_SCU})
+		} else if s.scu[scu] != b.scu[scu] {
+			res = append(res, lineState{scu, LINE_STATE_SCU_CHANGED})
+		}
+	}
+
 	return res
 }
 
-func (s *state) Equal(b *state) bool {
-	if len(b.r) != len(s.r) {
-		return false
+func (s *state) Scu(scu uint32) uint32 {
+	return s.scu[scu]
+}
+
+func (s *state) PortValue(port uint32) bool {
+	tset, tpin := portToSetPin(port)
+	for a, r := range gpioDataRegs {
+		bo := 0
+		for _, set := range r.sets {
+			if set.set != tset {
+				bo += set.pins
+				continue
+			}
+			bit := uint(bo + tpin)
+			high := (s.r[a] & (1 << bit)) != 0
+			return high
+		}
 	}
+	panic("Unknown port")
+}
+
+func (s *state) Equal(b *state) bool {
 	for r, c := range b.r {
+		v, ok := s.r[r]
+		if !ok {
+			return false
+		}
+		if v != c {
+			return false
+		}
+	}
+	for r, c := range b.scu {
 		v, ok := s.r[r]
 		if !ok {
 			return false
@@ -372,11 +420,15 @@ func (a *Ast) SnapshotGpio() *state {
 
 	s := state{}
 	s.r = make(map[uint32]uint32)
+	s.scu = make(map[uint32]uint32)
 	for r, _ := range gpioDirRegs {
 		s.r[r] = a.Mem().MustRead32(base + uintptr(r))
 	}
 	for r, _ := range gpioDataRegs {
 		s.r[r] = a.Mem().MustRead32(base + uintptr(r))
+	}
+	for _, r := range scuGpioRegs {
+		s.scu[r] = a.Mem().MustRead32(SCU_BASE + uintptr(r))
 	}
 	return &s
 }
@@ -404,14 +456,19 @@ func GpioPort(n string) uint32 {
 	return idx
 }
 
-func GpioPortToName(p uint32) string {
-	if p >= 27 * 8 {
-		return fmt.Sprintf("AB%d", p - 27 * 8)
-	} else if p >= 26 * 8 {
-		return fmt.Sprintf("AA%d", p - 26 * 8)
+func portToSetPin(p uint32) (string, int) {
+	if p >= 27*8 {
+		return "AB", int(p - 27*8)
+	} else if p >= 26*8 {
+		return "AA", int(p - 26*8)
 	} else {
-		return fmt.Sprintf("%c%d", 'A' + p / 8, p % 8)
+		return fmt.Sprintf("%c", 'A'+p/8), int(p % 8)
 	}
+}
+
+func GpioPortToName(p uint32) string {
+	set, pin := portToSetPin(p)
+	return fmt.Sprintf("%s%d", set, pin)
 }
 
 func GpioPortToFunction(p uint32) string {
@@ -420,10 +477,10 @@ func GpioPortToFunction(p uint32) string {
 
 func setPinToPort(set string, port int) uint32 {
 	if set == "AB" {
-		return uint32(27 * 8 + port)
+		return uint32(27*8 + port)
 	} else if set == "AA" {
-		return uint32(26 * 8 + port)
+		return uint32(26*8 + port)
 	} else {
-		return uint32(int(set[0] - 'A') * 8 + port)
+		return uint32(int(set[0]-'A')*8 + port)
 	}
 }
