@@ -6,7 +6,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -36,14 +35,6 @@ func main() {
 
 	log.SetOutput(os.Stdout)
 
-	// Dump multifunction pin setup
-	fmt.Printf("SCU80: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x80))
-	fmt.Printf("SCU84: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x84))
-	fmt.Printf("SCU88: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x88))
-	fmt.Printf("SCU8C: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x8C))
-	fmt.Printf("SCU90: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x90))
-	fmt.Printf("SCU94: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x94))
-
 	_ = platform.LinePortMap()
 
 	p := a.SnapshotGpio()
@@ -59,6 +50,8 @@ func main() {
 			log.Printf("%-30s high (output: %v)\n", portName(g.Port), dir[g.Port])
 		} else if g.State == ast2400.LINE_STATE_LOW {
 			log.Printf("%-30s low  (output: %v)\n", portName(g.Port), dir[g.Port])
+		} else if g.State == ast2400.LINE_STATE_SCU {
+			log.Printf("SCU%02x is %08x (description: %s)\n", g.Port, p.Scu(g.Port), ast2400.ScuRegisterToFunction(g.Port))
 		}
 	}
 	for {
@@ -70,13 +63,25 @@ func main() {
 					continue
 				}
 				if g.State == ast2400.LINE_STATE_BECAME_INPUT {
-					log.Printf("%-30s became input\n", portName(g.Port))
+					dir[g.Port] = false
+					log.Printf("%-30s became input (value: %v)\n", portName(g.Port), s.PortValue(g.Port))
 				} else if g.State == ast2400.LINE_STATE_BECAME_OUTPUT {
-					log.Printf("%-30s became output\n", portName(g.Port))
+					dir[g.Port] = true
+					log.Printf("%-30s became output (value: %v)\n", portName(g.Port), s.PortValue(g.Port))
 				} else if g.State == ast2400.LINE_STATE_BECAME_HIGH {
-					log.Printf("%-30s became high\n", portName(g.Port))
+					if dir[g.Port] {
+						log.Printf("%-30s driving high\n", portName(g.Port))
+					} else {
+						log.Printf("%-30s sensing high\n", portName(g.Port))
+					}
 				} else if g.State == ast2400.LINE_STATE_BECAME_LOW {
-					log.Printf("%-30s became low\n", portName(g.Port))
+					if dir[g.Port] {
+						log.Printf("%-30s driving low\n", portName(g.Port))
+					} else {
+						log.Printf("%-30s sensing low\n", portName(g.Port))
+					}
+				} else if g.State == ast2400.LINE_STATE_SCU_CHANGED {
+					log.Printf("SCU%02x is now %08x\n", g.Port, s.Scu(g.Port))
 				}
 			}
 		}
@@ -85,7 +90,6 @@ func main() {
 	}
 }
 
-
 func portName(p uint32) string {
 	n, ok := platform.GpioPortToName(p)
 	if !ok {
@@ -93,4 +97,3 @@ func portName(p uint32) string {
 	}
 	return n
 }
-
