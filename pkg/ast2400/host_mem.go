@@ -88,5 +88,5 @@ func (m *hostMem) MustWrite8(address uintptr, data uint8) {
 }
 
 func (m *hostMem) Close() {
-	m.Close()
+	m.mf.Close()
 }
