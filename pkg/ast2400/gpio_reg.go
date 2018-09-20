@@ -25,7 +25,7 @@ type gpioReg struct {
 	sets []gpioRegSet
 }
 
-type lineState struct {
+type LineState struct {
 	Port  uint32
 	State int
 }
@@ -292,18 +292,18 @@ var (
 	LINE_STATE_SCU_CHANGED = 9
 )
 
-type state struct {
-	r   map[uint32]uint32
-	scu map[uint32]uint32
+type State struct {
+	Gpio map[uint32]uint32
+	Scu  map[uint32]uint32
 }
 
-func (s *state) List() []lineState {
+func (s *State) List() []LineState {
 	return s.diff(nil)
 }
 
-func (s *state) diff(b *state) []lineState {
+func (s *State) diff(b *State) []LineState {
 	dirs := make(map[uint32]bool)
-	res := make([]lineState, 0)
+	res := make([]LineState, 0)
 
 	for a, r := range gpioDirRegs {
 		bo := 0
@@ -311,20 +311,20 @@ func (s *state) diff(b *state) []lineState {
 			for pin := 0; pin < set.pins; pin++ {
 				bit := uint(bo + pin)
 				port := setPinToPort(set.set, pin)
-				output := (s.r[a] & (1 << bit)) != 0
+				output := (s.Gpio[a] & (1 << bit)) != 0
 				dirs[port] = output
 				if b == nil {
 					if output {
-						res = append(res, lineState{port, LINE_STATE_OUTPUT})
+						res = append(res, LineState{port, LINE_STATE_OUTPUT})
 					} else {
-						res = append(res, lineState{port, LINE_STATE_INPUT})
+						res = append(res, LineState{port, LINE_STATE_INPUT})
 					}
 				}
-				if b != nil && output != ((b.r[a]&(1<<bit)) != 0) {
+				if b != nil && output != ((b.Gpio[a]&(1<<bit)) != 0) {
 					if output {
-						res = append(res, lineState{port, LINE_STATE_BECAME_OUTPUT})
+						res = append(res, LineState{port, LINE_STATE_BECAME_OUTPUT})
 					} else {
-						res = append(res, lineState{port, LINE_STATE_BECAME_INPUT})
+						res = append(res, LineState{port, LINE_STATE_BECAME_INPUT})
 					}
 				}
 			}
@@ -338,18 +338,18 @@ func (s *state) diff(b *state) []lineState {
 			for pin := 0; pin < set.pins && set.set != ""; pin++ {
 				bit := uint(bo + pin)
 				port := setPinToPort(set.set, pin)
-				high := (s.r[a] & (1 << bit)) != 0
+				high := (s.Gpio[a] & (1 << bit)) != 0
 				if b == nil {
 					if high {
-						res = append(res, lineState{port, LINE_STATE_HIGH})
+						res = append(res, LineState{port, LINE_STATE_HIGH})
 					} else {
-						res = append(res, lineState{port, LINE_STATE_LOW})
+						res = append(res, LineState{port, LINE_STATE_LOW})
 					}
-				} else if high != ((b.r[a] & (1 << bit)) != 0) {
+				} else if high != ((b.Gpio[a] & (1 << bit)) != 0) {
 					if high {
-						res = append(res, lineState{port, LINE_STATE_BECAME_HIGH})
+						res = append(res, LineState{port, LINE_STATE_BECAME_HIGH})
 					} else {
-						res = append(res, lineState{port, LINE_STATE_BECAME_LOW})
+						res = append(res, LineState{port, LINE_STATE_BECAME_LOW})
 					}
 				}
 			}
@@ -359,20 +359,16 @@ func (s *state) diff(b *state) []lineState {
 
 	for _, scu := range scuGpioRegs {
 		if b == nil {
-			res = append(res, lineState{scu, LINE_STATE_SCU})
-		} else if s.scu[scu] != b.scu[scu] {
-			res = append(res, lineState{scu, LINE_STATE_SCU_CHANGED})
+			res = append(res, LineState{scu, LINE_STATE_SCU})
+		} else if s.Scu[scu] != b.Scu[scu] {
+			res = append(res, LineState{scu, LINE_STATE_SCU_CHANGED})
 		}
 	}
 
 	return res
 }
 
-func (s *state) Scu(scu uint32) uint32 {
-	return s.scu[scu]
-}
-
-func (s *state) PortValue(port uint32) bool {
+func (s *State) PortValue(port uint32) bool {
 	tset, tpin := portToSetPin(port)
 	for a, r := range gpioDataRegs {
 		bo := 0
@@ -382,16 +378,16 @@ func (s *state) PortValue(port uint32) bool {
 				continue
 			}
 			bit := uint(bo + tpin)
-			high := (s.r[a] & (1 << bit)) != 0
+			high := (s.Gpio[a] & (1 << bit)) != 0
 			return high
 		}
 	}
 	panic("Unknown port")
 }
 
-func (s *state) Equal(b *state) bool {
-	for r, c := range b.r {
-		v, ok := s.r[r]
+func (s *State) Equal(b *State) bool {
+	for r, c := range b.Gpio {
+		v, ok := s.Gpio[r]
 		if !ok {
 			return false
 		}
@@ -399,8 +395,8 @@ func (s *state) Equal(b *state) bool {
 			return false
 		}
 	}
-	for r, c := range b.scu {
-		v, ok := s.r[r]
+	for r, c := range b.Scu {
+		v, ok := s.Scu[r]
 		if !ok {
 			return false
 		}
@@ -411,24 +407,24 @@ func (s *state) Equal(b *state) bool {
 	return true
 }
 
-func (s *state) Diff(b *state) []lineState {
+func (s *State) Diff(b *State) []LineState {
 	return s.diff(b)
 }
 
-func (a *Ast) SnapshotGpio() *state {
+func (a *Ast) SnapshotGpio() *State {
 	base := uintptr(0x1e780000)
 
-	s := state{}
-	s.r = make(map[uint32]uint32)
-	s.scu = make(map[uint32]uint32)
+	s := State{}
+	s.Gpio = make(map[uint32]uint32)
+	s.Scu = make(map[uint32]uint32)
 	for r, _ := range gpioDirRegs {
-		s.r[r] = a.Mem().MustRead32(base + uintptr(r))
+		s.Gpio[r] = a.Mem().MustRead32(base + uintptr(r))
 	}
 	for r, _ := range gpioDataRegs {
-		s.r[r] = a.Mem().MustRead32(base + uintptr(r))
+		s.Gpio[r] = a.Mem().MustRead32(base + uintptr(r))
 	}
 	for _, r := range scuGpioRegs {
-		s.scu[r] = a.Mem().MustRead32(SCU_BASE + uintptr(r))
+		s.Scu[r] = a.Mem().MustRead32(SCU_BASE + uintptr(r))
 	}
 	return &s
 }
