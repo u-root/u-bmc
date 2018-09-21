@@ -1,6 +1,3 @@
-// TODO(bluecmd): This is based from rendered DTB from Palmetto
-// A lot of things are probably wrong for Leopard
-
 // SPDX-License-Identifier: GPL-2.0+
 /dts-v1/;
 
@@ -8,7 +5,7 @@
 #include <dt-bindings/gpio/aspeed-gpio.h>
 
 / {
-	model = "F06C QCT Leopard BMC";
+	model = "Quanta F06 Leopard DDR3 BMC";
 	compatible = "ocp,leopard-bmc", "aspeed,ast2400";
 
 	chosen {
@@ -19,43 +16,6 @@
 	memory@40000000 {
 		reg = <0x40000000 0x20000000>;
 	};
-
-	reserved-memory {
-		#address-cells = <1>;
-		#size-cells = <1>;
-		ranges;
-
-		flash_memory: region@98000000 {
-			no-map;
-			reg = <0x98000000 0x01000000>; /* 16MB */
-		};
-	};
-
-	//leds {
-	//	compatible = "gpio-leds";
-
-	//	heartbeat {
-	//		gpios = <&gpio ASPEED_GPIO(R, 4) GPIO_ACTIVE_LOW>;
-	//	};
-
-	//	power {
-	//		gpios = <&gpio ASPEED_GPIO(R, 5) GPIO_ACTIVE_LOW>;
-	//	};
-
-	//	identify {
-	//		gpios = <&gpio ASPEED_GPIO(A, 2) GPIO_ACTIVE_LOW>;
-	//	};
-	//};
-
-	//gpio-keys {
-	//	compatible = "gpio-keys";
-
-	//	checkstop {
-	//		label = "checkstop";
-	//		gpios = <&gpio ASPEED_GPIO(P, 5) GPIO_ACTIVE_LOW>;
-	//		linux,code = <ASPEED_GPIO(P, 5)>;
-	//	};
-	//};
 };
 
 &fmc {
@@ -90,21 +50,12 @@
 			&pinctrl_ddcclk_default &pinctrl_ddcdat_default>;
 };
 
-&uart1 {
-	/* Rear RS-232 connector */
+// /dev/ttyS2: Host's ttyS1
+&uart3 {
 	status = "okay";
-
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_txd1_default
-			&pinctrl_rxd1_default
-			&pinctrl_nrts1_default
-			&pinctrl_ndtr1_default
-			&pinctrl_ndsr1_default
-			&pinctrl_ncts1_default
-			&pinctrl_ndcd1_default
-			&pinctrl_nri1_default>;
 };
 
+// /dev/ttyS4: BMC console UART
 &uart5 {
 	status = "okay";
 };
@@ -150,18 +101,7 @@
 	status = "okay";
 };
 
-&vuart {
-	status = "okay";
-};
-
-&lpc_ctrl {
-	status = "okay";
-	// TODO(bluecmd): Not really sure how this works. I guess it's different
-	// from iLPC2AHB?
-	memory-region = <&flash_memory>;
-	flash = <&spi>;
-};
-
+// TODO(bluecmd): This is only for debug, can be removed
 &lpc_host {
 	lpc2ahb_regs: regs {
 		compatible = "aspeed,bmc-misc";
