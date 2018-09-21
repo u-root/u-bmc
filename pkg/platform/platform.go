@@ -29,25 +29,21 @@ var (
 		"UNKN_E4":             ast2400.GpioPort("E4"),
 		"BMC_SMI_INT_N":       ast2400.GpioPort("E5"),
 		"PCH_BMC_THERMTRIP_N": ast2400.GpioPort("F0"),
-		// TODO(bluecmd): Verify
 		"CPU_CATERR_N":        ast2400.GpioPort("F1"),
 		"SLP_S3_N":            ast2400.GpioPort("G2"),
-		"BAT_DETECT":          ast2400.GpioPort("G4"),
-		"UNKN_M4":             ast2400.GpioPort("M4"),
-		"UNKN_M5":             ast2400.GpioPort("M5"),
+		// TODO(bluecmd): This is what the Tioga Pass has, unverified
+		"BAT_SENSE_EN_N":      ast2400.GpioPort("G4"),
 		"BIOS_SEL":            ast2400.GpioPort("N4"),
 		// Tristate:
 		// set to input to allow host to own BIOS flash
 		// set to output to allow bmc to own BIOS flash
 		"SPI_SEL":             ast2400.GpioPort("N5"),
-		"UNKN_N6":             ast2400.GpioPort("N6"),
-		"UNKN_N7":             ast2400.GpioPort("N7"),
+		"UART_SELECT0":        ast2400.GpioPort("N6"),
+		"UART_SELECT1":        ast2400.GpioPort("N7"),
 		"SKU0":                ast2400.GpioPort("P0"),
 		"SKU1":                ast2400.GpioPort("P1"),
 		"SKU2":                ast2400.GpioPort("P2"),
 		"SKU3":                ast2400.GpioPort("P3"),
-		"UNKN_P4":             ast2400.GpioPort("P4"),
-		"UNKN_P5":             ast2400.GpioPort("P5"),
 		"CPU0_PROCHOT_N":      ast2400.GpioPort("P6"),
 		"CPU1_PROCHOT_N":      ast2400.GpioPort("P7"),
 		"UNKN_Q4":             ast2400.GpioPort("Q4"),

@@ -16,12 +16,12 @@ import (
 
 var (
 	linePortMap = platform.LinePortMap()
-	g = (*gpioSystem)(nil)
+	g           = (*gpioSystem)(nil)
 )
 
 type gpioSystem struct {
-	f           *os.File
-	powerButton chan time.Duration
+	f      *os.File
+	button map[pb.Button]chan time.Duration
 }
 
 func (g *gpioSystem) monitorOne(line string) {
@@ -76,31 +76,32 @@ func (g *gpioSystem) hog(lines map[string]bool) {
 }
 
 func PressButton(b pb.Button, durMs uint32) error {
-	if durMs > 1000 * 10 {
+	if durMs > 1000*10 {
 		return fmt.Errorf("Maximum allowed depress duration is 10 seconds")
 	}
-	if b == pb.Button_POWER {
-		g.powerButton <- time.Duration(durMs) * time.Millisecond
-	} else {
+	dur := time.Duration(durMs) * time.Millisecond
+	c, ok := g.button[b]
+	if !ok {
 		return fmt.Errorf("Unknown button %v", b)
 	}
+	c <- dur
 	return nil
 }
 
-func (g *gpioSystem) managePowerButton(line string) {
+func (g *gpioSystem) manageButton(line string, b pb.Button) {
 	// TODO(bluecmd): Assume the line is inverted for now, probably will
 	// always be the case in all platforms though
 	l := requestLineHandle(g.f, []uint32{linePortMap[line]}, []bool{true})
-	log.Printf("Initialized power button %s", line)
+	log.Printf("Initialized button %s", line)
 
 	for {
-		dur := <-g.powerButton
-		log.Printf("Pressing power button")
+		dur := <-g.button[b]
+		log.Printf("Pressing button %s", line)
 		setLineValues(l, []bool{false})
 
 		time.Sleep(dur)
 
-		log.Printf("Releasing power button")
+		log.Printf("Releasing button %s", line)
 		setLineValues(l, []bool{true})
 	}
 }
@@ -113,7 +114,10 @@ func startGpio(c string) {
 
 	g = &gpioSystem{
 		f: f,
-		powerButton: make(chan time.Duration),
+		button: map[pb.Button]chan time.Duration{
+			pb.Button_POWER: make(chan time.Duration),
+			pb.Button_RESET: make(chan time.Duration),
+		},
 	}
 
 	// TODO(bluecmd): These are motherboard specific, figure out how
@@ -144,28 +148,23 @@ func startGpio(c string) {
 		"SPI_SEL",
 		"SYS_PWR_OK",
 		"SYS_THROTTLE",
-		"UNKN_M4",
-		"UNKN_M5",
-		"UNKN_N2",
-		"UNKN_N6",
-		"UNKN_N7",
-		"UNKN_P4",
-		"UNKN_P5",
+		"UART_SELECT0",
+		"UART_SELECT1",
 	})
 
 	g.hog(map[string]bool{
-		"BMC_NMI_N":         true,
-		"BMC_RST_BTN_OUT_N": true,
-		"BMC_SMI_INT_N":     true,
-		"UNKN_E4":           true,
-		"UNKN_PWR_CAP":      true,
-		"BAT_DETECT":        false,
-		"BIOS_SEL":          false,
-		"FAST_PROCHOT":      false,
-		"PWR_LED_N":         false,
+		"BMC_NMI_N":      true,
+		"BMC_SMI_INT_N":  true,
+		"UNKN_E4":        true,
+		"UNKN_PWR_CAP":   true,
+		"BAT_SENSE_EN_N": false,
+		"BIOS_SEL":       false,
+		"FAST_PROCHOT":   false,
+		"PWR_LED_N":      false,
 		// TODO(bluecmd): Figure out what this controls
 		"UNKN_Q4": false,
 	})
 
-	go g.managePowerButton("BMC_PWR_BTN_OUT_N")
+	go g.manageButton("BMC_PWR_BTN_OUT_N", pb.Button_POWER)
+	go g.manageButton("BMC_RST_BTN_OUT_N", pb.Button_RESET)
 }
