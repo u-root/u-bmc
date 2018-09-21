@@ -35,7 +35,6 @@ var (
 		"BAT_DETECT":          ast2400.GpioPort("G4"),
 		"UNKN_M4":             ast2400.GpioPort("M4"),
 		"UNKN_M5":             ast2400.GpioPort("M5"),
-		"UNKN_N2":             ast2400.GpioPort("N2"),
 		"BIOS_SEL":            ast2400.GpioPort("N4"),
 		// Tristate:
 		// set to input to allow host to own BIOS flash
