@@ -43,9 +43,14 @@ func (a *Ast) MeasureFanRpm(fan uint) int {
 	// Reads are triggered by 0->1 transitions
 	a.Mem().MustWrite32(PWM_BASE+0x28, 0)
 	a.Mem().MustWrite32(PWM_BASE+0x28, 1<<fan)
-	// TODO(bluecmd): Right now assume tacho div 4, it is possible to read
-	// this from the registers though
-	div := 4
+
+	// Read tach divider and clock mode from PTCR10
+	ctrl := a.Mem().MustRead32(PWM_BASE+0x10)
+	div := 4 << (((ctrl >> 1) & 0x7) * 2)
+	both := (ctrl & 0x20) != 0
+	if both {
+		div = div * 2
+	}
 	v := uint32(0)
 	for v&(uint32(1)<<31) == 0 {
 		// Wait for the measurement to be taken
@@ -53,7 +58,7 @@ func (a *Ast) MeasureFanRpm(fan uint) int {
 		v = a.Mem().MustRead32(PWM_BASE + 0x2c)
 	}
 	v = v & ^(uint32(1) << 31)
-	return (24 * 1000 * 1000 * 60) / (2 * int(v) * div)
+	return (24 * 1000 * 1000 * 60) / (2 * int(v) * int(div))
 }
 
 func (a *Ast) SetFanDutyCycle(fan uint, p uint8) {
