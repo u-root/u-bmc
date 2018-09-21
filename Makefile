@@ -30,7 +30,7 @@ boot/zImage: linux.config
 		ARCH=$(ARCH)
 	cp linux/arch/$(ARCH)/boot/zImage $@
 
-boot/f06c-leopard-ddr3.dtb: platform/f06c-leopard-ddr3.dts
+boot/%.dtb: platform/%.dts
 	cpp \
 		-nostdinc \
 		-I linux/arch/$(ARCH)/boot/dts/ \
@@ -40,7 +40,7 @@ boot/f06c-leopard-ddr3.dtb: platform/f06c-leopard-ddr3.dts
 		$< \
 	| dtc -O dtb -o $@ -
 
-boot.ubifs.img: boot/u-boot.boot.img boot/zImage boot/f06c-leopard-ddr3.dtb boot/u-boot.env
+boot.ubifs.img: boot/u-boot.boot.img boot/zImage boot/quanta-f06-leopard-ddr3.dtb boot/u-boot.env
 	mkfs.ubifs -r boot -m 1 -e ${LEB} -c 64 -o $(@)
 
 root: initramfs.cpio
