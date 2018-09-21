@@ -103,8 +103,14 @@ func intrHandler(cmd *exec.Cmd) {
 }
 
 func main() {
+	log.Printf("Configuring SOC\n")
+	configureSoc()
+
 	log.Printf("Starting GPIO drivers\n")
 	startGpio("/dev/gpiochip0")
+
+	log.Printf("Configuring UART ports\n")
+	go startUart("/dev/ttyS2")
 
 	log.Printf("Setting up Network Controller Sideband Interface (NC-SI) for eth0\n")
 	go startNcsi("eth0")
