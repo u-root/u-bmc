@@ -16,6 +16,18 @@
 	memory@40000000 {
 		reg = <0x40000000 0x20000000>;
 	};
+
+	// TODO(bluecmd): Remove when u-bmc sets the ilpc2ahb bits itself
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		flash_memory: region@98000000 {
+			no-map;
+			reg = <0x98000000 0x01000000>; /* 16MB */
+		};
+	};
 };
 
 &fmc {
@@ -101,16 +113,15 @@
 	status = "okay";
 };
 
-// TODO(bluecmd): This is only for debug, can be removed
-&lpc_host {
-	lpc2ahb_regs: regs {
-		compatible = "aspeed,bmc-misc";
-		ilpc2ahb {
-			offset = <0x100>;
-			bit-mask = <0x1>;
-			bit-shift = <0x6>;
-		};
-	};
+// TODO(bluecmd): Right now this is needed in order to enable iLPC2AHB
+// for some reason. My understanding is that the FWH and L2H settings
+// should not affect iLPC2AHB, but they seem to.
+// Removing this stanza right now causes the BMC to not be reachable
+// over iLPC2AHB.
+&lpc_ctrl {
+	status = "okay";
+	memory-region = <&flash_memory>;
+	flash = <&spi>;
 };
 
 &mbox {
