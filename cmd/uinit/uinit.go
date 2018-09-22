@@ -162,7 +162,7 @@ func main() {
 			cmd.Stderr = os.Stderr
 			cmd.Stdout = os.Stdout
 			if err := cmd.Run(); err != nil {
-				log.Print("Failed to execute: %v", err)
+				log.Printf("Failed to execute: %v", err)
 			}
 		}()
 	}
@@ -177,7 +177,7 @@ func main() {
 	// Forward intr to the shell
 	go intrHandler(cmd)
 	if err := cmd.Run(); err != nil {
-		log.Print("Failed to execute: %v", err)
+		log.Printf("Failed to execute: %v", err)
 	}
 
 	log.Printf("Shell died, rebooting\n")
@@ -187,7 +187,7 @@ func main() {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
-		log.Print("Failed to execute: %v", err)
+		log.Printf("Failed to execute: %v", err)
 	}
 
 }
