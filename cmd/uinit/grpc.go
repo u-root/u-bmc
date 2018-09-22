@@ -29,13 +29,33 @@ func (m *mgmtServer) PressButton(ctx context.Context, r *pb.ButtonPressRequest) 
 }
 
 func (m *mgmtServer) GetFans(ctx context.Context, _ *pb.GetFansRequest) (*pb.GetFansResponse, error) {
-	// TODO(bluecmd): Implement
-	return nil, fmt.Errorf("Unimplemented")
+	r := pb.GetFansResponse{}
+	for i := 0; i < fanCount(); i++ {
+		rpm, err := readFanRpm(i)
+		if err != nil {
+			return nil, err
+		}
+		prct, err := readFanPercentage(i)
+		if err != nil {
+			return nil, err
+		}
+		r.Fan = append(r.Fan, &pb.Fan{
+			Fan: uint32(i), Mode: pb.FanMode_FAN_MODE_PERCENTAGE,
+			Percentage: uint32(prct), Rpm: uint32(rpm),
+		})
+	}
+	return &r, nil
 }
 
-func (m *mgmtServer) SetFan(ctx context.Context, _ *pb.SetFanRequest) (*pb.SetFanResponse, error) {
-	// TODO(bluecmd): Implement
-	return nil, fmt.Errorf("Unimplemented")
+func (m *mgmtServer) SetFan(ctx context.Context, r *pb.SetFanRequest) (*pb.SetFanResponse, error) {
+	if r.Mode != pb.FanMode_FAN_MODE_PERCENTAGE {
+		return nil, fmt.Errorf("Specified fan mode not supported")
+	}
+	err := setFanPercentage(int(r.Fan), int(r.Percentage))
+	if err != nil {
+		return nil, err
+	}
+	return &pb.SetFanResponse{}, nil
 }
 
 func streamIn(stream pb.ManagementService_StreamConsoleServer) {

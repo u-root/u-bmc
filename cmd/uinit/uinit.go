@@ -170,6 +170,11 @@ func main() {
 	log.Printf("Starting GPIO drivers\n")
 	startGpio("/dev/gpiochip0")
 
+	for i := 0; i < fanCount(); i++ {
+		log.Printf("Configuring fan %d for 20%%\n", i)
+		setFanPercentage(i, 20)
+	}
+
 	log.Printf("Configuring UART ports\n")
 	go startUart("/dev/ttyS2")
 
