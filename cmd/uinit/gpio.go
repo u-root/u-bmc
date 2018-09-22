@@ -115,8 +115,8 @@ func startGpio(c string) {
 	g = &gpioSystem{
 		f: f,
 		button: map[pb.Button]chan time.Duration{
-			pb.Button_POWER: make(chan time.Duration),
-			pb.Button_RESET: make(chan time.Duration),
+			pb.Button_BUTTON_POWER: make(chan time.Duration),
+			pb.Button_BUTTON_RESET: make(chan time.Duration),
 		},
 	}
 
@@ -165,6 +165,6 @@ func startGpio(c string) {
 		"UNKN_Q4": false,
 	})
 
-	go g.manageButton("BMC_PWR_BTN_OUT_N", pb.Button_POWER)
-	go g.manageButton("BMC_RST_BTN_OUT_N", pb.Button_RESET)
+	go g.manageButton("BMC_PWR_BTN_OUT_N", pb.Button_BUTTON_POWER)
+	go g.manageButton("BMC_RST_BTN_OUT_N", pb.Button_BUTTON_RESET)
 }
