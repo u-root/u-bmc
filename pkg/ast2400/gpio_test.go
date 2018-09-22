@@ -28,23 +28,23 @@ func TestGpioPort(t *testing.T) {
 }
 
 func TestGpioBecomeHighChange(t *testing.T) {
-	s1 := &state{make(map[uint32]uint32)}
-	s2 := &state{make(map[uint32]uint32)}
+	s1 := &State{make(map[uint32]uint32), make(map[uint32]uint32)}
+	s2 := &State{make(map[uint32]uint32), make(map[uint32]uint32)}
 
 	// Configure port I3 as output with low output
-	s1.r[0x070] = 0
-	s1.r[0x074] = 0x8
+	s1.Gpio[0x070] = 0
+	s1.Gpio[0x074] = 0x8
 
 	// .. that changes to high
-	s2.r[0x070] = 0x8
-	s2.r[0x074] = 0x8
+	s2.Gpio[0x070] = 0x8
+	s2.Gpio[0x074] = 0x8
 
 	if s1.Equal(s2) {
-		t.Fatalf("s1 should not equal s2n")
+		t.Fatalf("s1 should not equal s2")
 	}
 
 	d := s2.Diff(s1)
-	expected := []lineState{{GpioPort("I3"), LINE_STATE_BECAME_HIGH}}
+	expected := []LineState{{GpioPort("I3"), LINE_STATE_BECAME_HIGH}}
 
 	if !reflect.DeepEqual(d, expected) {
 		t.Errorf("Diff is not as expected, is %v, expected %v", d, expected)
@@ -52,23 +52,43 @@ func TestGpioBecomeHighChange(t *testing.T) {
 }
 
 func TestGpioBecomeOutputChange(t *testing.T) {
-	s1 := &state{make(map[uint32]uint32)}
-	s2 := &state{make(map[uint32]uint32)}
+	s1 := &State{make(map[uint32]uint32), make(map[uint32]uint32)}
+	s2 := &State{make(map[uint32]uint32), make(map[uint32]uint32)}
 
 	// Configure port I3 as input with high input
-	s1.r[0x070] = 0x8
-	s1.r[0x074] = 0
+	s1.Gpio[0x070] = 0x8
+	s1.Gpio[0x074] = 0
 
 	// .. that changes to high output
-	s2.r[0x070] = 0x8
-	s2.r[0x074] = 0x8
+	s2.Gpio[0x070] = 0x8
+	s2.Gpio[0x074] = 0x8
 
 	if s1.Equal(s2) {
-		t.Fatalf("s1 should not equal s2n")
+		t.Fatalf("s1 should not equal s2")
 	}
 
 	d := s2.Diff(s1)
-	expected := []lineState{{GpioPort("I3"), LINE_STATE_BECAME_OUTPUT}}
+	expected := []LineState{{GpioPort("I3"), LINE_STATE_BECAME_OUTPUT}}
+
+	if !reflect.DeepEqual(d, expected) {
+		t.Errorf("Diff is not as expected, is %v, expected %v", d, expected)
+	}
+}
+
+func TestScuChange(t *testing.T) {
+	s1 := &State{make(map[uint32]uint32), make(map[uint32]uint32)}
+	s2 := &State{make(map[uint32]uint32), make(map[uint32]uint32)}
+
+	// Configure SCU 0x80 to change
+	s1.Scu[0x080] = 0x8
+	s2.Scu[0x080] = 0x10
+
+	if s1.Equal(s2) {
+		t.Fatalf("s1 should not equal s2")
+	}
+
+	d := s2.Diff(s1)
+	expected := []LineState{{0x80, LINE_STATE_SCU_CHANGED}}
 
 	if !reflect.DeepEqual(d, expected) {
 		t.Errorf("Diff is not as expected, is %v, expected %v", d, expected)
