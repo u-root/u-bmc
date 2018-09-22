@@ -32,26 +32,26 @@ var (
 		"CPU_CATERR_N":        ast2400.GpioPort("F1"),
 		"SLP_S3_N":            ast2400.GpioPort("G2"),
 		// TODO(bluecmd): This is what the Tioga Pass has, unverified
-		"BAT_SENSE_EN_N":      ast2400.GpioPort("G4"),
-		"BIOS_SEL":            ast2400.GpioPort("N4"),
+		"BAT_SENSE_EN_N": ast2400.GpioPort("G4"),
+		"BIOS_SEL":       ast2400.GpioPort("N4"),
 		// Tristate:
 		// set to input to allow host to own BIOS flash
 		// set to output to allow bmc to own BIOS flash
-		"SPI_SEL":             ast2400.GpioPort("N5"),
-		"UART_SELECT0":        ast2400.GpioPort("N6"),
-		"UART_SELECT1":        ast2400.GpioPort("N7"),
-		"SKU0":                ast2400.GpioPort("P0"),
-		"SKU1":                ast2400.GpioPort("P1"),
-		"SKU2":                ast2400.GpioPort("P2"),
-		"SKU3":                ast2400.GpioPort("P3"),
-		"CPU0_PROCHOT_N":      ast2400.GpioPort("P6"),
-		"CPU1_PROCHOT_N":      ast2400.GpioPort("P7"),
-		"UNKN_Q4":             ast2400.GpioPort("Q4"),
-		"PWR_LED_N":           ast2400.GpioPort("Q5"),
-		"CPU0_FIVR_FAULT_N"  : ast2400.GpioPort("Q6"),
-		"CPU1_FIVR_FAULT_N"  : ast2400.GpioPort("Q7"),
-		"MB_SLOT_ID":          ast2400.GpioPort("R1"),
-		"SYS_THROTTLE":        ast2400.GpioPort("R4"),
+		"SPI_SEL":           ast2400.GpioPort("N5"),
+		"UART_SELECT0":      ast2400.GpioPort("N6"),
+		"UART_SELECT1":      ast2400.GpioPort("N7"),
+		"SKU0":              ast2400.GpioPort("P0"),
+		"SKU1":              ast2400.GpioPort("P1"),
+		"SKU2":              ast2400.GpioPort("P2"),
+		"SKU3":              ast2400.GpioPort("P3"),
+		"CPU0_PROCHOT_N":    ast2400.GpioPort("P6"),
+		"CPU1_PROCHOT_N":    ast2400.GpioPort("P7"),
+		"UNKN_Q4":           ast2400.GpioPort("Q4"),
+		"PWR_LED_N":         ast2400.GpioPort("Q5"),
+		"CPU0_FIVR_FAULT_N": ast2400.GpioPort("Q6"),
+		"CPU1_FIVR_FAULT_N": ast2400.GpioPort("Q7"),
+		"MB_SLOT_ID":        ast2400.GpioPort("R1"),
+		"SYS_THROTTLE":      ast2400.GpioPort("R4"),
 	}
 
 	// Reverse map of linePortMap

@@ -12,15 +12,15 @@ import (
 )
 
 type uartSystem struct {
-	s       *serial.Port
+	s *serial.Port
 	// Read from the host
-	uartIn  chan []byte
+	uartIn chan []byte
 	// To be written to the host
 	uartOut chan []byte
 }
 
 func (u *uartSystem) Read() []byte {
-	return <- u.uartIn
+	return <-u.uartIn
 }
 
 func (u *uartSystem) Write(b []byte) {

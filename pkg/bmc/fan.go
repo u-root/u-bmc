@@ -27,7 +27,7 @@ func readHwmon(m map[int]string, fan int) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("No such fan %d", fan)
 	}
-	f, err := os.OpenFile("/sys/class/hwmon/" + fname, os.O_RDWR, 0600)
+	f, err := os.OpenFile("/sys/class/hwmon/"+fname, os.O_RDWR, 0600)
 	if err != nil {
 		return 0, err
 	}
@@ -49,7 +49,7 @@ func writeHwmon(m map[int]string, fan int, v int) error {
 	if !ok {
 		return fmt.Errorf("No such fan %d", fan)
 	}
-	f, err := os.OpenFile("/sys/class/hwmon/" + fname, os.O_RDWR, 0600)
+	f, err := os.OpenFile("/sys/class/hwmon/"+fname, os.O_RDWR, 0600)
 	if err != nil {
 		return err
 	}

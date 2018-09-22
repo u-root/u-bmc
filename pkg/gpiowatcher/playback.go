@@ -31,28 +31,28 @@ func (p *playback) SnapshotGpio() *ast2400.State {
 		return nil
 	}
 	if err != nil {
-		log.Fatalf("binary.Read failed:", err)
+		log.Fatalf("binary.Read failed: %v", err)
 	}
 	err = binary.Read(p.f, binary.LittleEndian, &gpios)
 	if err != nil {
-		log.Fatalf("binary.Read failed:", err)
+		log.Fatalf("binary.Read failed: %v", err)
 	}
 	err = binary.Read(p.f, binary.LittleEndian, &scus)
 	if err != nil {
-		log.Fatalf("binary.Read failed:", err)
+		log.Fatalf("binary.Read failed: %v", err)
 	}
 
-	s := ast2400.State{make(map[uint32]uint32), make(map[uint32]uint32)}
+	s := ast2400.State{Gpio: make(map[uint32]uint32), Scu: make(map[uint32]uint32)}
 	for i := uint32(0); i < gpios; i++ {
 		var k uint32
 		var v uint32
 		err = binary.Read(p.f, binary.LittleEndian, &k)
 		if err != nil {
-			log.Fatalf("binary.Read failed:", err)
+			log.Fatalf("binary.Read failed: %v", err)
 		}
 		err = binary.Read(p.f, binary.LittleEndian, &v)
 		if err != nil {
-			log.Fatalf("binary.Read failed:", err)
+			log.Fatalf("binary.Read failed: %v", err)
 		}
 		s.Gpio[k] = v
 	}
@@ -61,11 +61,11 @@ func (p *playback) SnapshotGpio() *ast2400.State {
 		var v uint32
 		err = binary.Read(p.f, binary.LittleEndian, &k)
 		if err != nil {
-			log.Fatalf("binary.Read failed:", err)
+			log.Fatalf("binary.Read failed: %v", err)
 		}
 		err = binary.Read(p.f, binary.LittleEndian, &v)
 		if err != nil {
-			log.Fatalf("binary.Read failed:", err)
+			log.Fatalf("binary.Read failed: %v", err)
 		}
 		s.Scu[k] = v
 	}

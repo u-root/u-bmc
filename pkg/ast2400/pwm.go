@@ -45,7 +45,7 @@ func (a *Ast) MeasureFanRpm(fan uint) int {
 	a.Mem().MustWrite32(PWM_BASE+0x28, 1<<fan)
 
 	// Read tach divider and clock mode from PTCR10
-	ctrl := a.Mem().MustRead32(PWM_BASE+0x10)
+	ctrl := a.Mem().MustRead32(PWM_BASE + 0x10)
 	div := 4 << (((ctrl >> 1) & 0x7) * 2)
 	both := (ctrl & 0x20) != 0
 	if both {
