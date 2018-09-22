@@ -83,7 +83,9 @@ initramfs.cpio: u-root ssh_keys.pub
 	GOARM=5 GOARCH=$(ARCH) ./u-root \
 		-build=bb \
 		-o "$@.tmp" \
-		github.com/u-root/u-root/cmds/*/ \
+		core \
+		github.com/u-root/u-root/cmds/scp/ \
+		github.com/u-root/u-root/cmds/sshd/ \
 		github.com/u-root/elvish \
 		github.com/u-root/u-bmc/cmd/*/
 	mv "$@.tmp" "$@"
