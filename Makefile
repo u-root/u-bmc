@@ -86,13 +86,12 @@ initramfs.cpio: u-root ssh_keys.pub
 		core \
 		github.com/u-root/u-root/cmds/scp/ \
 		github.com/u-root/u-root/cmds/sshd/ \
-		github.com/u-root/elvish \
 		github.com/u-root/u-bmc/cmd/*/
 	mv "$@.tmp" "$@"
 
 clean:
 	\rm -f initramfs.cpio u-root \
 	 flash.img u-boot/u-boot.bin u-boot/u-boot-512.bin \
-	 root.ubifs.img boot.ubifs.img boot/zImage boot/f06c-leopard-ddr3.dtb \
+	 root.ubifs.img boot.ubifs.img boot/zImage boot/*.dtb \
 	 boot/u-boot.boot.img ubi.img
 	\rm -fr root/
