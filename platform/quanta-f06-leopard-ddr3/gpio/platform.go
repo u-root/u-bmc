@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package platform
+package gpio
 
 import (
 	"github.com/u-root/u-bmc/pkg/ast2400"
@@ -58,6 +58,9 @@ var (
 	portLineMap map[uint32]string
 )
 
+type Gpio struct {
+}
+
 func init() {
 	portLineMap = make(map[uint32]string)
 	for k, v := range linePortMap {
@@ -65,13 +68,12 @@ func init() {
 	}
 }
 
-func LinePortMap() map[string]uint32 {
-	// TODO(bluecmd): This will need to be abstracted away somehow if more
-	// platforms are to be supported.
-	return linePortMap
+func (_ *Gpio) GpioNameToPort(l string) (uint32, bool) {
+	s, ok := linePortMap[l]
+	return s, ok
 }
 
-func GpioPortToName(p uint32) (string, bool) {
-	s, ok := portLineMap[p]
+func (_ *Gpio) GpioPortToName(i uint32) (string, bool) {
+	s, ok := portLineMap[i]
 	return s, ok
 }
