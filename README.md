@@ -37,9 +37,7 @@ Prerequisites:
 sudo apt-get install gcc-arm-none-eabi mtd-utils u-boot-tools golang-1.10 fakeroot flex bison
 
 # Until u-root vendoring is working properly, also grab:
-go get -u github.com/u-root/elvish
-go get -u github.com/mdlayher/genetlink
-go get -u google.golang.org/grpc
+go get -u github.com/u-root/u-bmc/cmd/uinit
 ```
 
 Clone:
