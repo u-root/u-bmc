@@ -6,6 +6,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"log"
 	"net"
 
@@ -19,12 +21,42 @@ type mgmtServer struct {
 }
 
 func (m *mgmtServer) PressButton(ctx context.Context, r *pb.ButtonPressRequest) (*pb.ButtonPressResponse, error) {
-	log.Printf("Request: %v", *r)
 	err := PressButton(r.Button, r.DurationMs)
 	if err != nil {
 		return nil, err
 	}
 	return &pb.ButtonPressResponse{}, nil
+}
+
+func (m *mgmtServer) GetFans(ctx context.Context, _ *pb.GetFansRequest) (*pb.GetFansResponse, error) {
+	// TODO(bluecmd): Implement
+	return nil, fmt.Errorf("Unimplemented")
+}
+
+func (m *mgmtServer) SetFan(ctx context.Context, _ *pb.SetFanRequest) (*pb.SetFanResponse, error) {
+	// TODO(bluecmd): Implement
+	return nil, fmt.Errorf("Unimplemented")
+}
+
+func streamIn(stream pb.ManagementService_StreamConsoleServer) {
+	for {
+		buf := <-uartIn
+		stream.Send(&pb.ConsoleData{Data: buf})
+	}
+}
+
+func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServer) error {
+	go streamIn(stream)
+	for {
+		in, err := stream.Recv()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		uartOut <- in.Data
+	}
 }
 
 func startGrpc() {

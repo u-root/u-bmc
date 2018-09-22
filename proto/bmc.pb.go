@@ -26,21 +26,21 @@ const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 type Button int32
 
 const (
-	Button_UNSPEC Button = 0
-	Button_POWER  Button = 1
-	Button_RESET  Button = 2
+	Button_BUTTON_UNSPEC Button = 0
+	Button_BUTTON_POWER  Button = 1
+	Button_BUTTON_RESET  Button = 2
 )
 
 var Button_name = map[int32]string{
-	0: "UNSPEC",
-	1: "POWER",
-	2: "RESET",
+	0: "BUTTON_UNSPEC",
+	1: "BUTTON_POWER",
+	2: "BUTTON_RESET",
 }
 
 var Button_value = map[string]int32{
-	"UNSPEC": 0,
-	"POWER":  1,
-	"RESET":  2,
+	"BUTTON_UNSPEC": 0,
+	"BUTTON_POWER":  1,
+	"BUTTON_RESET":  2,
 }
 
 func (x Button) String() string {
@@ -49,6 +49,31 @@ func (x Button) String() string {
 
 func (Button) EnumDescriptor() ([]byte, []int) {
 	return fileDescriptor_491517c5ad0de192, []int{0}
+}
+
+type FanMode int32
+
+const (
+	FanMode_FAN_MODE_UNSPEC     FanMode = 0
+	FanMode_FAN_MODE_PERCENTAGE FanMode = 1
+)
+
+var FanMode_name = map[int32]string{
+	0: "FAN_MODE_UNSPEC",
+	1: "FAN_MODE_PERCENTAGE",
+}
+
+var FanMode_value = map[string]int32{
+	"FAN_MODE_UNSPEC":     0,
+	"FAN_MODE_PERCENTAGE": 1,
+}
+
+func (x FanMode) String() string {
+	return proto.EnumName(FanMode_name, int32(x))
+}
+
+func (FanMode) EnumDescriptor() ([]byte, []int) {
+	return fileDescriptor_491517c5ad0de192, []int{1}
 }
 
 type ButtonPressRequest struct {
@@ -89,7 +114,7 @@ func (m *ButtonPressRequest) GetButton() Button {
 	if m != nil {
 		return m.Button
 	}
-	return Button_UNSPEC
+	return Button_BUTTON_UNSPEC
 }
 
 func (m *ButtonPressRequest) GetDurationMs() uint32 {
@@ -129,10 +154,272 @@ func (m *ButtonPressResponse) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_ButtonPressResponse proto.InternalMessageInfo
 
+type SetFanRequest struct {
+	// Required: which fan to modify
+	Fan uint32 `protobuf:"varint,1,opt,name=fan,proto3" json:"fan,omitempty"`
+	// Required: which mode to put the fan in
+	Mode FanMode `protobuf:"varint,2,opt,name=mode,proto3,enum=bmc.FanMode" json:"mode,omitempty"`
+	// Required if mode is PERCENTAGE
+	Percentage           uint32   `protobuf:"varint,3,opt,name=percentage,proto3" json:"percentage,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SetFanRequest) Reset()         { *m = SetFanRequest{} }
+func (m *SetFanRequest) String() string { return proto.CompactTextString(m) }
+func (*SetFanRequest) ProtoMessage()    {}
+func (*SetFanRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_491517c5ad0de192, []int{2}
+}
+func (m *SetFanRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SetFanRequest.Unmarshal(m, b)
+}
+func (m *SetFanRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SetFanRequest.Marshal(b, m, deterministic)
+}
+func (m *SetFanRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SetFanRequest.Merge(m, src)
+}
+func (m *SetFanRequest) XXX_Size() int {
+	return xxx_messageInfo_SetFanRequest.Size(m)
+}
+func (m *SetFanRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_SetFanRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SetFanRequest proto.InternalMessageInfo
+
+func (m *SetFanRequest) GetFan() uint32 {
+	if m != nil {
+		return m.Fan
+	}
+	return 0
+}
+
+func (m *SetFanRequest) GetMode() FanMode {
+	if m != nil {
+		return m.Mode
+	}
+	return FanMode_FAN_MODE_UNSPEC
+}
+
+func (m *SetFanRequest) GetPercentage() uint32 {
+	if m != nil {
+		return m.Percentage
+	}
+	return 0
+}
+
+type SetFanResponse struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *SetFanResponse) Reset()         { *m = SetFanResponse{} }
+func (m *SetFanResponse) String() string { return proto.CompactTextString(m) }
+func (*SetFanResponse) ProtoMessage()    {}
+func (*SetFanResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_491517c5ad0de192, []int{3}
+}
+func (m *SetFanResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_SetFanResponse.Unmarshal(m, b)
+}
+func (m *SetFanResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_SetFanResponse.Marshal(b, m, deterministic)
+}
+func (m *SetFanResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SetFanResponse.Merge(m, src)
+}
+func (m *SetFanResponse) XXX_Size() int {
+	return xxx_messageInfo_SetFanResponse.Size(m)
+}
+func (m *SetFanResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_SetFanResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_SetFanResponse proto.InternalMessageInfo
+
+type GetFansRequest struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetFansRequest) Reset()         { *m = GetFansRequest{} }
+func (m *GetFansRequest) String() string { return proto.CompactTextString(m) }
+func (*GetFansRequest) ProtoMessage()    {}
+func (*GetFansRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_491517c5ad0de192, []int{4}
+}
+func (m *GetFansRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetFansRequest.Unmarshal(m, b)
+}
+func (m *GetFansRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetFansRequest.Marshal(b, m, deterministic)
+}
+func (m *GetFansRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetFansRequest.Merge(m, src)
+}
+func (m *GetFansRequest) XXX_Size() int {
+	return xxx_messageInfo_GetFansRequest.Size(m)
+}
+func (m *GetFansRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetFansRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetFansRequest proto.InternalMessageInfo
+
+type Fan struct {
+	Fan                  uint32   `protobuf:"varint,1,opt,name=fan,proto3" json:"fan,omitempty"`
+	Mode                 FanMode  `protobuf:"varint,2,opt,name=mode,proto3,enum=bmc.FanMode" json:"mode,omitempty"`
+	Percentage           uint32   `protobuf:"varint,3,opt,name=percentage,proto3" json:"percentage,omitempty"`
+	Rpm                  uint32   `protobuf:"varint,4,opt,name=rpm,proto3" json:"rpm,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Fan) Reset()         { *m = Fan{} }
+func (m *Fan) String() string { return proto.CompactTextString(m) }
+func (*Fan) ProtoMessage()    {}
+func (*Fan) Descriptor() ([]byte, []int) {
+	return fileDescriptor_491517c5ad0de192, []int{5}
+}
+func (m *Fan) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Fan.Unmarshal(m, b)
+}
+func (m *Fan) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Fan.Marshal(b, m, deterministic)
+}
+func (m *Fan) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Fan.Merge(m, src)
+}
+func (m *Fan) XXX_Size() int {
+	return xxx_messageInfo_Fan.Size(m)
+}
+func (m *Fan) XXX_DiscardUnknown() {
+	xxx_messageInfo_Fan.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Fan proto.InternalMessageInfo
+
+func (m *Fan) GetFan() uint32 {
+	if m != nil {
+		return m.Fan
+	}
+	return 0
+}
+
+func (m *Fan) GetMode() FanMode {
+	if m != nil {
+		return m.Mode
+	}
+	return FanMode_FAN_MODE_UNSPEC
+}
+
+func (m *Fan) GetPercentage() uint32 {
+	if m != nil {
+		return m.Percentage
+	}
+	return 0
+}
+
+func (m *Fan) GetRpm() uint32 {
+	if m != nil {
+		return m.Rpm
+	}
+	return 0
+}
+
+type GetFansResponse struct {
+	Fan                  []*Fan   `protobuf:"bytes,1,rep,name=fan,proto3" json:"fan,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *GetFansResponse) Reset()         { *m = GetFansResponse{} }
+func (m *GetFansResponse) String() string { return proto.CompactTextString(m) }
+func (*GetFansResponse) ProtoMessage()    {}
+func (*GetFansResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_491517c5ad0de192, []int{6}
+}
+func (m *GetFansResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_GetFansResponse.Unmarshal(m, b)
+}
+func (m *GetFansResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_GetFansResponse.Marshal(b, m, deterministic)
+}
+func (m *GetFansResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetFansResponse.Merge(m, src)
+}
+func (m *GetFansResponse) XXX_Size() int {
+	return xxx_messageInfo_GetFansResponse.Size(m)
+}
+func (m *GetFansResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_GetFansResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_GetFansResponse proto.InternalMessageInfo
+
+func (m *GetFansResponse) GetFan() []*Fan {
+	if m != nil {
+		return m.Fan
+	}
+	return nil
+}
+
+type ConsoleData struct {
+	Data                 []byte   `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ConsoleData) Reset()         { *m = ConsoleData{} }
+func (m *ConsoleData) String() string { return proto.CompactTextString(m) }
+func (*ConsoleData) ProtoMessage()    {}
+func (*ConsoleData) Descriptor() ([]byte, []int) {
+	return fileDescriptor_491517c5ad0de192, []int{7}
+}
+func (m *ConsoleData) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ConsoleData.Unmarshal(m, b)
+}
+func (m *ConsoleData) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ConsoleData.Marshal(b, m, deterministic)
+}
+func (m *ConsoleData) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConsoleData.Merge(m, src)
+}
+func (m *ConsoleData) XXX_Size() int {
+	return xxx_messageInfo_ConsoleData.Size(m)
+}
+func (m *ConsoleData) XXX_DiscardUnknown() {
+	xxx_messageInfo_ConsoleData.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ConsoleData proto.InternalMessageInfo
+
+func (m *ConsoleData) GetData() []byte {
+	if m != nil {
+		return m.Data
+	}
+	return nil
+}
+
 func init() {
 	proto.RegisterType((*ButtonPressRequest)(nil), "bmc.ButtonPressRequest")
 	proto.RegisterType((*ButtonPressResponse)(nil), "bmc.ButtonPressResponse")
+	proto.RegisterType((*SetFanRequest)(nil), "bmc.SetFanRequest")
+	proto.RegisterType((*SetFanResponse)(nil), "bmc.SetFanResponse")
+	proto.RegisterType((*GetFansRequest)(nil), "bmc.GetFansRequest")
+	proto.RegisterType((*Fan)(nil), "bmc.Fan")
+	proto.RegisterType((*GetFansResponse)(nil), "bmc.GetFansResponse")
+	proto.RegisterType((*ConsoleData)(nil), "bmc.ConsoleData")
 	proto.RegisterEnum("bmc.Button", Button_name, Button_value)
+	proto.RegisterEnum("bmc.FanMode", FanMode_name, FanMode_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -148,6 +435,9 @@ const _ = grpc.SupportPackageIsVersion4
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.
 type ManagementServiceClient interface {
 	PressButton(ctx context.Context, in *ButtonPressRequest, opts ...grpc.CallOption) (*ButtonPressResponse, error)
+	SetFan(ctx context.Context, in *SetFanRequest, opts ...grpc.CallOption) (*SetFanResponse, error)
+	GetFans(ctx context.Context, in *GetFansRequest, opts ...grpc.CallOption) (*GetFansResponse, error)
+	StreamConsole(ctx context.Context, opts ...grpc.CallOption) (ManagementService_StreamConsoleClient, error)
 }
 
 type managementServiceClient struct {
@@ -167,9 +457,61 @@ func (c *managementServiceClient) PressButton(ctx context.Context, in *ButtonPre
 	return out, nil
 }
 
+func (c *managementServiceClient) SetFan(ctx context.Context, in *SetFanRequest, opts ...grpc.CallOption) (*SetFanResponse, error) {
+	out := new(SetFanResponse)
+	err := c.cc.Invoke(ctx, "/bmc.ManagementService/SetFan", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *managementServiceClient) GetFans(ctx context.Context, in *GetFansRequest, opts ...grpc.CallOption) (*GetFansResponse, error) {
+	out := new(GetFansResponse)
+	err := c.cc.Invoke(ctx, "/bmc.ManagementService/GetFans", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *managementServiceClient) StreamConsole(ctx context.Context, opts ...grpc.CallOption) (ManagementService_StreamConsoleClient, error) {
+	stream, err := c.cc.NewStream(ctx, &_ManagementService_serviceDesc.Streams[0], "/bmc.ManagementService/StreamConsole", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &managementServiceStreamConsoleClient{stream}
+	return x, nil
+}
+
+type ManagementService_StreamConsoleClient interface {
+	Send(*ConsoleData) error
+	Recv() (*ConsoleData, error)
+	grpc.ClientStream
+}
+
+type managementServiceStreamConsoleClient struct {
+	grpc.ClientStream
+}
+
+func (x *managementServiceStreamConsoleClient) Send(m *ConsoleData) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *managementServiceStreamConsoleClient) Recv() (*ConsoleData, error) {
+	m := new(ConsoleData)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // ManagementServiceServer is the server API for ManagementService service.
 type ManagementServiceServer interface {
 	PressButton(context.Context, *ButtonPressRequest) (*ButtonPressResponse, error)
+	SetFan(context.Context, *SetFanRequest) (*SetFanResponse, error)
+	GetFans(context.Context, *GetFansRequest) (*GetFansResponse, error)
+	StreamConsole(ManagementService_StreamConsoleServer) error
 }
 
 func RegisterManagementServiceServer(s *grpc.Server, srv ManagementServiceServer) {
@@ -194,6 +536,68 @@ func _ManagementService_PressButton_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ManagementService_SetFan_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetFanRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagementServiceServer).SetFan(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bmc.ManagementService/SetFan",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagementServiceServer).SetFan(ctx, req.(*SetFanRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManagementService_GetFans_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFansRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ManagementServiceServer).GetFans(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/bmc.ManagementService/GetFans",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ManagementServiceServer).GetFans(ctx, req.(*GetFansRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ManagementService_StreamConsole_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ManagementServiceServer).StreamConsole(&managementServiceStreamConsoleServer{stream})
+}
+
+type ManagementService_StreamConsoleServer interface {
+	Send(*ConsoleData) error
+	Recv() (*ConsoleData, error)
+	grpc.ServerStream
+}
+
+type managementServiceStreamConsoleServer struct {
+	grpc.ServerStream
+}
+
+func (x *managementServiceStreamConsoleServer) Send(m *ConsoleData) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *managementServiceStreamConsoleServer) Recv() (*ConsoleData, error) {
+	m := new(ConsoleData)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 var _ManagementService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "bmc.ManagementService",
 	HandlerType: (*ManagementServiceServer)(nil),
@@ -202,27 +606,56 @@ var _ManagementService_serviceDesc = grpc.ServiceDesc{
 			MethodName: "PressButton",
 			Handler:    _ManagementService_PressButton_Handler,
 		},
+		{
+			MethodName: "SetFan",
+			Handler:    _ManagementService_SetFan_Handler,
+		},
+		{
+			MethodName: "GetFans",
+			Handler:    _ManagementService_GetFans_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamConsole",
+			Handler:       _ManagementService_StreamConsole_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "bmc.proto",
 }
 
 func init() { proto.RegisterFile("bmc.proto", fileDescriptor_491517c5ad0de192) }
 
 var fileDescriptor_491517c5ad0de192 = []byte{
-	// 210 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x4c, 0xca, 0x4d, 0xd6,
-	0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x4e, 0xca, 0x4d, 0x56, 0x8a, 0xe2, 0x12, 0x72, 0x2a,
-	0x2d, 0x29, 0xc9, 0xcf, 0x0b, 0x28, 0x4a, 0x2d, 0x2e, 0x0e, 0x4a, 0x2d, 0x2c, 0x4d, 0x2d, 0x2e,
-	0x11, 0x52, 0xe6, 0x62, 0x4b, 0x02, 0x8b, 0x4a, 0x30, 0x2a, 0x30, 0x6a, 0xf0, 0x19, 0x71, 0xeb,
-	0x81, 0xb4, 0x41, 0x14, 0x06, 0x41, 0xa5, 0x84, 0xe4, 0xb9, 0xb8, 0x53, 0x4a, 0x8b, 0x12, 0x4b,
-	0x32, 0xf3, 0xf3, 0xe2, 0x73, 0x8b, 0x25, 0x98, 0x14, 0x18, 0x35, 0x78, 0x83, 0xb8, 0x60, 0x42,
-	0xbe, 0xc5, 0x4a, 0xa2, 0x5c, 0xc2, 0x28, 0x66, 0x17, 0x17, 0xe4, 0xe7, 0x15, 0xa7, 0x6a, 0x69,
-	0x71, 0xb1, 0x41, 0x84, 0x85, 0xb8, 0xb8, 0xd8, 0x42, 0xfd, 0x82, 0x03, 0x5c, 0x9d, 0x05, 0x18,
-	0x84, 0x38, 0xb9, 0x58, 0x03, 0xfc, 0xc3, 0x5d, 0x83, 0x04, 0x18, 0x41, 0xcc, 0x20, 0xd7, 0x60,
-	0xd7, 0x10, 0x01, 0x26, 0xa3, 0x70, 0x2e, 0x41, 0xdf, 0xc4, 0xbc, 0xc4, 0xf4, 0xd4, 0xdc, 0xd4,
-	0xbc, 0x92, 0xe0, 0xd4, 0xa2, 0xb2, 0xcc, 0xe4, 0x54, 0x21, 0x27, 0x2e, 0x6e, 0xb0, 0x89, 0x50,
-	0x53, 0xc4, 0x91, 0x1c, 0x87, 0xec, 0x0b, 0x29, 0x09, 0x4c, 0x09, 0x88, 0x13, 0x94, 0x18, 0x92,
-	0xd8, 0xc0, 0x61, 0x60, 0x0c, 0x08, 0x00, 0x00, 0xff, 0xff, 0x1a, 0xff, 0xc0, 0x64, 0x10, 0x01,
-	0x00, 0x00,
+	// 443 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x93, 0x4f, 0x6f, 0xd3, 0x40,
+	0x10, 0xc5, 0xe3, 0x3a, 0x4a, 0x61, 0x1c, 0xa7, 0xdb, 0x09, 0xa8, 0x96, 0x0f, 0x10, 0xcc, 0x25,
+	0xaa, 0x44, 0x85, 0x52, 0x09, 0xc4, 0x09, 0x35, 0xa9, 0xd3, 0x53, 0xfe, 0x68, 0x9d, 0x0a, 0x89,
+	0x4b, 0xb4, 0x71, 0x86, 0xaa, 0x02, 0xef, 0x1a, 0x7b, 0xc3, 0xd7, 0x07, 0x65, 0xbd, 0x4e, 0x63,
+	0xf5, 0xcc, 0xcd, 0x7a, 0x33, 0xf3, 0x7e, 0xb3, 0x33, 0x63, 0x78, 0xb9, 0xc9, 0xd2, 0xab, 0xbc,
+	0x50, 0x5a, 0xa1, 0xbb, 0xc9, 0xd2, 0xe8, 0x3b, 0xe0, 0x78, 0xa7, 0xb5, 0x92, 0xcb, 0x82, 0xca,
+	0x92, 0xd3, 0xef, 0x1d, 0x95, 0x1a, 0xdf, 0x43, 0x67, 0x63, 0xd4, 0xc0, 0x19, 0x38, 0xc3, 0xde,
+	0xc8, 0xbb, 0xda, 0x97, 0x55, 0x89, 0xdc, 0x86, 0xf0, 0x2d, 0x78, 0xdb, 0x5d, 0x21, 0xf4, 0xa3,
+	0x92, 0xeb, 0xac, 0x0c, 0x4e, 0x06, 0xce, 0xd0, 0xe7, 0x50, 0x4b, 0xb3, 0x32, 0x7a, 0x0d, 0xfd,
+	0x86, 0x77, 0x99, 0x2b, 0x59, 0x52, 0x94, 0x82, 0x9f, 0x90, 0x9e, 0x0a, 0x59, 0xd3, 0x18, 0xb8,
+	0x3f, 0x44, 0x85, 0xf2, 0xf9, 0xfe, 0x13, 0x07, 0xd0, 0xce, 0xd4, 0x96, 0x8c, 0x67, 0x6f, 0xd4,
+	0x35, 0xf4, 0xa9, 0x90, 0x33, 0xb5, 0x25, 0x6e, 0x22, 0xf8, 0x06, 0x20, 0xa7, 0x22, 0x25, 0xa9,
+	0xc5, 0x03, 0x05, 0x6e, 0xc5, 0x7e, 0x52, 0x22, 0x06, 0xbd, 0x1a, 0x62, 0xb1, 0x0c, 0x7a, 0x77,
+	0x46, 0xa9, 0x5f, 0x19, 0xfd, 0x04, 0x77, 0x2a, 0xe4, 0xff, 0xc0, 0xef, 0x3d, 0x8b, 0x3c, 0x0b,
+	0xda, 0x95, 0x67, 0x91, 0x67, 0xd1, 0x07, 0x38, 0x3b, 0xe0, 0xab, 0x8e, 0x30, 0xac, 0xc1, 0xee,
+	0xd0, 0x1b, 0xbd, 0xa8, 0x29, 0xa6, 0x85, 0xe8, 0x1d, 0x78, 0x13, 0x25, 0x4b, 0xf5, 0x8b, 0x6e,
+	0x85, 0x16, 0x88, 0xd0, 0xde, 0x0a, 0x2d, 0x4c, 0x93, 0x5d, 0x6e, 0xbe, 0x2f, 0xbf, 0x42, 0xa7,
+	0x1a, 0x2f, 0x9e, 0x83, 0x3f, 0xbe, 0x5f, 0xad, 0x16, 0xf3, 0xf5, 0xfd, 0x3c, 0x59, 0xc6, 0x13,
+	0xd6, 0x42, 0x06, 0x5d, 0x2b, 0x2d, 0x17, 0xdf, 0x62, 0xce, 0x9c, 0x23, 0x85, 0xc7, 0x49, 0xbc,
+	0x62, 0x27, 0x97, 0x9f, 0xe1, 0xd4, 0xbe, 0x0a, 0xfb, 0x70, 0x36, 0xbd, 0x99, 0xaf, 0x67, 0x8b,
+	0xdb, 0xf8, 0xc9, 0xe3, 0x02, 0xfa, 0x07, 0x71, 0x19, 0xf3, 0x49, 0x3c, 0x5f, 0xdd, 0xdc, 0xc5,
+	0xcc, 0x19, 0xfd, 0x75, 0xe0, 0x7c, 0x26, 0xa4, 0x78, 0xa0, 0x8c, 0xa4, 0x4e, 0xa8, 0xf8, 0xf3,
+	0x98, 0x12, 0x8e, 0xc1, 0x33, 0x8b, 0xb6, 0x4d, 0x5d, 0x1c, 0xdd, 0xcc, 0xf1, 0x71, 0x85, 0xc1,
+	0xf3, 0x80, 0x5d, 0x51, 0x0b, 0xaf, 0xa1, 0x53, 0xad, 0x0d, 0xd1, 0x64, 0x35, 0x0e, 0x25, 0xec,
+	0x37, 0xb4, 0x43, 0xd1, 0x27, 0x38, 0xb5, 0xa3, 0xc5, 0x2a, 0xa3, 0xb9, 0xe7, 0xf0, 0x55, 0x53,
+	0x3c, 0xd4, 0x7d, 0x01, 0x3f, 0xd1, 0x05, 0x89, 0xcc, 0x4e, 0x1a, 0x99, 0x49, 0x3c, 0x9a, 0x7b,
+	0xf8, 0x4c, 0x89, 0x5a, 0x43, 0xe7, 0xa3, 0xb3, 0xe9, 0x98, 0x5f, 0xe8, 0xfa, 0x5f, 0x00, 0x00,
+	0x00, 0xff, 0xff, 0x4d, 0xfa, 0xbe, 0x63, 0x4f, 0x03, 0x00, 0x00,
 }
