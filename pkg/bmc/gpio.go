@@ -118,7 +118,6 @@ func (g *GpioSystem) ManageButton(line string, b pb.Button) error {
 		log.Printf("Releasing button %s", line)
 		setLineValues(l, []bool{true})
 	}
-	return nil
 }
 
 func startGpio(p GpioPlatform) (*GpioSystem, error) {

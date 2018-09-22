@@ -26,34 +26,34 @@ func newBinaryLog(p *ast2400.State) *binaryLog {
 func (l *binaryLog) Log(s *ast2400.State) {
 	err := binary.Write(l.f, binary.LittleEndian, int64(time.Now().Unix()))
 	if err != nil {
-		log.Fatalf("binary.Write failed:", err)
+		log.Fatalf("binary.Write failed: %v", err)
 	}
 	err = binary.Write(l.f, binary.LittleEndian, uint32(len(s.Gpio)))
 	if err != nil {
-		log.Fatalf("binary.Write failed:", err)
+		log.Fatalf("binary.Write failed: %v", err)
 	}
 	err = binary.Write(l.f, binary.LittleEndian, uint32(len(s.Scu)))
 	if err != nil {
-		log.Fatalf("binary.Write failed:", err)
+		log.Fatalf("binary.Write failed: %v", err)
 	}
 	for k, v := range s.Gpio {
 		err = binary.Write(l.f, binary.LittleEndian, k)
 		if err != nil {
-			log.Fatalf("binary.Write failed:", err)
+			log.Fatalf("binary.Write failed: %v", err)
 		}
 		err = binary.Write(l.f, binary.LittleEndian, v)
 		if err != nil {
-			log.Fatalf("binary.Write failed:", err)
+			log.Fatalf("binary.Write failed: %v", err)
 		}
 	}
 	for k, v := range s.Scu {
 		err = binary.Write(l.f, binary.LittleEndian, k)
 		if err != nil {
-			log.Fatalf("binary.Write failed:", err)
+			log.Fatalf("binary.Write failed: %v", err)
 		}
 		err = binary.Write(l.f, binary.LittleEndian, v)
 		if err != nil {
-			log.Fatalf("binary.Write failed:", err)
+			log.Fatalf("binary.Write failed: %v", err)
 		}
 	}
 

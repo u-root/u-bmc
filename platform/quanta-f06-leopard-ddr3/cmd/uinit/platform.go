@@ -7,9 +7,9 @@ package main
 import (
 	"log"
 
-	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/gpio"
 	"github.com/u-root/u-bmc/pkg/ast2400"
 	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/gpio"
 
 	pb "github.com/u-root/u-bmc/proto"
 )
@@ -73,7 +73,7 @@ func (p *platform) InitializeSystem() error {
 	// - Route UART2 to UART3
 	// - Route UART3 to UART2
 	// TODO(bluecmd): Platform dependent
-	p.a.Mem().MustWrite32(0x1E789000+0x9c, 0x6 << 22 | 0x4 << 19)
+	p.a.Mem().MustWrite32(0x1E789000+0x9c, 0x6<<22|0x4<<19)
 
 	// Re-enable the clock of UART2 to enable the internal routing
 	// which will make u-bmc end of the pipe be /dev/ttyS2
@@ -81,11 +81,11 @@ func (p *platform) InitializeSystem() error {
 	// if we do that then /dev/ttyS1 might be confusing as it will not work
 	// properly.
 	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0, ast2400.SCU_PASSWORD)
-	csr := p.a.Mem().MustRead32(ast2400.SCU_BASE+0x0c)
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0c, csr & ^uint32(1 << 16))
+	csr := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x0c)
+	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0c, csr & ^uint32(1<<16))
 	// Enable UART1 and UART2 pins
-	mfr := p.a.Mem().MustRead32(ast2400.SCU_BASE+0x84)
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x84, mfr | 0xffff0000)
+	mfr := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x84)
+	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x84, mfr|0xffff0000)
 	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0, 0x0)
 
 	log.Printf("Setting up Network Controller Sideband Interface (NC-SI) for eth0")
@@ -94,14 +94,14 @@ func (p *platform) InitializeSystem() error {
 }
 
 func (p *platform) PwmMap() map[int]string {
-	return map[int]string {
+	return map[int]string{
 		0: "hwmon0/pwm1",
 		1: "hwmon0/pwm2",
 	}
 }
 
 func (p *platform) FanMap() map[int]string {
-	return map[int]string {
+	return map[int]string{
 		0: "hwmon0/fan1_input",
 		1: "hwmon0/fan2_input",
 	}
