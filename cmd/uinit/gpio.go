@@ -109,7 +109,8 @@ func (g *gpioSystem) manageButton(line string, b pb.Button) {
 func startGpio(c string) {
 	f, err := os.OpenFile(c, os.O_RDWR, 0600)
 	if err != nil {
-		log.Fatalf("startGpio: open: %v", err)
+		log.Printf("startGpio: open: %v", err)
+		return
 	}
 
 	g = &gpioSystem{

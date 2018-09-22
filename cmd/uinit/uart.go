@@ -32,7 +32,8 @@ func startUart(f string) {
 	c := &serial.Config{Name: f, Baud: 57600}
 	s, err := serial.OpenPort(c)
 	if err != nil {
-		log.Fatalf("serial.OpenPort: %v", err)
+		log.Printf("serial.OpenPort: %v", err)
+		return
 	}
 
 	go uartSender(s)

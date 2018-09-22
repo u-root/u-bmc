@@ -9,6 +9,7 @@ import (
 	"crypto/elliptic"
 	"crypto/x509"
 	"encoding/pem"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -22,7 +23,6 @@ import (
 
 var (
 	commands = []string{
-		"/bbin/sshd --ip [::0] --port 22 --privatekey /conf/ssh_host_ecdsa_key --keys /conf/authorized_keys",
 	}
 )
 
@@ -49,37 +49,44 @@ func newSshKey() []byte {
 func addIp(cidr string, iface string) {
 	l, err := netlink.LinkByName(iface)
 	if err != nil {
-		log.Fatalf("Unable to get interface %s: %v", iface, err)
+		log.Printf("Unable to get interface %s: %v", iface, err)
+		return
 	}
 
 	addr, err := netlink.ParseAddr(cidr)
 	if err != nil {
-		log.Fatalf("netlink.ParseAddr %v: %v", cidr, err)
+		log.Printf("netlink.ParseAddr %v: %v", cidr, err)
+		return
 	}
 
 	h, err := netlink.NewHandle(unix.NETLINK_ROUTE)
 	if err != nil {
-		log.Fatalf("netlink.NewHandle: %v", err)
+		log.Printf("netlink.NewHandle: %v", err)
+		return
 	}
 	defer h.Delete()
 	if err := h.AddrReplace(l, addr); err != nil {
-		log.Fatalf("AddrReplace(%v): %v", addr, err)
+		log.Printf("AddrReplace(%v): %v", addr, err)
+		return
 	}
 }
 
 func setLinkUp(iface string) {
 	l, err := netlink.LinkByName(iface)
 	if err != nil {
-		log.Fatalf("Unable to get interface %s: %v", iface, err)
+		log.Printf("Unable to get interface %s: %v", iface, err)
+		return
 	}
 
 	h, err := netlink.NewHandle(unix.NETLINK_ROUTE)
 	if err != nil {
-		log.Fatalf("netlink.NewHandle: %v", err)
+		log.Printf("netlink.NewHandle: %v", err)
+		return
 	}
 	defer h.Delete()
 	if err := h.LinkSetUp(l); err != nil {
-		log.Fatalf("handle.LinkSetUp: %v", err)
+		log.Printf("handle.LinkSetUp: %v", err)
+		return
 	}
 }
 
@@ -102,25 +109,32 @@ func intrHandler(cmd *exec.Cmd) {
 	}
 }
 
+func startSsh(environ []string) {
+	cmd := exec.Command(
+		"/bbin/sshd",
+		"--ip", "[::0]",
+		"--port", "22",
+		"--privatekey", "/conf/ssh_host_ecdsa_key",
+		"--keys", "/conf/authorized_keys")
+	cmd.Env = environ
+	cmd.Stdin = nil
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		log.Printf("Failed to execute: %v", err)
+	}
+}
+
 func main() {
-	log.Printf("Configuring SOC\n")
-	configureSoc()
-
-	log.Printf("Starting GPIO drivers\n")
-	startGpio("/dev/gpiochip0")
-
-	log.Printf("Configuring UART ports\n")
-	go startUart("/dev/ttyS2")
-
-	log.Printf("Setting up Network Controller Sideband Interface (NC-SI) for eth0\n")
-	go startNcsi("eth0")
+	lf, err := os.OpenFile("/tmp/u-bmc.log", os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		log.Printf("os.OpenFile u-bmc.log: %v", err)
+	} else {
+		log.SetOutput(io.MultiWriter(os.Stdout, lf))
+	}
 
 	log.Printf("Loading system configuration\n")
-
 	syscall.Sethostname([]byte("ubmc"))
-
-	// TOOD(bluecmd): Need /dev/mem for platform libraries for now
-	syscall.Mknod("/dev/mem", syscall.S_IFCHR|0600, 0x0101)
 
 	// Fun story: if you don't have both IPv4 and IPv6 loopback configured
 	// golang binaries will not bind to :: but to 0.0.0.0 instead.
@@ -144,28 +158,26 @@ func main() {
 	environ := append(os.Environ(), "USER=root")
 	environ = append(environ, "HOME=/root")
 
+	// TOOD(bluecmd): Need /dev/mem for platform libraries for now
+	syscall.Mknod("/dev/mem", syscall.S_IFCHR|0600, 0x0101)
+
+	log.Printf("Starting debug SSH server\n")
+	go startSsh(environ)
+
+	log.Printf("Configuring SOC\n")
+	configureSoc()
+
+	log.Printf("Starting GPIO drivers\n")
+	startGpio("/dev/gpiochip0")
+
+	log.Printf("Configuring UART ports\n")
+	go startUart("/dev/ttyS2")
+
+	log.Printf("Setting up Network Controller Sideband Interface (NC-SI) for eth0\n")
+	go startNcsi("eth0")
+
 	log.Printf("Starting gRPC interface\n")
 	startGrpc()
-
-	log.Printf("System startup\n")
-	for _, line := range commands {
-		log.Printf("Executing command: %v\n", line)
-		cmdSplit := strings.Split(line, " ")
-		if len(cmdSplit) == 0 {
-			continue
-		}
-
-		go func() {
-			cmd := exec.Command(cmdSplit[0], cmdSplit[1:]...)
-			cmd.Env = environ
-			cmd.Stdin = nil
-			cmd.Stderr = os.Stderr
-			cmd.Stdout = os.Stdout
-			if err := cmd.Run(); err != nil {
-				log.Printf("Failed to execute: %v", err)
-			}
-		}()
-	}
 
 	log.Printf("Starting local shell\n")
 	cmd := exec.Command("/bbin/elvish")
@@ -189,5 +201,4 @@ func main() {
 	if err := cmd.Run(); err != nil {
 		log.Printf("Failed to execute: %v", err)
 	}
-
 }
