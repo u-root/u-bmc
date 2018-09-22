@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package bmc
 
 import (
 	"log"
@@ -110,7 +110,7 @@ func handleNcsiPackageList(b []byte) {
 	}
 }
 
-func startNcsi(iface string) {
+func StartNcsi(iface string) {
 	c, err := genetlink.Dial(nil)
 	if err != nil {
 		log.Printf("dial generic netlink: %v", err)

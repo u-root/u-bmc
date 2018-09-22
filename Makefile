@@ -7,6 +7,7 @@ LEB=65408
 ARCH ?= arm
 CROSS_COMPILE ?= arm-none-eabi-
 MAKE_JOBS ?= -j8
+PLATFORM ?= quanta-f06-leopard-ddr3
 
 .PHONY: sim
 
@@ -40,7 +41,7 @@ boot/%.dtb: platform/%.dts
 		$< \
 	| dtc -O dtb -o $@ -
 
-boot.ubifs.img: boot/u-boot.boot.img boot/zImage boot/quanta-f06-leopard-ddr3.dtb boot/u-boot.env
+boot.ubifs.img: boot/u-boot.boot.img boot/zImage boot/$(PLATFORM).dtb boot/u-boot.env
 	mkfs.ubifs -r boot -m 1 -e ${LEB} -c 64 -o $(@)
 
 root: initramfs.cpio
@@ -79,14 +80,15 @@ u-root:
 	go build -o u-root github.com/u-root/u-root
 
 initramfs.cpio: u-root ssh_keys.pub
-	$(MAKE) -C cmd/uinit ssh_keys.go
+	$(MAKE) -C pkg/bmc/ ssh_keys.go
 	GOARM=5 GOARCH=$(ARCH) ./u-root \
 		-build=bb \
 		-o "$@.tmp" \
 		core \
 		github.com/u-root/u-root/cmds/scp/ \
 		github.com/u-root/u-root/cmds/sshd/ \
-		github.com/u-root/u-bmc/cmd/*/
+		github.com/u-root/u-bmc/cmd/*/ \
+		github.com/u-root/u-bmc/platform/$(PLATFORM)/cmd/*/
 	mv "$@.tmp" "$@"
 
 clean:

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package bmc
 
 import (
 	"context"
@@ -16,12 +16,30 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type mgmtServer struct {
+type rpcGpioSystem interface {
+	PressButton(pb.Button, uint32) error
+}
 
+type rpcFanSystem interface {
+	ReadFanPercentage(int) (int, error)
+	ReadFanRpm(int) (int, error)
+	SetFanPercentage(int, int) error
+	FanCount() int
+}
+
+type rpcUartSystem interface {
+	Read() []byte
+	Write([]byte)
+}
+
+type mgmtServer struct {
+	gpio rpcGpioSystem
+	fan  rpcFanSystem
+	uart rpcUartSystem
 }
 
 func (m *mgmtServer) PressButton(ctx context.Context, r *pb.ButtonPressRequest) (*pb.ButtonPressResponse, error) {
-	err := PressButton(r.Button, r.DurationMs)
+	err := m.gpio.PressButton(r.Button, r.DurationMs)
 	if err != nil {
 		return nil, err
 	}
@@ -30,12 +48,12 @@ func (m *mgmtServer) PressButton(ctx context.Context, r *pb.ButtonPressRequest) 
 
 func (m *mgmtServer) GetFans(ctx context.Context, _ *pb.GetFansRequest) (*pb.GetFansResponse, error) {
 	r := pb.GetFansResponse{}
-	for i := 0; i < fanCount(); i++ {
-		rpm, err := readFanRpm(i)
+	for i := 0; i < m.fan.FanCount(); i++ {
+		rpm, err := m.fan.ReadFanRpm(i)
 		if err != nil {
 			return nil, err
 		}
-		prct, err := readFanPercentage(i)
+		prct, err := m.fan.ReadFanPercentage(i)
 		if err != nil {
 			return nil, err
 		}
@@ -51,22 +69,21 @@ func (m *mgmtServer) SetFan(ctx context.Context, r *pb.SetFanRequest) (*pb.SetFa
 	if r.Mode != pb.FanMode_FAN_MODE_PERCENTAGE {
 		return nil, fmt.Errorf("Specified fan mode not supported")
 	}
-	err := setFanPercentage(int(r.Fan), int(r.Percentage))
+	err := m.fan.SetFanPercentage(int(r.Fan), int(r.Percentage))
 	if err != nil {
 		return nil, err
 	}
 	return &pb.SetFanResponse{}, nil
 }
 
-func streamIn(stream pb.ManagementService_StreamConsoleServer) {
+func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer) {
 	for {
-		buf := <-uartIn
-		stream.Send(&pb.ConsoleData{Data: buf})
+		stream.Send(&pb.ConsoleData{Data: m.uart.Read()})
 	}
 }
 
 func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServer) error {
-	go streamIn(stream)
+	go m.streamIn(stream)
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
@@ -75,11 +92,11 @@ func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServ
 		if err != nil {
 			return err
 		}
-		uartOut <- in.Data
+		m.uart.Write(in.Data)
 	}
 }
 
-func startGrpc() {
+func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem) {
 	// TODO(bluecmd): Since we have no RNG, no configuration, etc
 	// only use http for now
 	l, err := net.Listen("tcp", "[::]:80")
@@ -87,7 +104,7 @@ func startGrpc() {
 		log.Fatalf("could not listen: %v", err)
 	}
 
-	s := mgmtServer{}
+	s := mgmtServer{gpio, fan, uart}
 
 	g := grpc.NewServer()
 	pb.RegisterManagementServiceServer(g, &s)
