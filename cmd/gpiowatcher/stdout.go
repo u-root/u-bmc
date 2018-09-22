@@ -18,7 +18,7 @@ var (
 	// U4 and V2 is RMII receive clock probably never really interesting
 	// V6 and O2 is the fan PWM input on the F06 Leopard
 	// TODO(bluecmd): This can be made adaptive in the future
-	ignoreLines = flag.String("ignore", "U4,V2,O0,O2", "Ignore events on the specified comma separated lines when printing")
+	ignoreLines = flag.String("ignore", "U4,V2,O0,O2,N0,N1", "Ignore events on the specified comma separated lines when printing")
 )
 
 type stdoutLog struct {
