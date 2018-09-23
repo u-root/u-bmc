@@ -103,7 +103,7 @@ func (p *platform) PwmMap() map[int]string {
 func (p *platform) FanMap() map[int]string {
 	return map[int]string{
 		0: "hwmon0/fan1_input",
-		1: "hwmon0/fan2_input",
+		1: "hwmon0/fan3_input",
 	}
 }
 
