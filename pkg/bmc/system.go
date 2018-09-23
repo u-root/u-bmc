@@ -122,17 +122,19 @@ func startSsh(environ []string) {
 	cmd.Stdin = nil
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
 		log.Printf("Failed to execute: %v", err)
 	}
 }
 
 func Startup(p Platform) {
+	loggers := []io.Writer{os.Stdout}
 	lf, err := os.OpenFile("/tmp/u-bmc.log", os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		log.Printf("os.OpenFile u-bmc.log: %v", err)
 	} else {
-		log.SetOutput(io.MultiWriter(os.Stdout, lf))
+		loggers = append(loggers, lf)
+		log.SetOutput(io.MultiWriter(loggers...))
 	}
 
 	log.Printf("Loading system configuration")
@@ -165,7 +167,8 @@ func Startup(p Platform) {
 	syscall.Mknod("/dev/mem", syscall.S_IFCHR|0600, 0x0101)
 
 	log.Printf("Starting debug SSH server")
-	go startSsh(environ)
+	// Make sure sshd starts up completely before we continue, to allow for debugging
+	startSsh(environ)
 
 	log.Printf("Initialize system hardware")
 	p.InitializeSystem()
@@ -193,7 +196,10 @@ func Startup(p Platform) {
 	}
 
 	log.Printf("Starting gRPC interface")
-	startGrpc(gpio, fan, uart)
+	err = startGrpc(gpio, fan, uart)
+	if err != nil {
+		log.Printf("startGrpc: %v", err)
+	}
 
 	log.Printf("Starting local shell")
 	cmd := exec.Command("/bbin/elvish")
