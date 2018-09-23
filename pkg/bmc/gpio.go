@@ -55,13 +55,7 @@ func (g *GpioSystem) monitorOne(line string) error {
 		} else {
 			f = fmt.Sprintf("unknown event %v", ev)
 		}
-		// TODO(bluecmd): Just to be sure, read the value (there is a race but
-		// I just to double check that the edge detection works somewhat well)
-		vals, err := getLineValues(e)
-		if err != nil {
-			return err
-		}
-		log.Printf("%s: %s, value is now %d", line, f, vals.values[0])
+		log.Printf("%s: %s", line, f)
 
 	}
 	log.Printf("Monitoring stopped for GPIO line %s", line)
