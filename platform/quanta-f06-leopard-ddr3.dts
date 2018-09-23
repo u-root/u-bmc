@@ -125,6 +125,10 @@
 
 &i2c7 {
 	status = "okay";
+	hsc@11 {
+		compatible = "adi,adm1278";
+		reg = <0x11>;
+	};
 };
 
 // TODO(bluecmd): Right now this is needed in order to enable iLPC2AHB
