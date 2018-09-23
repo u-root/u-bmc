@@ -30,11 +30,20 @@ func (g *GpioSystem) monitorOne(line string) error {
 	if !ok {
 		return fmt.Errorf("Could not resolve GPIO %s", line)
 	}
-	e := getLineEvent(g.f, port, GPIOHANDLE_REQUEST_INPUT, GPIOEVENT_REQUEST_BOTH_EDGES)
-	d := getLineValues(e)
+	e, err := getLineEvent(g.f, port, GPIOHANDLE_REQUEST_INPUT, GPIOEVENT_REQUEST_BOTH_EDGES)
+	if err != nil {
+		return err
+	}
+	d, err := getLineValues(e)
+	if err != nil {
+		return err
+	}
 	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d.values[0])
 	for {
-		ev := readEvent(e)
+		ev, err := readEvent(e)
+		if err != nil {
+			return err
+		}
 		if ev == nil {
 			break
 		}
@@ -48,7 +57,11 @@ func (g *GpioSystem) monitorOne(line string) error {
 		}
 		// TODO(bluecmd): Just to be sure, read the value (there is a race but
 		// I just to double check that the edge detection works somewhat well)
-		log.Printf("%s: %s, value is now %d", line, f, getLineValues(e).values[0])
+		vals, err := getLineValues(e)
+		if err != nil {
+			return err
+		}
+		log.Printf("%s: %s, value is now %d", line, f, vals.values[0])
 
 	}
 	log.Printf("Monitoring stopped for GPIO line %s", line)
@@ -57,15 +70,21 @@ func (g *GpioSystem) monitorOne(line string) error {
 
 func (g *GpioSystem) Monitor(lines []string) {
 	for _, line := range lines {
-		go g.monitorOne(line)
+		go func(l string) {
+			err := g.monitorOne(l)
+			if err != nil {
+				log.Printf("Monitor %s failed: %v", l, err)
+			}
+		}(line)
 	}
 }
 
-func (g *GpioSystem) Hog(lines map[string]bool) error {
+func (g *GpioSystem) Hog(lines map[string]bool) {
 	// TODO(bluecmd): There is a hard limit of 64 lines per kernel handle,
 	// if we ever hit that we will have to change this part.
 	if len(lines) > 64 {
-		return fmt.Errorf("Too many GPIO lines to hog: %d > 64", len(lines))
+		log.Printf("Too many GPIO lines to hog: %d > 64", len(lines))
+		return
 	}
 	lidx := make([]uint32, len(lines))
 	vals := make([]bool, len(lines))
@@ -73,7 +92,8 @@ func (g *GpioSystem) Hog(lines map[string]bool) error {
 	for l, v := range lines {
 		port, ok := g.p.GpioNameToPort(l)
 		if !ok {
-			return fmt.Errorf("Could not resolve GPIO %s", l)
+			log.Printf("Could not resolve GPIO %s", l)
+			return
 		}
 		lidx[i] = port
 		vals[i] = v
@@ -81,8 +101,10 @@ func (g *GpioSystem) Hog(lines map[string]bool) error {
 		i++
 	}
 
-	requestLineHandle(g.f, lidx, vals)
-	return nil
+	_, err := requestLineHandle(g.f, lidx, vals)
+	if err != nil {
+		log.Printf("Hog failed: %v", err)
+	}
 }
 
 func (g *GpioSystem) PressButton(b pb.Button, durMs uint32) error {
@@ -98,14 +120,19 @@ func (g *GpioSystem) PressButton(b pb.Button, durMs uint32) error {
 	return nil
 }
 
-func (g *GpioSystem) ManageButton(line string, b pb.Button) error {
+func (g *GpioSystem) ManageButton(line string, b pb.Button) {
 	// TODO(bluecmd): Assume the line is inverted for now, probably will
 	// always be the case in all platforms though
 	port, ok := g.p.GpioNameToPort(line)
 	if !ok {
-		return fmt.Errorf("Could not resolve GPIO %s", line)
+		log.Printf("Could not resolve GPIO %s", line)
+		return
 	}
-	l := requestLineHandle(g.f, []uint32{port}, []bool{true})
+	l, err := requestLineHandle(g.f, []uint32{port}, []bool{true})
+	if err != nil {
+		log.Printf("ManageButton %s failed: %v", line, err)
+		return
+	}
 	log.Printf("Initialized button %s", line)
 
 	for {

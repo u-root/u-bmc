@@ -8,7 +8,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 
 	pb "github.com/u-root/u-bmc/proto"
@@ -76,9 +75,12 @@ func (m *mgmtServer) SetFan(ctx context.Context, r *pb.SetFanRequest) (*pb.SetFa
 	return &pb.SetFanResponse{}, nil
 }
 
-func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer) {
+func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer) error {
 	for {
-		stream.Send(&pb.ConsoleData{Data: m.uart.Read()})
+		err := stream.Send(&pb.ConsoleData{Data: m.uart.Read()})
+		if err != nil {
+			return err
+		}
 	}
 }
 
@@ -96,12 +98,12 @@ func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServ
 	}
 }
 
-func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem) {
+func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem) error {
 	// TODO(bluecmd): Since we have no RNG, no configuration, etc
 	// only use http for now
 	l, err := net.Listen("tcp", "[::]:80")
 	if err != nil {
-		log.Fatalf("could not listen: %v", err)
+		return fmt.Errorf("could not listen: %v", err)
 	}
 
 	s := mgmtServer{gpio, fan, uart}
@@ -110,4 +112,5 @@ func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem) {
 	pb.RegisterManagementServiceServer(g, &s)
 	reflection.Register(g)
 	go g.Serve(l)
+	return nil
 }
