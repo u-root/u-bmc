@@ -65,7 +65,7 @@
 &pwm_tacho {
 	status = "okay";
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm2_default>;
+	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default>;
 	fan@0 {
 		reg = <0x00>;
 		aspeed,fan-tach-ch = /bits/ 8 <0x00>;
