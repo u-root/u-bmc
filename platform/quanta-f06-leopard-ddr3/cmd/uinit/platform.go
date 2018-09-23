@@ -86,6 +86,12 @@ func (p *platform) InitializeSystem() error {
 	// Enable UART1 and UART2 pins
 	mfr := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x84)
 	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x84, mfr|0xffff0000)
+	// Disable all pass-through GPIO ports. This enables u-bmc to control
+	// the power buttons, which are routed as pass-through before boot has
+	// completed.
+	hws := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x70)
+	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x70, hws & ^uint32(3 << 21))
+	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x8c, 0)
 	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0, 0x0)
 
 	log.Printf("Setting up Network Controller Sideband Interface (NC-SI) for eth0")
