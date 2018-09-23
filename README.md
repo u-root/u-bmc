@@ -6,17 +6,34 @@
 
 u-bmc uses u-root to create a Linux OS distribution that is fully open-source.
 
+u-bmc borrows and contributes to [OpenBMC](https://github.com/openbmc/openbmc) which has
+similar high-level goals, but chooses to pursue industry-standard compliance. Where
+OpenBMC uses IPMI, u-bmc uses gRPC.
+
+# Why?
+
+BMC software has historically been known to be insecure. There is no inherent reason for that.
+u-bmc sets out to improve this by offering an alternative built on modern technologies.
+
 # Support
 
 u-bmc is still in experimental stage and is currently only supporting
-BMCs based on ASPEED AST2400. Currently the only motherboard supported is the
-Quanta F06 Leopard from Open Compute Project.
+BMCs based on ASPEED AST2400. Other BMC SOCs are planned, and if you want
+to contribute let us know.
+
+Currently the supported boards are:
+- Open Compute Project: Quanta F06 Leopard DDR3
+
+Planned boards are:
+- Open Compute Project: Quanta F20 Yosemite
+
+Do you want to become a contributor of a board? Let us know!
 
 # Roadmap
 
-This is to give you, the reader, some sense of what we want to create:
+To give you some sense of what we want to create:
 
- * All function exported over GRPC like:
+ * All function exported over gRPC like:
    * Serial-over-LAN
    * Sensor data
    * iKVM
@@ -27,7 +44,7 @@ This is to give you, the reader, some sense of what we want to create:
    * Support SSH CA-signed certificates to avoid having to upload a bunch of certs
  * USB device emulation
    * Must have: USB storage from image
-   * Must have: USB ethernet to host, replaces KCS IPMI interface.
+   * Cool to have: USB ethernet to host, replaces KCS IPMI interface.
    * Cool to have: USB graphics card + mouse + keyboard for KVM
 
 # Usage
@@ -67,6 +84,9 @@ sudo ./socflash_x64 of=bmc-backup.img if=flash.img lpcport=0x2e option=gl
 ```
 
 # Updating Dependencies
+
+**NOTE: Due to a [bug](https://github.com/u-root/u-root/issues/936) in
+u-root vendoring is temporarily disabled**
 
 ```
 Latest released version of dep is required:
