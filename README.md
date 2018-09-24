@@ -68,12 +68,19 @@ Setup:
 ```
 # SSH ECDSA public keys does not work for now
 cp ~/.ssh/id_rsa.pub ssh_keys.pub
-fakeroot make
+make
 ```
 
 If you have qemu-system-arm installed:
 ```
 make sim
+```
+
+To run the integration tests (requires QEMU):
+```
+export UROOT_QEMU=qemu-system-arm
+cd integration
+go test
 ```
 
 If you're using a supported platform and want to try it on your hardware you

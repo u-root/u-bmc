@@ -21,6 +21,15 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+var (
+	environ []string
+)
+
+func init() {
+	environ = append(os.Environ(), "USER=root")
+	environ = append(environ, "HOME=/root")
+}
+
 type Platform interface {
 	InitializeSystem() error
 	HostUart() (string, int)
@@ -102,16 +111,20 @@ func createFile(file string, mode os.FileMode, c []byte) {
 	f.Write(c)
 }
 
-func intrHandler(cmd *exec.Cmd) {
+func intrHandler(cmd *exec.Cmd, exited chan bool) {
 	for {
 		c := make(chan os.Signal, 1)
 		signal.Notify(c, os.Interrupt)
-		_ = <-c
-		cmd.Process.Signal(os.Interrupt)
+		select {
+		case _ = <-c:
+			cmd.Process.Signal(os.Interrupt)
+		case _ = <-exited:
+			return
+		}
 	}
 }
 
-func startSsh(environ []string) {
+func startSsh() {
 	cmd := exec.Command(
 		"/bbin/sshd",
 		"--ip", "[::0]",
@@ -127,7 +140,7 @@ func startSsh(environ []string) {
 	}
 }
 
-func Startup(p Platform) {
+func Startup(p Platform) error {
 	loggers := []io.Writer{os.Stdout}
 	lf, err := os.OpenFile("/tmp/u-bmc.log", os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
@@ -160,32 +173,32 @@ func Startup(p Platform) {
 	// TODO(bluecmd): The idea is to remove this for a StartSshServer RPC call.
 	createFile("/conf/authorized_keys", 0600, []byte(strings.Join(authorizedKeys, "\n")))
 
-	environ := append(os.Environ(), "USER=root")
-	environ = append(environ, "HOME=/root")
-
 	// The platform libraries need access to physical memory
 	syscall.Mknod("/dev/mem", syscall.S_IFCHR|0600, 0x0101)
 
 	log.Printf("Starting debug SSH server")
 	// Make sure sshd starts up completely before we continue, to allow for debugging
-	startSsh(environ)
+	startSsh()
 
 	log.Printf("Initialize system hardware")
 	p.InitializeSystem()
 	if err != nil {
 		log.Printf("platform.InitializeSystem: %v", err)
+		return err
 	}
 
 	log.Printf("Starting GPIO drivers")
 	gpio, err := startGpio(p)
 	if err != nil {
 		log.Printf("startGpio: %v", err)
+		return err
 	}
 
 	log.Printf("Starting fan system")
 	fan, err := startFan(p)
 	if err != nil {
 		log.Printf("startFan: %v", err)
+		return err
 	}
 
 	tty, baud := p.HostUart()
@@ -193,34 +206,36 @@ func Startup(p Platform) {
 	uart, err := startUart(tty, baud)
 	if err != nil {
 		log.Printf("startUart: %v", err)
+		return err
 	}
 
 	log.Printf("Starting gRPC interface")
 	err = startGrpc(gpio, fan, uart)
 	if err != nil {
 		log.Printf("startGrpc: %v", err)
+		return err
 	}
+	return nil
+}
 
-	log.Printf("Starting local shell")
+func Shell() {
 	cmd := exec.Command("/bbin/elvish")
 	cmd.Dir = "/root"
 	cmd.Env = environ
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
+	exited := make(chan bool)
 	// Forward intr to the shell
-	go intrHandler(cmd)
+	go intrHandler(cmd, exited)
 	if err := cmd.Run(); err != nil {
 		log.Printf("Failed to execute: %v", err)
 	}
+	exited <- true
+}
 
-	log.Printf("Shell died, rebooting")
-	cmd = exec.Command("/bbin/shutdown", "reboot")
-	cmd.Env = environ
-	cmd.Stdin = os.Stdin
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		log.Printf("Failed to execute: %v", err)
+func Reboot() {
+	if err := unix.Reboot(unix.LINUX_REBOOT_CMD_RESTART); err != nil {
+		log.Fatalf("reboot failed: %v", err)
 	}
 }
