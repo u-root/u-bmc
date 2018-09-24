@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package main
+package platform
 
 import (
 	"log"
 
 	"github.com/u-root/u-bmc/pkg/ast2400"
 	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/gpio"
+	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/gpio"
 
 	pb "github.com/u-root/u-bmc/proto"
 )
@@ -125,9 +125,12 @@ func (p *platform) InitializeFans(fan *bmc.FanSystem) error {
 	return nil
 }
 
-func main() {
+func (p *platform) Close() {
+	p.a.Close()
+}
+
+func Platform() *platform {
 	a := ast2400.Open()
-	defer a.Close()
 	p := platform{a, gpio.Gpio{}}
-	bmc.Startup(&p)
+	return &p
 }

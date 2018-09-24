@@ -44,13 +44,11 @@ boot/%.dtb: platform/%.dts
 boot.ubifs.img: boot/u-boot.boot.img boot/zImage boot/$(PLATFORM).dtb boot/u-boot.env
 	mkfs.ubifs -r boot -m 1 -e ${LEB} -c 64 -o $(@)
 
-root: initramfs.cpio
+root.ubifs.img: initramfs.cpio
 	rm -fr root/
 	mkdir -p root/root
-	(cd root; cpio -idv < ../$(<))
-
-root.ubifs.img: root
-	mkfs.ubifs -r root -m 1 -e ${LEB} -c 440 -o $(@)
+	fakeroot sh -c "(cd root/; cpio -idv < ../$(<)); \
+		mkfs.ubifs -r root -m 1 -e ${LEB} -c 440 -o $(@)"
 
 ubi.img: root.ubifs.img boot.ubifs.img
 	ubinize -vv -o ubi.img -m 1 -p64KiB ubi.cfg

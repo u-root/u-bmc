@@ -7,7 +7,7 @@ package main
 import (
 	"flag"
 	"github.com/u-root/u-bmc/pkg/gpiowatcher"
-	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/gpio"
+	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/gpio"
 )
 
 var (
