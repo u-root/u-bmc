@@ -5,7 +5,7 @@
 
 cat << _EOF_
 // AUTOGENERATE BY ssh_keys.sh
-package main
+package bmc
 
 var (
 	authorizedKeys = []string{
