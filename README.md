@@ -1,5 +1,9 @@
 # u-bmc
 
+[![Build
+Status](https://circleci.com/gh/u-root/u-bmc.svg?style=shield)](https://circleci.com/gh/u-root/u-bmc)
+[![Go Report
+Card](https://goreportcard.com/badge/github.com/u-root/u-bmc)](https://goreportcard.com/report/github.com/u-root/u-bmc)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/u-root/u-bmc/blob/master/LICENSE)
 
 # Description
@@ -9,6 +13,10 @@ u-bmc uses u-root to create a Linux OS distribution that is fully open-source.
 u-bmc borrows and contributes to [OpenBMC](https://github.com/openbmc/openbmc) which has
 similar high-level goals, but chooses to pursue industry-standard compliance. Where
 OpenBMC uses IPMI, u-bmc uses gRPC.
+
+# Demo
+
+[![asciicast](https://asciinema.org/a/202889.png)](https://asciinema.org/a/202889)
 
 # Why?
 
