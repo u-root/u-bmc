@@ -41,23 +41,15 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Get dependencies
-          command: |
-            go get github.com/golang/protobuf/proto
-            go get github.com/mdlayher/genetlink
-            go get github.com/mdlayher/netlink
-            go get github.com/tarm/serial
-            go get github.com/u-root/u-root
-            go get github.com/vishvananda/netlink
-            go get golang.org/x/net/context
-            go get golang.org/x/sys/unix
-            go get google.golang.org/grpc
-            go get google.golang.org/grpc/reflection
-      - run:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            make -C pkg/bmc ssh_keys.go
+            make -C config ssh_keys.go
+      - run:
+          name: Get dependencies
+          command: |
+            go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
+            go get -t -d github.com/u-root/u-bmc/integration
       - run:
           name: Test all
           command: go test -a -ldflags '-s' ./...
@@ -73,23 +65,15 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Get dependencies
-          command: |
-            go get github.com/golang/protobuf/proto
-            go get github.com/mdlayher/genetlink
-            go get github.com/mdlayher/netlink
-            go get github.com/tarm/serial
-            go get github.com/u-root/u-root
-            go get github.com/vishvananda/netlink
-            go get golang.org/x/net/context
-            go get golang.org/x/sys/unix
-            go get google.golang.org/grpc
-            go get google.golang.org/grpc/reflection
-      - run:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            make -C pkg/bmc ssh_keys.go
+            make -C config ssh_keys.go
+      - run:
+          name: Get dependencies
+          command: |
+            go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
+            go get -t -d github.com/u-root/u-bmc/integration
       - run:
           name: Race detector
           command: go test -race ./...
