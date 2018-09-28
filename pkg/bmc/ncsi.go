@@ -6,108 +6,95 @@ package bmc
 
 import (
 	"log"
+	"net"
 	"time"
 
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
-	vnl "github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
-const (
-	NCSI_CMD_PKG_INFO        = 1
-	NCSI_CMD_SET_INTERFACE   = 2
-	NCSI_CMD_CLEAR_INTERFACE = 3
-
-	NCSI_ATTR_IFINDEX      = 1
-	NCSI_ATTR_PACKAGE_LIST = 2
-	NCSI_ATTR_PACKAGE_ID   = 3
-	NCSI_ATTR_CHANNEL_ID   = 4
-
-	NCSI_PKG_ATTR              = 1
-	NCSI_PKG_ATTR_ID           = 2
-	NCSI_PKG_ATTR_FORCED       = 3
-	NCSI_PKG_ATTR_CHANNEL_LIST = 4
-
-	NCSI_CHANNEL_ATTR               = 1
-	NCSI_CHANNEL_ATTR_ID            = 2
-	NCSI_CHANNEL_ATTR_VERSION_MAJOR = 3
-	NCSI_CHANNEL_ATTR_VERSION_MINOR = 4
-	NCSI_CHANNEL_ATTR_VERSION_STR   = 5
-	NCSI_CHANNEL_ATTR_LINK_STATE    = 6
-	NCSI_CHANNEL_ATTR_ACTIVE        = 7
-	NCSI_CHANNEL_ATTR_FORCED        = 8
-	NCSI_CHANNEL_ATTR_VLAN_LIST     = 9
-	NCSI_CHANNEL_ATTR_VLAN_ID       = 10
-)
-
-func registerNcsiPackage(b []byte) {
+func registerNcsiPackage(b []byte) error {
 	ad, err := netlink.NewAttributeDecoder(b)
 	if err != nil {
-		log.Printf("failed to create attribute decoder: %v", err)
-		return
+		return err
 	}
 
 	for ad.Next() {
-		if ad.Type() == NCSI_PKG_ATTR_ID {
+		switch ad.Type() {
+		case unix.NCSI_PKG_ATTR_ID:
 			id := ad.Uint32()
 			log.Printf("NCSI package %d present", id)
-		} else if ad.Type() == NCSI_PKG_ATTR_CHANNEL_LIST {
-			handleNcsiChannelList(ad.Bytes())
+		case unix.NCSI_PKG_ATTR_CHANNEL_LIST:
+			ad.Do(handleNcsiChannelList)
 		}
 	}
+
+	return ad.Err()
 }
 
-func registerNcsiChannel(b []byte) {
+func registerNcsiChannel(b []byte) error {
 	ad, err := netlink.NewAttributeDecoder(b)
 	if err != nil {
-		log.Printf("failed to create attribute decoder: %v", err)
-		return
+		return err
 	}
 
-	id := -1
-	ls := -1
-	active := false
-	forced := false
+	var (
+		id     = -1
+		ls     = -1
+		active = false
+		forced = false
+	)
+
 	for ad.Next() {
-		if ad.Type() == NCSI_CHANNEL_ATTR_ID {
+		switch ad.Type() {
+		case unix.NCSI_CHANNEL_ATTR_ID:
 			id = int(ad.Uint32())
-		} else if ad.Type() == NCSI_CHANNEL_ATTR_ACTIVE {
+		case unix.NCSI_CHANNEL_ATTR_ACTIVE:
 			active = true
-		} else if ad.Type() == NCSI_CHANNEL_ATTR_FORCED {
+		case unix.NCSI_CHANNEL_ATTR_FORCED:
 			forced = true
-		} else if ad.Type() == NCSI_CHANNEL_ATTR_LINK_STATE {
+		case unix.NCSI_CHANNEL_ATTR_LINK_STATE:
 			ls = int(ad.Uint32())
 		}
 	}
+
+	if err := ad.Err(); err != nil {
+		return err
+	}
+
 	log.Printf("NCSI channel %d present [link state: %d, active: %v, forced: %v]", id, ls, active, forced)
+	return nil
 }
 
-func handleNcsiChannelList(b []byte) {
+func handleNcsiChannelList(b []byte) error {
 	ad, err := netlink.NewAttributeDecoder(b)
 	if err != nil {
-		log.Printf("failed to create attribute decoder: %v", err)
-		return
+		return err
 	}
 
 	for ad.Next() {
-		if ad.Type() == NCSI_CHANNEL_ATTR {
-			registerNcsiChannel(ad.Bytes())
+		if ad.Type() == unix.NCSI_CHANNEL_ATTR {
+			ad.Do(registerNcsiChannel)
 		}
 	}
+
+	return ad.Err()
 }
 
-func handleNcsiPackageList(b []byte) {
+func handleNcsiPackageList(b []byte) error {
 	ad, err := netlink.NewAttributeDecoder(b)
 	if err != nil {
-		log.Printf("failed to create attribute decoder: %v", err)
-		return
+		return err
 	}
 
 	for ad.Next() {
-		if ad.Type() == NCSI_PKG_ATTR {
-			registerNcsiPackage(ad.Bytes())
+		if ad.Type() == unix.NCSI_PKG_ATTR {
+			ad.Do(registerNcsiPackage)
 		}
 	}
+
+	return ad.Err()
 }
 
 func StartNcsi(iface string) {
@@ -124,14 +111,14 @@ func StartNcsi(iface string) {
 		return
 	}
 
-	l, err := vnl.LinkByName(iface)
+	ifi, err := net.InterfaceByName(iface)
 	if err != nil {
 		log.Printf("unable to get interface %s: %v", iface, err)
 		return
 	}
 
 	ae := netlink.NewAttributeEncoder()
-	ae.Uint32(NCSI_ATTR_IFINDEX, uint32(l.Attrs().Index))
+	ae.Uint32(unix.NCSI_ATTR_IFINDEX, uint32(ifi.Index))
 	ed, err := ae.Encode()
 	if err != nil {
 		log.Printf("failed to encode NCSI attribute data: %v", err)
@@ -142,7 +129,7 @@ func StartNcsi(iface string) {
 	for {
 		req := genetlink.Message{
 			Header: genetlink.Header{
-				Command: NCSI_CMD_PKG_INFO,
+				Command: unix.NCSI_CMD_PKG_INFO,
 				Version: family.Version,
 			},
 			Data: ed,
@@ -163,9 +150,14 @@ func StartNcsi(iface string) {
 				return
 			}
 			for ad.Next() {
-				if ad.Type() == NCSI_ATTR_PACKAGE_LIST {
-					handleNcsiPackageList(ad.Bytes())
+				if ad.Type() == unix.NCSI_ATTR_PACKAGE_LIST {
+					ad.Do(handleNcsiPackageList)
 				}
+			}
+
+			if ad.Err() != nil {
+				log.Printf("failed to decode NCSI attributes: %v", err)
+				return
 			}
 		}
 		// TODO(bluecmd): We will only do this once for now
