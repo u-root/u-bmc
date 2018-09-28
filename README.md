@@ -59,7 +59,7 @@ To give you some sense of what we want to create:
 
 Prerequisites:
 ```
-sudo apt-get install gcc-arm-none-eabi mtd-utils u-boot-tools golang-1.10 fakeroot flex bison
+sudo apt-get install gcc-arm-none-eabi mtd-utils u-boot-tools golang-1.10 fakeroot flex bison device-tree-compiler qemu-system-arm
 
 # Until u-root vendoring is working properly, also grab:
 go get -u github.com/u-root/u-bmc/cmd/uinit
