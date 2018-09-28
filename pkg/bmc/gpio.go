@@ -5,6 +5,7 @@
 package bmc
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -22,7 +23,13 @@ type GpioPlatform interface {
 type GpioSystem struct {
 	p      GpioPlatform
 	f      *os.File
-	button map[pb.Button]chan time.Duration
+	button map[pb.Button]chan push
+}
+
+type push struct {
+	d   time.Duration
+	c   chan bool
+	ctx context.Context
 }
 
 func (g *GpioSystem) monitorOne(line string) error {
@@ -101,17 +108,18 @@ func (g *GpioSystem) Hog(lines map[string]bool) {
 	}
 }
 
-func (g *GpioSystem) PressButton(b pb.Button, durMs uint32) error {
+func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32) (chan bool, error) {
 	if durMs > 1000*10 {
-		return fmt.Errorf("Maximum allowed depress duration is 10 seconds")
+		return nil, fmt.Errorf("Maximum allowed depress duration is 10 seconds")
 	}
 	dur := time.Duration(durMs) * time.Millisecond
 	c, ok := g.button[b]
 	if !ok {
-		return fmt.Errorf("Unknown button %v", b)
+		return nil, fmt.Errorf("Unknown button %v", b)
 	}
-	c <- dur
-	return nil
+	cc := make(chan bool)
+	c <- push{dur, cc, ctx}
+	return cc, nil
 }
 
 func (g *GpioSystem) ManageButton(line string, b pb.Button) {
@@ -130,14 +138,21 @@ func (g *GpioSystem) ManageButton(line string, b pb.Button) {
 	log.Printf("Initialized button %s", line)
 
 	for {
-		dur := <-g.button[b]
+		p := <-g.button[b]
+		if p.ctx.Err() != nil {
+			continue
+		}
 		log.Printf("Pressing button %s", line)
 		setLineValues(l, []bool{false})
 
-		time.Sleep(dur)
+		time.Sleep(p.d)
 
 		log.Printf("Releasing button %s", line)
 		setLineValues(l, []bool{true})
+		select {
+		case p.c <- true:
+		default:
+		}
 	}
 }
 
@@ -150,9 +165,9 @@ func startGpio(p GpioPlatform) (*GpioSystem, error) {
 	g := GpioSystem{
 		p: p,
 		f: f,
-		button: map[pb.Button]chan time.Duration{
-			pb.Button_BUTTON_POWER: make(chan time.Duration),
-			pb.Button_BUTTON_RESET: make(chan time.Duration),
+		button: map[pb.Button]chan push{
+			pb.Button_BUTTON_POWER: make(chan push),
+			pb.Button_BUTTON_RESET: make(chan push),
 		},
 	}
 
