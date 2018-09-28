@@ -16,7 +16,7 @@ import (
 )
 
 type rpcGpioSystem interface {
-	PressButton(pb.Button, uint32) error
+	PressButton(context.Context, pb.Button, uint32) (chan bool, error)
 }
 
 type rpcFanSystem interface {
@@ -38,10 +38,12 @@ type mgmtServer struct {
 }
 
 func (m *mgmtServer) PressButton(ctx context.Context, r *pb.ButtonPressRequest) (*pb.ButtonPressResponse, error) {
-	err := m.gpio.PressButton(r.Button, r.DurationMs)
+	c, err := m.gpio.PressButton(ctx, r.Button, r.DurationMs)
 	if err != nil {
 		return nil, err
 	}
+	// Wait for completion
+	<-c
 	return &pb.ButtonPressResponse{}, nil
 }
 
