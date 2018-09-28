@@ -20,7 +20,7 @@ type platform struct {
 }
 
 func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
-	go g.Monitor([]string{
+	g.Monitor([]string{
 		"CPU0_FIVR_FAULT_N",
 		"CPU0_PROCHOT_N",
 		"CPU0_THERMTRIP_N",
@@ -50,7 +50,7 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"UART_SELECT1",
 	})
 
-	go g.Hog(map[string]bool{
+	g.Hog(map[string]bool{
 		"BMC_NMI_N":      true,
 		"BMC_SMI_INT_N":  true,
 		"UNKN_E4":        true,
