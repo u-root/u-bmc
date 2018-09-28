@@ -385,6 +385,23 @@ func (s *State) PortValue(port uint32) bool {
 	panic("Unknown port")
 }
 
+func (s *State) PortDirection(port uint32) bool {
+	tset, tpin := portToSetPin(port)
+	for a, r := range gpioDirRegs {
+		bo := 0
+		for _, set := range r.sets {
+			if set.set != tset {
+				bo += set.pins
+				continue
+			}
+			bit := uint(bo + tpin)
+			output := (s.Gpio[a] & (1 << bit)) != 0
+			return output
+		}
+	}
+	panic("Unknown port")
+}
+
 func (s *State) Equal(b *State) bool {
 	for r, c := range b.Gpio {
 		v, ok := s.Gpio[r]
