@@ -59,7 +59,7 @@ To give you some sense of what we want to create:
 
 Prerequisites:
 ```
-sudo apt-get install gcc-arm-none-eabi mtd-utils u-boot-tools golang-1.10 fakeroot flex bison device-tree-compiler qemu-system-arm
+sudo apt-get install gcc-arm-none-eabi mtd-utils u-boot-tools golang-1.10 fakeroot flex bison device-tree-compiler
 
 # Until u-root vendoring is working properly, also grab:
 go get -u github.com/u-root/u-bmc/cmd/uinit
@@ -78,13 +78,17 @@ Setup:
 cp ~/.ssh/id_rsa.pub ssh_keys.pub
 make
 ```
+# Hacking
 
-If you have qemu-system-arm installed:
+To run the simulator and the integration test you need a special
+Qemu from https://github.com/openbmc/qemu. Using the upstream Qemu will
+work somewhat, but the integration tests will fail.
+
 ```
 make sim
 ```
 
-To run the integration tests (requires QEMU):
+To run the integration tests:
 ```
 export UROOT_QEMU=qemu-system-arm
 cd integration
