@@ -70,6 +70,8 @@ Clone:
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
 git submodule init && git submodule update
+# Until https://github.com/u-root/u-root/issues/936 is fixed
+rm -r ~/go/src/github.com/u-root/u-root/vendor/google.golang.org/grpc/codes
 ```
 
 Setup:
