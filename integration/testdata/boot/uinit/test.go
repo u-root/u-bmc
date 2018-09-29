@@ -29,7 +29,9 @@ func main() {
 		if !s.PortDirection(port) {
 			fmt.Printf("BOOT_TEST_FAILED: BMC_PWR_BTN_OUT_N not output\n")
 		} else {
-			fmt.Printf("BOOT_TEST_OK\n")
+			for {
+				fmt.Printf("BOOT_TEST_OK\n")
+			}
 		}
 	}
 	unix.Reboot(unix.LINUX_REBOOT_CMD_POWER_OFF)
