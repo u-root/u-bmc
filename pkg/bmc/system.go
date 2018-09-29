@@ -35,6 +35,15 @@ const (
 	timeRefreshDelaySecondsJitter = 3600
 )
 
+const banner = `
+██╗   ██╗      ██████╗ ███╗   ███╗ ██████╗
+██║   ██║      ██╔══██╗████╗ ████║██╔════╝
+██║   ██║█████╗██████╔╝██╔████╔██║██║
+██║   ██║╚════╝██╔══██╗██║╚██╔╝██║██║
+╚██████╔╝      ██████╔╝██║ ╚═╝ ██║╚██████╗
+ ╚═════╝       ╚═════╝ ╚═╝     ╚═╝ ╚═════╝
+ `
+
 var (
 	environ []string
 )
@@ -42,6 +51,7 @@ var (
 func init() {
 	environ = append(os.Environ(), "USER=root")
 	environ = append(environ, "HOME=/root")
+	environ = append(environ, "TZ=UTC")
 }
 
 type Platform interface {
@@ -218,6 +228,10 @@ func Startup(p Platform) error {
 }
 
 func StartupWithConfig(p Platform, c *config.Config) error {
+	fmt.Printf("\n")
+	fmt.Printf(banner)
+	fmt.Printf("Welcome to u-bmc version %s\n\n", c.Version.Version)
+
 	// Seed the non-crypto random generator using the crypto one (which is
 	// hardware based). The non-crypto generator is used for random back-off
 	// timers and such, while the crypto one is used for crypto keys.
