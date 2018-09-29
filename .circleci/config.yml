@@ -44,11 +44,12 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            make -C config ssh_keys.go
+            go generate ./config/
       - run:
           name: Get dependencies
           command: |
             go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
+            go get -d github.com/u-root/u-bmc/cmd/ubmcctl
             go get -t -d github.com/u-root/u-bmc/integration
       - run:
           name: Test all
@@ -68,11 +69,12 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            make -C config ssh_keys.go
+            go generate ./config/
       - run:
           name: Get dependencies
           command: |
             go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
+            go get -d github.com/u-root/u-bmc/cmd/ubmcctl
             go get -t -d github.com/u-root/u-bmc/integration
       - run:
           name: Race detector
@@ -86,7 +88,16 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Create test key
+          command: |
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+            go generate ./config/
+      - run:
           name: build all commands
           command: |
             cd cmd
+            go get ./...
             go install -a ./...
+            cd ../
+            go get ./platform/quanta-f06-leopard-ddr3/cmd/uinit
+            go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit

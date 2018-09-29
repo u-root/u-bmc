@@ -9,3 +9,4 @@ initramfs.cpio
 initramfs.cpio.tmp
 ssh_keys.pub
 u-root
+linux.config.old

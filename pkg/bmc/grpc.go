@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/u-root/u-bmc/config"
 	pb "github.com/u-root/u-bmc/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -35,6 +36,7 @@ type mgmtServer struct {
 	gpio rpcGpioSystem
 	fan  rpcFanSystem
 	uart rpcUartSystem
+	v    *config.Version
 }
 
 func (m *mgmtServer) PressButton(ctx context.Context, r *pb.ButtonPressRequest) (*pb.ButtonPressResponse, error) {
@@ -100,7 +102,11 @@ func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServ
 	}
 }
 
-func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem) error {
+func (m *mgmtServer) GetVersion(ctx context.Context, r *pb.GetVersionRequest) (*pb.GetVersionResponse, error) {
+	return &pb.GetVersionResponse{Version: m.v.Version, GitHash: m.v.GitHash}, nil
+}
+
+func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem, v *config.Version) error {
 	// TODO(bluecmd): Since we have no RNG, no configuration, etc
 	// only use http for now
 	l, err := net.Listen("tcp", "[::]:80")
@@ -108,7 +114,7 @@ func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem) error {
 		return fmt.Errorf("could not listen: %v", err)
 	}
 
-	s := mgmtServer{gpio, fan, uart}
+	s := mgmtServer{gpio, fan, uart, v}
 
 	g := grpc.NewServer()
 	pb.RegisterManagementServiceServer(g, &s)

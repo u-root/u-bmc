@@ -78,7 +78,7 @@ u-root:
 	go build -o u-root github.com/u-root/u-root
 
 initramfs.cpio: u-root ssh_keys.pub
-	$(MAKE) -C config/ ssh_keys.go
+	go generate ./config/
 	GOARM=5 GOARCH=$(ARCH) ./u-root \
 		-build=bb \
 		-o "$@.tmp" \
