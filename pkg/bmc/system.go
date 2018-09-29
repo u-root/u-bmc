@@ -282,7 +282,7 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	<-timeAcquired
 
 	log.Printf("Starting gRPC interface")
-	if err = startGrpc(gpio, fan, uart); err != nil {
+	if err = startGrpc(gpio, fan, uart, &c.Version); err != nil {
 		log.Printf("startGrpc: %v", err)
 		return err
 	}

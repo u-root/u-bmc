@@ -49,7 +49,7 @@ func (*handler) OnReceiveHeaders(md metadata.MD) {
 func (*handler) OnReceiveResponse(resp proto.Message) {
 	t := proto.MarshalTextString(resp)
 	if t != "" {
-		log.Printf("%v\n", t)
+		fmt.Printf("%v\n", t)
 	}
 }
 

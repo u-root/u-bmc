@@ -44,7 +44,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            make -C config ssh_keys.go
+            go generate ./config/
       - run:
           name: Get dependencies
           command: |
@@ -69,7 +69,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            make -C config ssh_keys.go
+            go generate ./config/
       - run:
           name: Get dependencies
           command: |
@@ -91,7 +91,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            make -C config ssh_keys.go
+            go generate ./config/
       - run:
           name: build all commands
           command: |

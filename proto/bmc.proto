@@ -11,6 +11,7 @@ service ManagementService {
   rpc SetFan (SetFanRequest) returns (SetFanResponse) {}
   rpc GetFans (GetFansRequest) returns (GetFansResponse) {}
   rpc StreamConsole (stream ConsoleData) returns (stream ConsoleData) {}
+  rpc GetVersion (GetVersionRequest) returns (GetVersionResponse) {}
 }
 
 enum Button {
@@ -72,4 +73,14 @@ message GetFansResponse {
 
 message ConsoleData {
   bytes data = 1;
+}
+
+message GetVersionRequest {
+
+}
+
+message GetVersionResponse {
+  string version = 1;
+
+  string git_hash = 2;
 }
