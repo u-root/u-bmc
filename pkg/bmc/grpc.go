@@ -106,19 +106,31 @@ func (m *mgmtServer) GetVersion(ctx context.Context, r *pb.GetVersionRequest) (*
 	return &pb.GetVersionResponse{Version: m.v.Version, GitHash: m.v.GitHash}, nil
 }
 
-func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem, v *config.Version) error {
-	// TODO(bluecmd): Since we have no RNG, no configuration, etc
-	// only use http for now
-	l, err := net.Listen("tcp", "[::]:80")
+func (m *mgmtServer) EnableRemote() error {
+	// TODO(bluecmd): Add HTTPS when that is implemented
+	l, err := net.Listen("tcp", "[::]:443")
 	if err != nil {
 		return fmt.Errorf("could not listen: %v", err)
 	}
+	m.newServer(l)
+	return nil
+}
 
-	s := mgmtServer{gpio, fan, uart, v}
-
+func (m *mgmtServer) newServer(l net.Listener) {
 	g := grpc.NewServer()
-	pb.RegisterManagementServiceServer(g, &s)
+	pb.RegisterManagementServiceServer(g, m)
 	reflection.Register(g)
 	go g.Serve(l)
-	return nil
+}
+
+func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem, v *config.Version) (*mgmtServer, error) {
+	l, err := net.Listen("tcp", "[::1]:80")
+	if err != nil {
+		return nil, fmt.Errorf("could not listen: %v", err)
+	}
+
+	s := mgmtServer{gpio, fan, uart, v}
+	s.newServer(l)
+
+	return &s, nil
 }

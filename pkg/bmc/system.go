@@ -20,7 +20,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/u-root/u-bmc/config"
@@ -30,8 +29,10 @@ import (
 )
 
 const (
-	timeRetryDelay              = 10 * time.Second
-	timeRetryDelaySecondsJitter = 10
+	timeRetryDelay                = 10 * time.Second
+	timeRetryDelaySecondsJitter   = 10
+	timeRefreshDelay              = 7 * time.Hour
+	timeRefreshDelaySecondsJitter = 3600
 )
 
 var (
@@ -158,10 +159,7 @@ func startSsh(ak []string) error {
 	return nil
 }
 
-func acquireTime(c chan bool, rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
-	// TODO(bluecmd): If the RTC is already set, we should ignore this
-	log.Printf("Acquiring trusted time")
-
+func acquireTime(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
 	var tt time.Time
 	for {
 		t, err := ttime.AcquireTime(rs, ntps)
@@ -173,14 +171,17 @@ func acquireTime(c chan bool, rs []ttime.RoughtimeServer, ntps []ttime.NtpServer
 			time.Sleep(delay)
 			continue
 		} else {
-			tt = t
+			tt = *t
 			break
 		}
 	}
 
 	log.Printf("Got trusted time: %v", tt)
-	// TODO(bluecmd): Set time
-	c <- true
+	tv := unix.NsecToTimeval(tt.UnixNano())
+	if err := unix.Settimeofday(&tv); err != nil {
+		log.Printf("Unable to set system time: %v", err)
+		return
+	}
 }
 
 func seedRandomGenerator() {
@@ -198,6 +199,18 @@ func seedRandomGenerator() {
 	// that they are not the same across power cycles
 	log.Printf("Non-secret random seed set to %16x", seed)
 	rand.Seed(seed)
+}
+
+func backgroundTimeSync(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
+	for {
+		j := time.Duration(rand.Intn(timeRefreshDelaySecondsJitter)) * time.Second
+		delay := timeRefreshDelay + j
+		log.Printf("Scheduling time re-sync in %s", delay.String())
+		tmr := time.NewTimer(timeRefreshDelay)
+		<-tmr.C
+		log.Printf("Re-syncing trusted time")
+		acquireTime(rs, ntps)
+	}
 }
 
 func Startup(p Platform) error {
@@ -220,7 +233,7 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	}
 
 	log.Printf("Loading system configuration")
-	syscall.Sethostname([]byte("ubmc"))
+	unix.Sethostname([]byte("ubmc"))
 
 	// Fun story: if you don't have both IPv4 and IPv6 loopback configured
 	// golang binaries will not bind to :: but to 0.0.0.0 instead.
@@ -232,7 +245,12 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	setLinkUp("eth0")
 
 	timeAcquired := make(chan bool)
-	go acquireTime(timeAcquired, c.RoughtimeServers, c.NtpServers)
+	go func() {
+		log.Printf("Acquiring trusted time")
+		acquireTime(c.RoughtimeServers, c.NtpServers)
+		// TODO(bluecmd): If the RTC is already set, we should send this straight away
+		timeAcquired <- true
+	}()
 
 	createFile("/etc/passwd", 0644, []byte("root:x:0:0:root:/root:/bbin/elvish"))
 	createFile("/etc/group", 0644, []byte("root:x:0:"))
@@ -240,7 +258,7 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	os.MkdirAll("/conf/", 0700)
 
 	// The platform libraries need access to physical memory
-	syscall.Mknod("/dev/mem", syscall.S_IFCHR|0600, 0x0101)
+	unix.Mknod("/dev/mem", unix.S_IFCHR|0600, 0x0101)
 
 	if c.StartDebugSshServer {
 		log.Printf("Starting debug SSH server")
@@ -259,14 +277,14 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	log.Printf("Starting GPIO drivers")
 	gpio, err := startGpio(p)
 	if err != nil {
-		log.Printf("startGpio: %v", err)
+		log.Printf("startGpio failed: %v", err)
 		return err
 	}
 
 	log.Printf("Starting fan system")
 	fan, err := startFan(p)
 	if err != nil {
-		log.Printf("startFan: %v", err)
+		log.Printf("startFan failed: %v", err)
 		return err
 	}
 
@@ -274,18 +292,30 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	log.Printf("Configuring host UART console %s @ %d baud", tty, baud)
 	uart, err := startUart(tty, baud)
 	if err != nil {
-		log.Printf("startUart: %v", err)
+		log.Printf("startUart failed: %v", err)
 		return err
 	}
-
-	// Before we enable remote calls, make sure we have acquired accurate time
-	<-timeAcquired
 
 	log.Printf("Starting gRPC interface")
-	if err = startGrpc(gpio, fan, uart, &c.Version); err != nil {
-		log.Printf("startGrpc: %v", err)
+	rpc, err := startGrpc(gpio, fan, uart, &c.Version)
+	if err != nil {
+		log.Printf("startGrpc failed: %v", err)
 		return err
 	}
+
+	go func() {
+		// Before we enable remote calls, make sure we have acquired accurate time
+		<-timeAcquired
+
+		log.Printf("Time has been verified, enabling remote RPCs")
+		if err := rpc.EnableRemote(); err != nil {
+			log.Printf("rpc.EnableRemote failed: %v", err)
+		}
+
+		// Start background time sync
+		go backgroundTimeSync(c.RoughtimeServers, c.NtpServers)
+	}()
+
 	return nil
 }
 
