@@ -1,5 +1,8 @@
 boot/out
 boot/keys
+boot/loader.cpio.gz
+boot/loader/loader
+boot/signer/signer
 boot/*.dtb
 boot/zImage*
 build/*

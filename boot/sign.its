@@ -26,16 +26,27 @@
 				algo = "sha256";
 			};
 		};
+		ramdisk-1 {
+			description = "loader";
+			data = /incbin/("loader.cpio.gz");
+			type = "ramdisk";
+			arch = "arm";
+			compression = "none";
+			hash-1 {
+				algo = "sha256";
+			};
+		};
 	};
 	configurations {
 		default = "conf-1";
 		conf-1 {
 			kernel = "kernel-1";
 			fdt = "fdt-1";
+			ramdisk = "ramdisk-1";
 			signature-1 {
 				algo = "sha256,rsa2048";
 				key-name-hint = "u-bmc";
-				sign-images = "fdt", "kernel";
+				sign-images = "fdt", "kernel", "ramdisk";
 			};
 		};
 	};

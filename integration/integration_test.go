@@ -39,7 +39,7 @@ func init() {
 //
 // - `uinitName` is the name of a directory containing uinit found at
 //   `github.com/u-root/u-bmc/integration/testdata`.
-func testWithQEMU(t *testing.T, uinitName string, extraArgs []string) (string, *qemu.QEMU) {
+func testWithQEMU(t *testing.T, uinitName string, extraEnv []string) (string, *qemu.QEMU) {
 	if _, ok := os.LookupEnv("UROOT_QEMU"); !ok {
 		t.Skip("test is skipped unless UROOT_QEMU is set")
 	}
@@ -69,8 +69,7 @@ func testWithQEMU(t *testing.T, uinitName string, extraArgs []string) (string, *
 	}
 
 	// Copy build artifacts to our temp dir
-	ubootDir := filepath.Join(tmpDir, "u-boot")
-	if err := os.Mkdir(ubootDir, 0700); err != nil {
+	if err := os.Mkdir(filepath.Join(tmpDir, "u-boot"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	if err := cp.Copy("../u-boot/u-boot-512.bin", filepath.Join(tmpDir, "u-boot", "u-boot-512.bin")); err != nil {
@@ -111,22 +110,14 @@ func testWithQEMU(t *testing.T, uinitName string, extraArgs []string) (string, *
 		t.Fatal(err)
 	}
 
-	cmd := exec.Command(
-		"make", "-f", makefile, "flash.img",
-		"-o", "u-boot/u-boot-512.bin",
-		"-o", "boot.ubifs.img",
-		"-o", "initramfs.cpio")
-	cmd.Dir = tmpDir
-	err = cmd.Run()
-	if err != nil {
-		t.Fatal(err)
-	}
+	build(t, tmpDir, makefile, extraEnv)
 
 	flash := filepath.Join(tmpDir, "flash.img")
-
-	extraArgs = append(extraArgs, "-drive", "file="+flash+",format=raw,if=mtd")
-	extraArgs = append(extraArgs, "-M", "palmetto-bmc")
-	extraArgs = append(extraArgs, "-m", "256")
+	extraArgs := []string{
+		"-drive", "file="+flash+",format=raw,if=mtd",
+		"-M", "palmetto-bmc",
+		"-m", "256",
+	}
 
 	// Create file for serial logs.
 	if err := os.MkdirAll(logDir, 0755); err != nil {
@@ -147,6 +138,23 @@ func testWithQEMU(t *testing.T, uinitName string, extraArgs []string) (string, *
 		t.Fatal("could not spawn QEMU: ", err)
 	}
 	return tmpDir, q
+}
+
+func build(t *testing.T, tmpDir string, makefile string, extraEnv []string) {
+	cmd := exec.Command(
+		"make", "-f", makefile, "flash.img",
+		"-o", "u-boot/u-boot-512.bin",
+		"-o", "boot/signer/signer",
+		"-o", "boot.ubifs.img",
+		"-o", "initramfs.cpio")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Dir = tmpDir
+	cmd.Env = append(os.Environ(), extraEnv...)
+	err := cmd.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func cleanup(t *testing.T, tmpDir string, q *qemu.QEMU) {

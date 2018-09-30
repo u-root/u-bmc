@@ -51,6 +51,7 @@ jobs:
       - run:
           name: Get dependencies
           command: |
+            go get -d github.com/u-root/u-bmc/boot/loader
             go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
             go get -d github.com/u-root/u-bmc/cmd/ubmcctl
             go get -t -d github.com/u-root/u-bmc/integration
@@ -76,6 +77,7 @@ jobs:
       - run:
           name: Get dependencies
           command: |
+            go get -d github.com/u-root/u-bmc/boot/loader
             go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
             go get -d github.com/u-root/u-bmc/cmd/ubmcctl
             go get -t -d github.com/u-root/u-bmc/integration
@@ -102,6 +104,8 @@ jobs:
             go get ./...
             go install -a ./...
             cd ../
+            go get ./boot/signer/
+            go get ./boot/loader/
             go get ./platform/quanta-f06-leopard-ddr3/cmd/uinit
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
@@ -147,6 +151,7 @@ jobs:
           name: Build image
           command: |
             go generate ./config/
+            go get ./boot/loader/
             go get ./platform/quanta-f06-leopard-ddr3/cmd/uinit
             go get ./cmd/...
             # Until https://github.com/u-root/u-root/issues/936 is fixed
