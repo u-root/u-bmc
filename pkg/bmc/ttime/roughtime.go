@@ -75,13 +75,12 @@ func (n NtpServer) Server() string {
 }
 
 func AcquireTime(rs []RoughtimeServer, ntps []NtpServer) (*time.Time, error) {
+	// Calculate what the NTP servers would have reported at this time
+	start := time.Now()
 	rt := getOneRoughtime(rs)
 	if rt == nil {
 		return nil, fmt.Errorf("No roughtime servers available")
 	}
-	// Calculate what the NTP servers would have reported at this time
-	start := time.Now()
-
 	unixSecs := rt.Midpoint / 1000 / 1000
 	unixNsecs := rt.Midpoint % (1000 * 1000)
 	midpoint := time.Unix(int64(unixSecs), int64(unixNsecs))
@@ -103,8 +102,8 @@ func AcquireTime(rs []RoughtimeServer, ntps []NtpServer) (*time.Time, error) {
 			log.Printf("Rejecting bad NTP time from %s (%s > %s), it's too late", n, ct.String(), latest.String())
 			continue
 		}
-		if ct.Before(earliest) {
-			log.Printf("Rejecting bad NTP time from %s (%s < %s), it's too early", n, ct.String(), earliest.String())
+		if t.Before(earliest) {
+			log.Printf("Rejecting bad NTP time from %s (%s < %s), it's too early", n, t.String(), earliest.String())
 			continue
 		}
 		// Accept the first NTP time that inside the roughtime window
