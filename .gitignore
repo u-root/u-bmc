@@ -1,4 +1,5 @@
-boot/*.img
+boot/out
+boot/keys
 boot/*.dtb
 boot/zImage*
 build/*
