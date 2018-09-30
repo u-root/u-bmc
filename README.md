@@ -63,6 +63,7 @@ sudo apt-get install gcc-arm-none-eabi mtd-utils golang-1.10 fakeroot flex bison
 
 # Until u-root vendoring is working properly, also grab:
 go generate github.com/u-root/u-bmc/config
+go get -u github.com/u-root/u-bmc/boot/loader
 go get -u github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
 ```
 
@@ -81,6 +82,11 @@ Setup:
 cp ~/.ssh/id_rsa.pub ssh_keys.pub
 make
 ```
+
+Since u-bmc uses signed binaries it is important that you back up the
+contents of boot/keys/ after building as u-bmc will only accept updates
+signed with these keys.
+
 # Hacking
 
 To run the simulator and the integration test you need a special
@@ -103,6 +109,27 @@ can use socflash\_x64 provided by ASPEED like this:
 ```
 echo This is extremely likely to break things as u-bmc is still experimental
 sudo ./socflash_x64 of=bmc-backup.img if=flash.img lpcport=0x2e option=gl
+```
+
+If you want to quickly upload a new build of u-bmc without updating the kernel,
+you can use SCP like this:
+
+```
+scp root/bbin/bb my-ubmc:/bb
+scp root/bbin/bb.sig my-ubmc:/bb.sig
+ssh my-ubmc
+# Verify that bb is sane by executing /bb
+/bb
+# Should return:
+# <timestmap> You need to specify which command to invoke.
+# Exception: /bbin/bb exited with 1
+# [tty], line 1: /bbin/bb
+mv /bb /bbin/bb
+mv /bb.sig /bbin/bb.sig
+# Verify the signature before rebooting
+gpgv /etc/u-bmc.pub /bbin/bb.sig /bbin/bb
+sync
+shutdown -r
 ```
 
 # Updating Dependencies

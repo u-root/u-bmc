@@ -10,7 +10,7 @@
 
 	chosen {
 		stdout-path = &uart5;
-		bootargs = "console=ttyS4,57600n8 earlyprintk panic=1 ubi.mtd=ubi root=ubi0:root rootfstype=ubifs init=/init rw";
+		bootargs = "console=ttyS4,57600n8 earlyprintk panic=1 root=/dev/ram0 rdinit=/loader ubi.mtd=0";
 	};
 
 	memory@40000000 {
