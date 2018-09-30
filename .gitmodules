@@ -4,3 +4,5 @@
 [submodule "linux"]
 	path = linux
 	url = https://github.com/openbmc/linux.git
+  branch = dev-4.18
+

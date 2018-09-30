@@ -59,10 +59,11 @@ To give you some sense of what we want to create:
 
 Prerequisites:
 ```
-sudo apt-get install gcc-arm-none-eabi mtd-utils golang-1.10 fakeroot flex bison device-tree-compiler
+sudo apt-get install gcc-arm-none-eabi mtd-utils golang-1.10 fakeroot flex bison device-tree-compiler bc libssl-dev
 
 # Until u-root vendoring is working properly, also grab:
-go get -u github.com/u-root/u-bmc/cmd/uinit
+go generate github.com/u-root/u-bmc/config
+go get -u github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
 ```
 
 Clone:
