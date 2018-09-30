@@ -4,6 +4,9 @@
 
 all: version.go ssh_keys.go
 
+../ssh_keys.pub:
+	touch $@
+
 ssh_keys.go: ../ssh_keys.pub
 	cat "$<" | ./ssh_keys.sh > "$@"
 

@@ -13,6 +13,9 @@ workflows:
       - compile:
           requires:
             - clean-code
+      - image:
+          requires:
+            - clean-code
 jobs:
   clean-code:
     docker:
@@ -101,3 +104,69 @@ jobs:
             cd ../
             go get ./platform/quanta-f06-leopard-ddr3/cmd/uinit
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
+  image:
+    docker:
+      - image: circleci/golang:1.11
+    working_directory: /go/src/github.com/u-root/u-bmc
+    environment:
+      - CGO_ENABLED: 0
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command:
+            sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio
+      - run:
+          name: Compile qemu
+          command: |
+            git clone https://github.com/openbmc/qemu.git --depth 1
+            cd qemu
+            mkdir build
+            cd build
+            ../configure --target-list=arm-softmmu
+            make -j8
+            sudo make install
+      - run:
+          name: Create test key
+          command: |
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+      # TODO(bluecmd): This step should probably be cached somehow
+      - run:
+          name: Update submodules
+          command: |
+            git submodule init && git submodule update u-boot
+            # Since linux is huge and we're tracking a branch, submodules
+            # take a long time and we cannot use depth. Fetch the latest zip
+            # instead
+            wget https://github.com/openbmc/linux/archive/dev-4.18.zip
+            unzip dev-4.18.zip
+            rm dev-4.18.zip
+            rm -rf linux/
+            mv linux-dev-4.18/ linux/
+      - run:
+          name: Build image
+          command: |
+            go generate ./config/
+            go get ./platform/quanta-f06-leopard-ddr3/cmd/uinit
+            go get ./cmd/...
+            # Until https://github.com/u-root/u-root/issues/936 is fixed
+            go get github.com/u-root/u-root
+            rm -r $GOPATH/src/github.com/u-root/u-root/vendor/google.golang.org/grpc/codes
+            make
+      - store_artifacts:
+          path: flash.img
+          destination: flash.img
+      - run:
+          name: Run integration tests
+          command: |
+            export UROOT_QEMU=qemu-system-arm
+            cd integration/
+            go test
+      - run:
+          name: Copy failed integration tests
+          command: |
+            mkdir /tmp/integration-data/
+            tar -cvf /tmp/integration-data/integration.tar /tmp/ubmc-integration*/
+          when: on_fail
+      - store_artifacts:
+          path: /tmp/integration-data/
