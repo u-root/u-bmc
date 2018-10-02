@@ -25,6 +25,9 @@ import (
 const (
 	ubootImage = "../u-boot/u-boot-512.bin"
 	bootImage  = "../boot.ubifs.img"
+	// Serial output is written to this directory and picked up by circleci, or
+	// you, if you want to read the serial logs.
+	logDir = "serial"
 )
 
 func init() {
@@ -125,9 +128,19 @@ func testWithQEMU(t *testing.T, uinitName string, extraArgs []string) (string, *
 	extraArgs = append(extraArgs, "-M", "palmetto-bmc")
 	extraArgs = append(extraArgs, "-m", "256")
 
+	// Create file for serial logs.
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Fatalf("could not create serial log directory: %v", err)
+	}
+	logFile, err := os.Create(path.Join(logDir, uinitName+".log"))
+	if err != nil {
+		t.Fatalf("could not create log file: %v", err)
+	}
+
 	// Start QEMU
 	q := &qemu.QEMU{
 		ExtraArgs: extraArgs,
+		SerialOutput: logFile,
 	}
 	t.Logf("command line:\n%s", q.CmdLineQuoted())
 	if err := q.Start(); err != nil {

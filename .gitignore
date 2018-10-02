@@ -6,6 +6,7 @@ build/*
 *.img
 .*.sw*
 root/
+integration/serial/
 initramfs.cpio
 initramfs.cpio.tmp
 ssh_keys.pub
