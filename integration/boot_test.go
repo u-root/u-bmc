@@ -10,10 +10,9 @@ import (
 	"testing"
 )
 
-
 // TestBoot boots an image and then shuts down
 func TestBoot(t *testing.T) {
-	tmpDir, q := testWithQEMU(t, "boot", []string{})
+	tmpDir, q := testWithQEMU(t, "boot", "TestBoot", []string{})
 	defer cleanup(t, tmpDir, q)
 
 	if err := q.Expect("BOOT_TEST_OK"); err != nil {
@@ -26,7 +25,7 @@ func TestBoot(t *testing.T) {
 func TestVerifyFail(t *testing.T) {
 	// Corrupt the signature by adding the contents of "/proc/uptime" at the end
 	// when calculating the hash for /init (which is symlinked to /bbin/bb).
-	tmpDir, q := testWithQEMU(t, "boot", []string{"TEST_EXTRA_SIGN=/proc/uptime"})
+	tmpDir, q := testWithQEMU(t, "boot", "TestVerifyFail", []string{"TEST_EXTRA_SIGN=/proc/uptime"})
 	defer cleanup(t, tmpDir, q)
 
 	if err := q.Expect("invalid signature: hash tag doesn't match"); err != nil {

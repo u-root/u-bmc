@@ -39,7 +39,7 @@ func init() {
 //
 // - `uinitName` is the name of a directory containing uinit found at
 //   `github.com/u-root/u-bmc/integration/testdata`.
-func testWithQEMU(t *testing.T, uinitName string, extraEnv []string) (string, *qemu.QEMU) {
+func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []string) (string, *qemu.QEMU) {
 	if _, ok := os.LookupEnv("UROOT_QEMU"); !ok {
 		t.Skip("test is skipped unless UROOT_QEMU is set")
 	}
@@ -114,7 +114,7 @@ func testWithQEMU(t *testing.T, uinitName string, extraEnv []string) (string, *q
 
 	flash := filepath.Join(tmpDir, "flash.img")
 	extraArgs := []string{
-		"-drive", "file="+flash+",format=raw,if=mtd",
+		"-drive", "file=" + flash + ",format=raw,if=mtd",
 		"-M", "palmetto-bmc",
 		"-m", "256",
 	}
@@ -123,14 +123,14 @@ func testWithQEMU(t *testing.T, uinitName string, extraEnv []string) (string, *q
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		t.Fatalf("could not create serial log directory: %v", err)
 	}
-	logFile, err := os.Create(path.Join(logDir, uinitName+".log"))
+	logFile, err := os.Create(path.Join(logDir, logName+".log"))
 	if err != nil {
 		t.Fatalf("could not create log file: %v", err)
 	}
 
 	// Start QEMU
 	q := &qemu.QEMU{
-		ExtraArgs: extraArgs,
+		ExtraArgs:    extraArgs,
 		SerialOutput: logFile,
 	}
 	t.Logf("command line:\n%s", q.CmdLineQuoted())
