@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/u-root/u-bmc/pkg/ast2400"
 	"github.com/u-root/u-bmc/pkg/bmc"
@@ -24,6 +25,7 @@ func main() {
 		fmt.Printf("BOOT_TEST_FAILED: %v\n", err)
 	} else {
 		// Verify that the power button is set to an output for sanity
+		time.Sleep(3 * time.Second)
 		s := a.SnapshotGpio()
 		port, _ := p.GpioNameToPort("BMC_PWR_BTN_OUT_N")
 		if !s.PortDirection(port) {

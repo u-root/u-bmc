@@ -24,7 +24,7 @@ import (
 
 const (
 	ubootImage = "../u-boot/u-boot-512.bin"
-	bootImage  = "../boot.ubifs.img"
+	bootImage  = "../boot.img"
 	// Serial output is written to this directory and picked up by circleci, or
 	// you, if you want to read the serial logs.
 	logDir = "serial"
@@ -75,7 +75,7 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 	if err := cp.Copy("../u-boot/u-boot-512.bin", filepath.Join(tmpDir, "u-boot", "u-boot-512.bin")); err != nil {
 		t.Fatal(err)
 	}
-	if err := cp.Copy("../boot.ubifs.img", filepath.Join(tmpDir, "boot.ubifs.img")); err != nil {
+	if err := cp.Copy("../boot.img", filepath.Join(tmpDir, "boot.img")); err != nil {
 		t.Fatal(err)
 	}
 	if err := cp.Copy("../ubi.cfg", filepath.Join(tmpDir, "ubi.cfg")); err != nil {
@@ -112,7 +112,7 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 
 	build(t, tmpDir, makefile, extraEnv)
 
-	flash := filepath.Join(tmpDir, "flash.img")
+	flash := filepath.Join(tmpDir, "flash.sim.img")
 	extraArgs := []string{
 		"-drive", "file=" + flash + ",format=raw,if=mtd",
 		"-M", "palmetto-bmc",
@@ -142,10 +142,10 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 
 func build(t *testing.T, tmpDir string, makefile string, extraEnv []string) {
 	cmd := exec.Command(
-		"make", "-f", makefile, "flash.img",
+		"make", "-f", makefile, "flash.sim.img",
 		"-o", "u-boot/u-boot-512.bin",
 		"-o", "boot/signer/signer",
-		"-o", "boot.ubifs.img",
+		"-o", "boot.img",
 		"-o", "initramfs.cpio")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
