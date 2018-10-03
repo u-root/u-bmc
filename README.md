@@ -108,7 +108,7 @@ If you're using a supported platform and want to try it on your hardware you
 can use socflash\_x64 provided by ASPEED like this:
 ```
 echo This is extremely likely to break things as u-bmc is still experimental
-sudo ./socflash_x64 of=bmc-backup.img if=flash.img lpcport=0x2e option=gl
+sudo ./socflash_x64 of=bmc-backup.img if=flash.img lpcport=0x2e option=glc
 ```
 
 If you want to quickly upload a new build of u-bmc without updating the kernel,
