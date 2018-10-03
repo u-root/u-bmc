@@ -279,8 +279,23 @@ func (f *mt25q512) Close() {
 }
 
 func (f *mt25q512) LockBootloader() error {
-	lv := 0x3 // Enable write lock and lock down
-	for i := 0; i < 512 * 1024; i += 64 * 1024 {
+	lv := uint8(0x3) // Enable write lock and lock down
+	// Lock first 512 KiB
+	// The first sector has 4K sub-pages
+	i := 0
+	for ; i < 64 * 1024; i += 4 * 1024 {
+		f.cmd8(COMMON_OP_WREN)
+		f.cs(0)
+		f.mem.MustWrite8(FLASH_START, uint8(MT25Q_WR_LOCK_BITS&0xff))
+		f.mem.MustWrite8(FLASH_START, uint8((i >> 24) & 0xff))
+		f.mem.MustWrite8(FLASH_START, uint8((i >> 16) & 0xff))
+		f.mem.MustWrite8(FLASH_START, uint8((i >> 8) & 0xff))
+		f.mem.MustWrite8(FLASH_START, uint8(i & 0xff))
+		f.mem.MustWrite8(FLASH_START, uint8(lv))
+		f.cs(1)
+	}
+	// The next are normal 64K
+	for ; i < 512 * 1024; i += 64 * 1024 {
 		f.cmd8(COMMON_OP_WREN)
 		f.cs(0)
 		// Lock first 512 KiB
@@ -293,15 +308,26 @@ func (f *mt25q512) LockBootloader() error {
 		f.cs(1)
 	}
 
+	// Verify
 	f.cs(0)
 	f.mem.MustWrite8(FLASH_START, uint8(MT25Q_RD_LOCK_BITS&0xff))
 	f.mem.MustWrite8(FLASH_START, uint8(0))
 	f.mem.MustWrite8(FLASH_START, uint8(0))
 	f.mem.MustWrite8(FLASH_START, uint8(0))
 	f.mem.MustWrite8(FLASH_START, uint8(0))
-	for i := 0; i < 24; i++ {
-		log.Printf("%02x: %02x", i, f.mem.MustRead8(FLASH_START))
+
+	ok := true
+	for i := 0; i < 512*1024; i++ {
+		r := f.mem.MustRead8(FLASH_START)
+		if r != lv {
+			log.Printf("! %08x: %02x", i, r)
+			ok = false
+		}
 	}
 	f.cs(1)
+
+	if !ok {
+		return fmt.Errorf("Verification of locking failed")
+	}
 	return nil
 }
