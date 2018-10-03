@@ -42,12 +42,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Mount(ubi0:root): %v", err)
 	}
-	_ = unix.Mkdir("/mnt/boot", 0700)
-	err = unix.Mount("ubi0:boot", "/mnt/boot", "ubifs", 0, "")
-	if err != nil {
-		log.Printf("Mount(ubi0:boot): %v", err)
-	}
 	err = unix.Chroot("/mnt/")
+	if err != nil {
+		log.Fatalf("chroot: %v", err)
+	}
+	err = unix.Chdir("/")
 	if err != nil {
 		log.Fatalf("chroot: %v", err)
 	}
