@@ -145,3 +145,7 @@
 &mbox {
 	status = "okay";
 };
+
+&rtc {
+	status = "okay";
+};
