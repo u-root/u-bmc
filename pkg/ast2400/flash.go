@@ -30,6 +30,7 @@ const (
 	COMMON_OP_EN4B         = 0xb7
 	COMMON_OP_EX4B         = 0xe9
 	COMMON_OP_FAST_READ    = 0x0b
+	COMMON_OP_RD_FLAG_REG  = 0x70
 
 	MT25Q_WR_LOCK_BITS      = 0xe5
 	MT25Q_RD_LOCK_BITS      = 0xe8
@@ -64,6 +65,7 @@ type Flash interface {
 	Write([]byte) (int, error)
 	WriteAt([]byte, int64) (int, error)
 	LockBootloader() error
+	StatusFlags() (int, error)
 }
 
 func (f *spiflash) cs(h int) {
@@ -131,6 +133,13 @@ func (a *Ast) SystemFlash() (Flash, error) {
 	} else {
 		return nil, fmt.Errorf("Unknown flash ID: %06x", id)
 	}
+}
+
+func (f *commonSpiFlash) StatusFlags() (int, error) {
+	f.cs(0)
+	defer f.cs(1)
+	f.mem.MustWrite8(FLASH_START, uint8(COMMON_OP_RD_FLAG_REG&0xff))
+	return int(f.mem.MustRead8(FLASH_START)), nil
 }
 
 func (f *commonSpiFlash) Read(b []byte) (int, error) {
@@ -278,12 +287,21 @@ func (f *mt25q512) Close() {
 	f.cmd8(COMMON_OP_EX4B)
 }
 
+func waitForReady(f Flash) {
+	for {
+		if v, _ := f.StatusFlags(); v & 0x80 != 0 {
+			return
+		}
+	}
+}
+
 func (f *mt25q512) LockBootloader() error {
 	lv := uint8(0x3) // Enable write lock and lock down
 	// Lock first 512 KiB
 	// The first sector has 4K sub-pages
 	i := 0
 	for ; i < 64 * 1024; i += 4 * 1024 {
+		waitForReady(f)
 		f.cmd8(COMMON_OP_WREN)
 		f.cs(0)
 		f.mem.MustWrite8(FLASH_START, uint8(MT25Q_WR_LOCK_BITS&0xff))
@@ -296,6 +314,7 @@ func (f *mt25q512) LockBootloader() error {
 	}
 	// The next are normal 64K
 	for ; i < 512 * 1024; i += 64 * 1024 {
+		waitForReady(f)
 		f.cmd8(COMMON_OP_WREN)
 		f.cs(0)
 		// Lock first 512 KiB
@@ -309,6 +328,7 @@ func (f *mt25q512) LockBootloader() error {
 	}
 
 	// Verify
+	waitForReady(f)
 	f.cs(0)
 	f.mem.MustWrite8(FLASH_START, uint8(MT25Q_RD_LOCK_BITS&0xff))
 	f.mem.MustWrite8(FLASH_START, uint8(0))
@@ -319,7 +339,7 @@ func (f *mt25q512) LockBootloader() error {
 	ok := true
 	for i := 0; i < 512*1024; i++ {
 		r := f.mem.MustRead8(FLASH_START)
-		if r != lv {
+		if r & 0x3 != lv {
 			log.Printf("! %08x: %02x", i, r)
 			ok = false
 		}
