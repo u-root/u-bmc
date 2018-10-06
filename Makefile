@@ -13,7 +13,7 @@ ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 # errors in the integration test. It should not be used for any real builds.
 TEST_EXTRA_SIGN ?= /dev/null
 
-.PHONY: sim
+.PHONY: sim linux-modules
 
 flash.img: u-boot/u-boot-512.bin ubi.img
 	cat $^ > $@
@@ -31,10 +31,25 @@ boot/keys/u-bmc.pub: boot/signer/signer boot/keys/u-bmc.key
 	echo | boot/signer/signer > /dev/null
 	touch boot/keys/u-bmc.pub
 
-boot/loader.cpio.gz: boot/loader/loader boot/keys/u-bmc.pub
+linux-modules: linux.config $(shell find module -name \*.c -type f) | boot/zImage
+	$(MAKE) $(MAKE_JOBS) \
+		-C linux/ \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		KCONFIG_CONFIG="../$<" \
+		ARCH=$(ARCH) M=$(PWD)/module \
+		modules
+	linux/scripts/sign-file sha256 linux/certs/signing_key.pem \
+		linux/certs/signing_key.x509 \
+		module/bootlock.ko
+
+# TOOD(bluecmd): The cpio does not need to be compressed as it will be
+# compressed again later, but I did not manage to get the kernel to recognize
+# the initramfs unless it was compressed as well.
+boot/loader.cpio.gz: boot/loader/loader boot/keys/u-bmc.pub linux-modules
 	rm -f boot/loader.cpio.gz
 	sh -c "cd boot/loader/; echo loader | cpio -H newc -ov -F ../loader.cpio"
 	sh -c "cd boot/keys/; echo u-bmc.pub | cpio -H newc -oAv -F ../loader.cpio"
+	sh -c "cd module/; echo *.ko | cpio -H newc -oAv -F ../boot/loader.cpio"
 	gzip boot/loader.cpio
 
 boot/keys/u-bmc.key:
@@ -117,7 +132,8 @@ sim: flash.sim.img
 		-m 256 \
 		-M palmetto-bmc \
 		-nographic \
-		-drive file=$<,format=raw,if=mtd
+		-drive file=$<,format=raw,if=mtd \
+		-d guest_errors
 	stty sane
 
 u-root:
@@ -138,7 +154,9 @@ initramfs.cpio: u-root ssh_keys.pub $(shell find . -name \*.go -type f)
 
 clean:
 	\rm -f initramfs.cpio u-root \
-	 flash.img u-boot/u-boot.bin u-boot/u-boot-512.bin \
+	 flash.img flash.sim.img u-boot/u-boot.bin u-boot/u-boot-512.bin \
 	 root.ubifs.img boot.ubifs.img boot/zImage boot/*.dtb \
-	 boot.img ubi.img boot/loader/loader boot/signer/signer
-	\rm -fr root/
+	 boot.img ubi.img boot/loader/loader boot/signer/signer boot/loader.cpio.gz \
+	 module/*.o module/*.mod.c module/*.ko module/.*.cmd module/modules.order \
+	 module/Module.symvers config/ssh_keys.go config/version.go
+	\rm -fr root/ boot/modules/ module/.tmp_versions/ boot/out
