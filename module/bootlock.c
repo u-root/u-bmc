@@ -20,6 +20,8 @@
 #define MT25Q_READ_VOLATILE_LOCK 0xe8
 #define MT25Q_WRITE_VOLATILE_LOCK 0xe5
 #define COMMON_OP_WREN 0x06
+#define COMMON_OP_RDID 0x9f
+#define COMMON_OP_RDSR 0x05
 
 static struct spi_nor *nor;
 static void __iomem* aspeed_fmc_base;
@@ -70,29 +72,60 @@ static void aspeed_write8(uint32_t addr, uint8_t op, uint8_t d) {
 	aspeed_cs(0);
 }
 
+static int aspeed_busy(void) {
+	int sr;
+	aspeed_cs(1);
+	iowrite8(COMMON_OP_RDSR, aspeed_nor_base);
+	sr = ioread8(aspeed_nor_base);
+	aspeed_cs(0);
+	return sr & 0x1;
+}
+
 static int mt25q_read_vol_lock(uint32_t addr) {
 	return aspeed_read8(addr, MT25Q_READ_VOLATILE_LOCK);
 }
 
 static void mt25q_write_vol_lock(uint32_t addr, uint8_t val) {
+	while(aspeed_busy());
 	aspeed_write8(addr, MT25Q_WRITE_VOLATILE_LOCK, val & 0x3);
 }
 
+static int device_supported(void) {
+	int id;
+	int sup;
+	aspeed_cs(1);
+	iowrite8(COMMON_OP_RDID, aspeed_nor_base);
+	id = ioread32(aspeed_nor_base);
+	switch (id) {
+		case 0x20ba20: // MT25QL512ABB
+			sup = 1;
+			break;
+		default:
+			sup = 0;
+	}
+	aspeed_cs(0);
+	return sup;
+}
+
 static ssize_t lock_show(struct kobject *kobj, struct kobj_attribute *attr,
-                         char *buff)
-{
+                         char *buff) {
 	int ret;
 	int locked = 1;
 	uint32_t addr;
 
-	// TODO(bluecmd): Do this iff the chip is an MT25Q chip
 	mutex_lock(&nor->lock);
 	nor->prepare(nor, SPI_NOR_OPS_LOCK);
 	aspeed_user_control(1);
 
+	if (!device_supported()) {
+		ret = -EMEDIUMTYPE;
+		goto read_err;
+	}
+
 	for (addr = 0; addr < BOOT_AREA;) {
 		uint8_t r;
 		r = mt25q_read_vol_lock(addr);
+		// TODO(bluecmd): Remove when proven in the field
 		printk(KERN_INFO "read from %08x returned %x\n", addr, r);
 		if ((r & 0x3) != 0x3) {
 			locked = 0;
@@ -105,6 +138,7 @@ static ssize_t lock_show(struct kobject *kobj, struct kobj_attribute *attr,
 		}
 	}
 
+read_err:
 	aspeed_user_control(0);
 	nor->unprepare(nor, SPI_NOR_OPS_LOCK);
 	mutex_unlock(&nor->lock);
@@ -118,13 +152,18 @@ static ssize_t lock_show(struct kobject *kobj, struct kobj_attribute *attr,
 
 // Any write to the lock file will make the flash enter lockdown mode
 static ssize_t lock_store(struct kobject *kobj, struct kobj_attribute *attr,
-		const char *buff, size_t count)
-{
+                          const char *buff, size_t count) {
+	int ret = 0;
 	uint32_t addr;
 
-	// TODO(bluecmd): Do this iff the chip is an MT25Q chip
 	mutex_lock(&nor->lock);
 	nor->prepare(nor, SPI_NOR_OPS_LOCK);
+	aspeed_user_control(1);
+
+	if (!device_supported()) {
+		ret = -EMEDIUMTYPE;
+		goto lock_err;
+	}
 
 	for (addr = 0; addr < BOOT_AREA;) {
 		mt25q_write_vol_lock(addr, 0x3);
@@ -135,9 +174,11 @@ static ssize_t lock_store(struct kobject *kobj, struct kobj_attribute *attr,
 		}
 	}
 
+lock_err:
+	aspeed_user_control(0);
 	nor->unprepare(nor, SPI_NOR_OPS_LOCK);
 	mutex_unlock(&nor->lock);
-	return count;
+	return ret < 0 ? ret : count;
 }
 
 static struct kobj_attribute bootlock_attribute =
@@ -154,8 +195,7 @@ static struct attribute_group attr_group = {
 
 static struct kobject *kobj;
 
-int __init sysfs_init(void)
-{
+int __init sysfs_init(void) {
 	struct mtd_info *mtd;
 	int ret;
 
@@ -182,14 +222,14 @@ int __init sysfs_init(void)
 	// a reference to the spi_nor.
 	nor = (struct spi_nor*)mtd->priv;
 
+	// TODO(bluecmd): This should all be part of an "aspeed-fmc" module
 	aspeed_fmc_base = ioremap(ASPEED_FMC_AHB_BASE, 0x14);
 	aspeed_nor_base = ioremap(ASPEED_NOR_AHB_BASE, 0x10);
 
 	return ret;
 }
 
-void __exit sysfs_exit(void)
-{
+void __exit sysfs_exit(void) {
 	kobject_put(kobj);
 }
 
