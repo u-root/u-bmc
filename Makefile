@@ -132,7 +132,8 @@ sim: flash.sim.img
 		-m 256 \
 		-M palmetto-bmc \
 		-nographic \
-		-drive file=$<,format=raw,if=mtd
+		-drive file=$<,format=raw,if=mtd \
+		-d guest_errors
 	stty sane
 
 u-root:

@@ -14,37 +14,86 @@
 
 #define BOOT_AREA 512*1024
 
+#define ASPEED_FMC_AHB_BASE 0x1e620000
+#define ASPEED_NOR_AHB_BASE 0x20000000
+
 #define MT25Q_READ_VOLATILE_LOCK 0xe8
 #define MT25Q_WRITE_VOLATILE_LOCK 0xe5
+#define COMMON_OP_WREN 0x06
 
 static struct spi_nor *nor;
+static void __iomem* aspeed_fmc_base;
+static void __iomem* aspeed_nor_base;
+
+static void aspeed_user_control(int ctrl) {
+	uint32_t r;
+	r = ioread32(aspeed_fmc_base + 0x10) & ~(0x3);
+	r |= ctrl ? 0x3 : 0;
+	iowrite32(r, aspeed_fmc_base + 0x10);
+}
+
+static void aspeed_cs(int cs) {
+	uint32_t r;
+	r = ioread32(aspeed_fmc_base + 0x10) & ~(0x4);
+	r |= (!cs) << 2;
+	iowrite32(r, aspeed_fmc_base + 0x10);
+}
+
+static int aspeed_read8(uint32_t addr, uint8_t op) {
+	int ret;
+	__be32 temp;
+	if (nor->addr_width != 4) {
+		panic("nor->addr_width not 4");
+	}
+	temp = cpu_to_be32(addr);
+	aspeed_cs(1);
+	iowrite8(op, aspeed_nor_base);
+	iowrite8_rep(aspeed_nor_base, &temp, 4);
+	ret = ioread8(aspeed_nor_base);
+	aspeed_cs(0);
+	return ret;
+}
+
+static void aspeed_write8(uint32_t addr, uint8_t op, uint8_t d) {
+	__be32 temp;
+	if (nor->addr_width != 4) {
+		panic("nor->addr_width not 4");
+	}
+	temp = cpu_to_be32(addr);
+	aspeed_cs(1);
+	iowrite8(COMMON_OP_WREN, aspeed_nor_base);
+	aspeed_cs(0);
+	aspeed_cs(1);
+	iowrite8(op, aspeed_nor_base);
+	iowrite8_rep(aspeed_nor_base, &temp, 4);
+	iowrite8(d, aspeed_nor_base);
+	aspeed_cs(0);
+}
+
+static int mt25q_read_vol_lock(uint32_t addr) {
+	return aspeed_read8(addr, MT25Q_READ_VOLATILE_LOCK);
+}
+
+static void mt25q_write_vol_lock(uint32_t addr, uint8_t val) {
+	aspeed_write8(addr, MT25Q_WRITE_VOLATILE_LOCK, val & 0x3);
+}
 
 static ssize_t lock_show(struct kobject *kobj, struct kobj_attribute *attr,
-		char *buff)
+                         char *buff)
 {
-	u8 read_opcode, read_dummy;
 	int ret;
 	int locked = 1;
 	uint32_t addr;
 
 	// TODO(bluecmd): Do this iff the chip is an MT25Q chip
 	mutex_lock(&nor->lock);
-
-	read_opcode = nor->read_opcode;
-	read_dummy = nor->read_dummy;
-
 	nor->prepare(nor, SPI_NOR_OPS_LOCK);
-
-	nor->read_opcode = MT25Q_READ_VOLATILE_LOCK;
-	nor->read_dummy = 0;
+	aspeed_user_control(1);
 
 	for (addr = 0; addr < BOOT_AREA;) {
 		uint8_t r;
-		ret = nor->read(nor, addr, 1, &r);
-		if (ret == 0) {
-			ret = -EIO;
-			goto read_err;
-		}
+		r = mt25q_read_vol_lock(addr);
+		printk(KERN_INFO "read from %08x returned %x\n", addr, r);
 		if ((r & 0x3) != 0x3) {
 			locked = 0;
 			break;
@@ -56,12 +105,8 @@ static ssize_t lock_show(struct kobject *kobj, struct kobj_attribute *attr,
 		}
 	}
 
-read_err:
+	aspeed_user_control(0);
 	nor->unprepare(nor, SPI_NOR_OPS_LOCK);
-
-	nor->read_opcode = read_opcode;
-  nor->read_dummy = read_dummy;
-
 	mutex_unlock(&nor->lock);
 	if (ret < 0) {
 		return ret;
@@ -75,24 +120,14 @@ read_err:
 static ssize_t lock_store(struct kobject *kobj, struct kobj_attribute *attr,
 		const char *buff, size_t count)
 {
-	u8 program_opcode;
-	int ret;
 	uint32_t addr;
 
 	// TODO(bluecmd): Do this iff the chip is an MT25Q chip
 	mutex_lock(&nor->lock);
-
-	program_opcode = nor->program_opcode;
 	nor->prepare(nor, SPI_NOR_OPS_LOCK);
-	nor->program_opcode = MT25Q_WRITE_VOLATILE_LOCK;
 
 	for (addr = 0; addr < BOOT_AREA;) {
-		uint8_t r = 0x3;
-		ret = nor->write(nor, addr, 1, &r);
-		if (ret == 0) {
-			ret = -EIO;
-			goto write_err;
-		}
+		mt25q_write_vol_lock(addr, 0x3);
 		if (addr < 64*1024) {
 			addr += 4 * 1024;
 		} else {
@@ -100,11 +135,9 @@ static ssize_t lock_store(struct kobject *kobj, struct kobj_attribute *attr,
 		}
 	}
 
-write_err:
 	nor->unprepare(nor, SPI_NOR_OPS_LOCK);
-	nor->program_opcode = program_opcode;
 	mutex_unlock(&nor->lock);
-	return ret < 0 ? ret : count;
+	return count;
 }
 
 static struct kobj_attribute bootlock_attribute =
@@ -148,6 +181,9 @@ int __init sysfs_init(void)
 	// TODO(bluecmd): This is not very nice, there must be a better way to get
 	// a reference to the spi_nor.
 	nor = (struct spi_nor*)mtd->priv;
+
+	aspeed_fmc_base = ioremap(ASPEED_FMC_AHB_BASE, 0x14);
+	aspeed_nor_base = ioremap(ASPEED_NOR_AHB_BASE, 0x10);
 
 	return ret;
 }
