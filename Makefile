@@ -154,8 +154,9 @@ initramfs.cpio: u-root ssh_keys.pub $(shell find . -name \*.go -type f)
 
 clean:
 	\rm -f initramfs.cpio u-root \
-	 flash.img u-boot/u-boot.bin u-boot/u-boot-512.bin \
+	 flash.img flash.sim.img u-boot/u-boot.bin u-boot/u-boot-512.bin \
 	 root.ubifs.img boot.ubifs.img boot/zImage boot/*.dtb \
-	 boot.img ubi.img boot/loader/loader boot/signer/signer \
-	 module/*.o module/*.mod.c module/*.ko
-	\rm -fr root/ boot/modules/
+	 boot.img ubi.img boot/loader/loader boot/signer/signer boot/loader.cpio.gz \
+	 module/*.o module/*.mod.c module/*.ko module/.*.cmd module/modules.order \
+	 module/Module.symvers config/ssh_keys.go config/version.go
+	\rm -fr root/ boot/modules/ module/.tmp_versions/ boot/out
