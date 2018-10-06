@@ -5,6 +5,7 @@ boot/loader/loader
 boot/signer/signer
 boot/*.dtb
 boot/zImage*
+boot/modules
 build/*
 *.img
 .*.sw*
@@ -15,3 +16,11 @@ initramfs.cpio.tmp
 ssh_keys.pub
 u-root
 linux.config.old
+module/.*.cmd
+module/.tmp_versions
+module/*.ko
+module/*.mod.c
+module/*.o
+module/modules.*
+module/Module.symvers
+

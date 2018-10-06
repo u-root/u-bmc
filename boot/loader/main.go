@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/machinebox/progress"
+	"github.com/u-root/u-root/pkg/kmodule"
 	"golang.org/x/crypto/openpgp/errors"
 	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/sys/unix"
@@ -30,6 +31,9 @@ const (
 )
 
 func main() {
+	if err := loadModule("/bootlock.ko"); err != nil {
+		log.Fatalf("loadModule(/bootlock.ko): %v", err)
+	}
 	keyf, err := os.Open(pubKeyPath)
 	if err != nil {
 		log.Fatalf("Open(%s): %v", pubKeyPath, err)
@@ -137,4 +141,13 @@ func verifyDetachedSignature(key *packet.PublicKey, contentf, sigf *os.File) err
 		panic("unreachable")
 	}
 	return err
+}
+
+func loadModule(fp string) error {
+	f, err := os.Open(fp)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	return kmodule.FileInit(f, "", 0)
 }

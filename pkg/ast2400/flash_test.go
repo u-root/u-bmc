@@ -50,7 +50,7 @@ func TestMx25l256Supported(t *testing.T) {
 	fm := fakeMemory(t)
 	a := OpenWithMemory(fm)
 	expectInit(fm, MX25L256_ID)
-	expectCmd8(fm, MX25_OP_EN4B)
+	expectCmd8(fm, COMMON_OP_EN4B)
 	f, err := a.SystemFlash()
 	if err != nil {
 		t.Fatalf("Failed: %v", err)
@@ -62,7 +62,7 @@ func TestMx25l256Supported(t *testing.T) {
 		t.Fatalf("ID verification failed %v != %v", id, MX25L256_ID)
 	}
 
-	expectCmd8(fm, MX25_OP_EX4B)
+	expectCmd8(fm, COMMON_OP_EX4B)
 	f.Close()
 }
 
@@ -80,14 +80,14 @@ func TestMx25l256FastRead(t *testing.T) {
 	fm := fakeMemory(t)
 	a := OpenWithMemory(fm)
 	expectInit(fm, MX25L256_ID)
-	expectCmd8(fm, MX25_OP_EN4B)
+	expectCmd8(fm, COMMON_OP_EN4B)
 	f, err := a.SystemFlash()
 	if err != nil {
 		t.Fatalf("Failed: %v", err)
 	}
 
 	fm.ExpectWrite32(0x1e620010, 0x603)
-	fm.ExpectWrite8(0x20000000, MX25_OP_FAST_READ)
+	fm.ExpectWrite8(0x20000000, COMMON_OP_FAST_READ)
 	fm.ExpectWrite8(0x20000000, 0x01)
 	fm.ExpectWrite8(0x20000000, 0x55)
 	fm.ExpectWrite8(0x20000000, 0xbb)
@@ -116,15 +116,15 @@ func TestMx25l256EraseAndWrite(t *testing.T) {
 	fm := fakeMemory(t)
 	a := OpenWithMemory(fm)
 	expectInit(fm, MX25L256_ID)
-	expectCmd8(fm, MX25_OP_EN4B)
+	expectCmd8(fm, COMMON_OP_EN4B)
 	f, err := a.SystemFlash()
 	if err != nil {
 		t.Fatalf("Failed: %v", err)
 	}
 
-	expectCmd8(fm, MX25_OP_WREN)
+	expectCmd8(fm, COMMON_OP_WREN)
 	fm.ExpectWrite32(0x1e620010, 0x603)
-	fm.ExpectWrite8(0x20000000, MX25_OP_BLOCK_ERASE)
+	fm.ExpectWrite8(0x20000000, COMMON_OP_BLOCK_ERASE)
 	fm.ExpectWrite8(0x20000000, 0x01)
 	fm.ExpectWrite8(0x20000000, 0x55)
 	fm.ExpectWrite8(0x20000000, 0x00)
@@ -144,9 +144,9 @@ func TestMx25l256EraseAndWrite(t *testing.T) {
 	fm.ExpectWrite32(0x1e620010, 0x607)
 
 	for i := 0; i < 64*1024/256; i++ {
-		expectCmd8(fm, MX25_OP_WREN)
+		expectCmd8(fm, COMMON_OP_WREN)
 		fm.ExpectWrite32(0x1e620010, 0x603)
-		fm.ExpectWrite8(0x20000000, MX25_OP_PAGE_PROGRAM)
+		fm.ExpectWrite8(0x20000000, COMMON_OP_PAGE_PROGRAM)
 		fm.ExpectWrite8(0x20000000, 0x01)
 		fm.ExpectWrite8(0x20000000, 0x55)
 		fm.ExpectWrite8(0x20000000, uint8(i))
