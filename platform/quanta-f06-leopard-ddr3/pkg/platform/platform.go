@@ -24,33 +24,33 @@ type platform struct {
 func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 	p.g = g
 	g.Monitor(map[string]bmc.GpioCallback{
-		"CPU0_FIVR_FAULT_N": bmc.LogGpio,
-		"CPU0_PROCHOT_N": bmc.LogGpio,
-		"CPU0_THERMTRIP_N": bmc.LogGpio,
-		"CPU1_FIVR_FAULT_N": bmc.LogGpio,
-		"CPU1_PROCHOT_N": bmc.LogGpio,
-		"CPU1_THERMTRIP_N": bmc.LogGpio,
-		"CPU_CATERR_N": bmc.LogGpio,
-		"MB_SLOT_ID": bmc.LogGpio,
-		"MEMAB_MEMHOT_N": bmc.LogGpio,
-		"MEMCD_MEMHOT_N": bmc.LogGpio,
-		"MEMEF_MEMHOT_N": bmc.LogGpio,
-		"MEMGH_MEMHOT_N": bmc.LogGpio,
-		"NMI_BTN_N": bmc.LogGpio,
+		"CPU0_FIVR_FAULT_N":   bmc.LogGpio,
+		"CPU0_PROCHOT_N":      bmc.LogGpio,
+		"CPU0_THERMTRIP_N":    bmc.LogGpio,
+		"CPU1_FIVR_FAULT_N":   bmc.LogGpio,
+		"CPU1_PROCHOT_N":      bmc.LogGpio,
+		"CPU1_THERMTRIP_N":    bmc.LogGpio,
+		"CPU_CATERR_N":        bmc.LogGpio,
+		"MB_SLOT_ID":          bmc.LogGpio,
+		"MEMAB_MEMHOT_N":      bmc.LogGpio,
+		"MEMCD_MEMHOT_N":      bmc.LogGpio,
+		"MEMEF_MEMHOT_N":      bmc.LogGpio,
+		"MEMGH_MEMHOT_N":      bmc.LogGpio,
+		"NMI_BTN_N":           bmc.LogGpio,
 		"PCH_BMC_THERMTRIP_N": bmc.LogGpio,
-		"PCH_PWR_OK": bmc.LogGpio,
-		"PWR_BTN_N": p.PowerButtonHandler,
-		"RST_BTN_N": p.ResetButtonHandler,
-		"SKU0": bmc.LogGpio,
-		"SKU1": bmc.LogGpio,
-		"SKU2": bmc.LogGpio,
-		"SKU3": bmc.LogGpio,
-		"SLP_S3_N": bmc.LogGpio,
-		"SPI_SEL": bmc.LogGpio,
-		"SYS_PWR_OK": bmc.LogGpio,
-		"SYS_THROTTLE": bmc.LogGpio,
-		"UART_SELECT0": bmc.LogGpio,
-		"UART_SELECT1": bmc.LogGpio,
+		"PCH_PWR_OK":          bmc.LogGpio,
+		"PWR_BTN_N":           p.PowerButtonHandler,
+		"RST_BTN_N":           p.ResetButtonHandler,
+		"SKU0":                bmc.LogGpio,
+		"SKU1":                bmc.LogGpio,
+		"SKU2":                bmc.LogGpio,
+		"SKU3":                bmc.LogGpio,
+		"SLP_S3_N":            bmc.LogGpio,
+		"SPI_SEL":             bmc.LogGpio,
+		"SYS_PWR_OK":          bmc.LogGpio,
+		"SYS_THROTTLE":        bmc.LogGpio,
+		"UART_SELECT0":        bmc.LogGpio,
+		"UART_SELECT1":        bmc.LogGpio,
 	})
 
 	g.Hog(map[string]bool{
@@ -71,22 +71,31 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 	return nil
 }
 
-func (p *platform) PowerButtonHandler(_ string, c chan bool) {
+func (p *platform) PowerButtonHandler(_ string, c chan bool, _ bool) {
 	pushc := chan bool(nil)
 	for state := range c {
 		// Power button is inverted
 		pressed := !state
 		if pressed {
+			log.Printf("Physical power button pressed")
+			pushc = make(chan bool)
 			p.g.Button[pb.Button_BUTTON_POWER] <- pushc
+			pushc <- true
+		} else if pushc != nil {
+			log.Printf("Physical power button released")
+			pushc <- false
+			close(pushc)
+			pushc = nil
 		}
 	}
 }
 
-func (p *platform) ResetButtonHandler(_ string, c chan bool) {
+func (p *platform) ResetButtonHandler(_ string, c chan bool, _ bool) {
 	for state := range c {
 		// Reset button is inverted
 		pressed := !state
 		if pressed {
+			log.Printf("Physical reset button triggered")
 			pushc := make(chan bool)
 			p.g.Button[pb.Button_BUTTON_RESET] <- pushc
 			pushc <- true
@@ -119,7 +128,7 @@ func (p *platform) InitializeSystem() error {
 	// the power buttons, which are routed as pass-through before boot has
 	// completed.
 	hws := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x70)
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x70, hws & ^uint32(3 << 21))
+	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x70, hws & ^uint32(3<<21))
 	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x8c, 0)
 	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0, 0x0)
 

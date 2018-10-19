@@ -17,9 +17,9 @@ import (
 const (
 	GPIO_INVERTED = 0x1
 
-	GPIO_EVENT_UNKNOWN        = 0
-	GPIO_EVENT_RISING_EDGE    = 1
-	GPIO_EVENT_FALLING_EDGE   = 2
+	GPIO_EVENT_UNKNOWN      = 0
+	GPIO_EVENT_RISING_EDGE  = 1
+	GPIO_EVENT_FALLING_EDGE = 2
 )
 
 type GpioPlatform interface {
@@ -29,7 +29,6 @@ type GpioPlatform interface {
 }
 
 type gpioLineImpl interface {
-	getValues() ([]bool, error)
 	setValues(out []bool) error
 }
 
@@ -49,11 +48,10 @@ type GpioSystem struct {
 	Button map[pb.Button]chan chan bool
 }
 
-type GpioCallback func(line string, c chan bool)
+type GpioCallback func(line string, c chan bool, initial bool)
 
-func LogGpio(line string, c chan bool) {
-	// The first value is the current value and that is already logged
-	<-c
+func LogGpio(line string, c chan bool, d bool) {
+	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d)
 	for value := range c {
 		f := ""
 		if value {
@@ -80,10 +78,8 @@ func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 	}
 
 	c := make(chan bool)
-	go cb(line, c)
+	go cb(line, c, d)
 
-	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d)
-	c <- d
 	for {
 		ev, err := e.read()
 		if ev == nil && err != nil {
@@ -108,13 +104,19 @@ func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 }
 
 func (g *GpioSystem) Monitor(lines map[string]GpioCallback) {
+	log.Printf("Setting up %v GPIO monitors", len(lines))
 	for line, cb := range lines {
-		go func(l string) {
+		// TODO(bluecmd): This is a bit redundant, but there have been cases
+		// where u-bmc starts up but no monitors are started. This logging statement
+		// is here to help pin-point the issue if it happens again. If there are no
+		// reports of that happening, this log line can be removed.
+		log.Printf("Starting monitor for GPIO %v", line)
+		go func(l string, cb GpioCallback) {
 			err := g.monitorOne(l, cb)
 			if err != nil {
 				log.Printf("Monitor %s failed: %v", l, err)
 			}
-		}(line)
+		}(line, cb)
 	}
 }
 
@@ -202,7 +204,7 @@ func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
 			} else {
 				log.Printf("Releasing button %s", line)
 			}
-			if flags & GPIO_INVERTED != 0 {
+			if flags&GPIO_INVERTED != 0 {
 				p = !p
 			}
 			l.setValues([]bool{p})
@@ -227,7 +229,7 @@ func startGpio(p GpioPlatform) (*GpioSystem, error) {
 
 func NewGpioSystem(p GpioPlatform, impl gpioImpl) *GpioSystem {
 	g := GpioSystem{
-		p: p,
+		p:    p,
 		impl: impl,
 		Button: map[pb.Button]chan chan bool{
 			pb.Button_BUTTON_POWER: make(chan chan bool),
@@ -236,4 +238,3 @@ func NewGpioSystem(p GpioPlatform, impl gpioImpl) *GpioSystem {
 	}
 	return &g
 }
-
