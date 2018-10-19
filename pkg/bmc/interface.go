@@ -136,9 +136,12 @@ func ConfigureInterfaces() error {
 		return err
 	}
 
-	// TODO(bluecmd): Read MAC address from NC-SI
 	iface := "eth0"
 	if err := setLinkUp(iface); err != nil {
+		return err
+	}
+	// TODO(bluecmd): Remove when DHCP is confirmed to work
+	if err := addIp("10.0.10.20/24", "eth0"); err != nil {
 		return err
 	}
 	go doDHCP4(iface)
