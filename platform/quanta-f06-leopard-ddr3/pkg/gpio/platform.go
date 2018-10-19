@@ -35,7 +35,6 @@ var (
 		"UNKN_BOOT0":          ast2400.GpioPort("G3"),
 		// TODO(bluecmd): This is what the Tioga Pass has, unverified
 		"BAT_SENSE_EN_N":    ast2400.GpioPort("G4"),
-		"BMC_UART_SELECT_N": ast2400.GpioPort("L7"),
 		"BIOS_SEL":          ast2400.GpioPort("N4"),
 		// Tristate:
 		// set to input to allow host to own BIOS flash

@@ -51,7 +51,6 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"SYS_THROTTLE":        bmc.LogGpio,
 		"UART_SELECT0":        bmc.LogGpio,
 		"UART_SELECT1":        bmc.LogGpio,
-		"BMC_UART_SELECT_N":   bmc.LogGpio,
 		"UNKN_BOOT0":          bmc.LogGpio,
 		"UNKN_BOOT1":          bmc.LogGpio,
 	})
