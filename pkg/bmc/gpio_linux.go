@@ -72,8 +72,8 @@ const (
 	GPIOEVENT_REQUEST_FALLING_EDGE = (1 << 1)
 	GPIOEVENT_REQUEST_BOTH_EDGES   = GPIOEVENT_REQUEST_RISING_EDGE | GPIOEVENT_REQUEST_FALLING_EDGE
 
-	GPIOEVENT_EVENT_RISING_EDGE    = 1
-	GPIOEVENT_EVENT_FALLING_EDGE   = 2
+	GPIOEVENT_EVENT_RISING_EDGE  = 1
+	GPIOEVENT_EVENT_FALLING_EDGE = 2
 )
 
 type gpioLnx struct {
@@ -147,11 +147,6 @@ func setLineValues(f *os.File, out []bool) error {
 		return fmt.Errorf("GPIOHANDLE_SET_LINE_VALUES_IOCTL: errno %v", errno)
 	}
 	return nil
-}
-
-
-func (l *gpioLnxLine) getValues() ([]bool, error) {
-	return getLineValues(l.f)
 }
 
 func (l *gpioLnxLine) setValues(out []bool) error {
