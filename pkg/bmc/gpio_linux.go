@@ -72,38 +72,19 @@ const (
 	GPIOEVENT_REQUEST_FALLING_EDGE = (1 << 1)
 	GPIOEVENT_REQUEST_BOTH_EDGES   = GPIOEVENT_REQUEST_RISING_EDGE | GPIOEVENT_REQUEST_FALLING_EDGE
 
-	GPIOEVENT_EVENT_RISING_EDGE  = 1
-	GPIOEVENT_EVENT_FALLING_EDGE = 2
+	GPIOEVENT_EVENT_RISING_EDGE    = 1
+	GPIOEVENT_EVENT_FALLING_EDGE   = 2
 )
 
-func getLine(f *os.File, line uint32) (*gpioline_info, error) {
-	linfo := gpioline_info{}
-	linfo.line_offset = line
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(f.Fd()),
-		uintptr(GPIO_GET_LINEINFO_IOCTL),
-		uintptr(unsafe.Pointer(&linfo)))
-	if errno != 0 {
-		return nil, fmt.Errorf("GPIO_GET_LINEINFO_IOCTL: errno %v", errno)
-	}
-	return &linfo, nil
+type gpioLnx struct {
+	f *os.File
 }
 
-func getChip(f *os.File) (*gpiochip_info, error) {
-	cinfo := gpiochip_info{}
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(f.Fd()),
-		uintptr(GPIO_GET_CHIPINFO_IOCTL),
-		uintptr(unsafe.Pointer(&cinfo)))
-	if errno != 0 {
-		return nil, fmt.Errorf("GPIO_GET_CHIPINFO_IOCTL: errno %v", errno)
-	}
-	return &cinfo, nil
+type gpioLnxLine struct {
+	f *os.File
 }
 
-func requestLineHandle(f *os.File, lines []uint32, out []bool) (*os.File, error) {
+func (g *gpioLnx) requestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error) {
 	rinfo := gpiohandle_request{}
 	for i, l := range lines {
 		rinfo.lineoffsets[i] = l
@@ -115,22 +96,22 @@ func requestLineHandle(f *os.File, lines []uint32, out []bool) (*os.File, error)
 		}
 	}
 	rinfo.flags = GPIOHANDLE_REQUEST_INPUT
-	copy(rinfo.consumer_label[:], []byte("gpio-utility"))
+	copy(rinfo.consumer_label[:], []byte("u-bmc"))
 	if len(out) > 0 {
 		rinfo.flags = GPIOHANDLE_REQUEST_OUTPUT
 	}
 	_, _, errno := syscall.Syscall(
 		syscall.SYS_IOCTL,
-		uintptr(f.Fd()),
+		uintptr(g.f.Fd()),
 		uintptr(GPIO_GET_LINEHANDLE_IOCTL),
 		uintptr(unsafe.Pointer(&rinfo)))
 	if errno != 0 {
 		return nil, fmt.Errorf("GPIO_GET_LINEHANDLE_IOCTL: errno %v", errno)
 	}
-	return os.NewFile(uintptr(rinfo.fd), "gpio"), nil
+	return &gpioLnxLine{os.NewFile(uintptr(rinfo.fd), "gpio")}, nil
 }
 
-func getLineValues(f *os.File) (*gpiohandle_data, error) {
+func getLineValues(f *os.File) ([]bool, error) {
 	hinfo := gpiohandle_data{}
 	_, _, errno := syscall.Syscall(
 		syscall.SYS_IOCTL,
@@ -140,10 +121,17 @@ func getLineValues(f *os.File) (*gpiohandle_data, error) {
 	if errno != 0 {
 		return nil, fmt.Errorf("GPIOHANDLE_GET_LINE_VALUES_IOCTL: errno %v", errno)
 	}
-	return &hinfo, nil
+
+	b := make([]bool, len(hinfo.values))
+	for i, v := range hinfo.values {
+		if v != 0 {
+			b[i] = true
+		}
+	}
+	return b, nil
 }
 
-func setLineValues(f *os.File, out []bool) (*gpiohandle_data, error) {
+func setLineValues(f *os.File, out []bool) error {
 	hinfo := gpiohandle_data{}
 	for i, v := range out {
 		if v {
@@ -156,35 +144,66 @@ func setLineValues(f *os.File, out []bool) (*gpiohandle_data, error) {
 		uintptr(GPIOHANDLE_SET_LINE_VALUES_IOCTL),
 		uintptr(unsafe.Pointer(&hinfo)))
 	if errno != 0 {
-		return nil, fmt.Errorf("GPIOHANDLE_SET_LINE_VALUES_IOCTL: errno %v", errno)
+		return fmt.Errorf("GPIOHANDLE_SET_LINE_VALUES_IOCTL: errno %v", errno)
 	}
-	return &hinfo, nil
+	return nil
 }
 
-func getLineEvent(f *os.File, line uint32, hf int, ef int) (*os.File, error) {
+
+func (l *gpioLnxLine) getValues() ([]bool, error) {
+	return getLineValues(l.f)
+}
+
+func (l *gpioLnxLine) setValues(out []bool) error {
+	return setLineValues(l.f, out)
+}
+
+type gpioLnxEvent struct {
+	f *os.File
+}
+
+func (g *gpioLnx) getLineEvent(line uint32) (gpioEventImpl, error) {
 	req := gpioevent_request{}
 	req.lineoffset = line
-	req.handleflags = uint32(hf)
-	req.eventflags = uint32(ef)
+	req.handleflags = uint32(GPIOHANDLE_REQUEST_INPUT)
+	req.eventflags = uint32(GPIOEVENT_REQUEST_BOTH_EDGES)
 	_, _, errno := syscall.Syscall(
 		syscall.SYS_IOCTL,
-		uintptr(f.Fd()),
+		uintptr(g.f.Fd()),
 		uintptr(GPIO_GET_LINEEVENT_IOCTL),
 		uintptr(unsafe.Pointer(&req)))
 	if errno != 0 {
 		return nil, fmt.Errorf("GPIO_GET_LINEEVENT_IOCTL: errno %v", errno)
 	}
-	return os.NewFile(uintptr(req.fd), "gpio-line-event"), nil
+	return &gpioLnxEvent{os.NewFile(uintptr(req.fd), "gpio-line-event")}, nil
 }
 
-func readEvent(f *os.File) (*gpioevent_data, error) {
+func (l *gpioLnxEvent) getValue() (bool, error) {
+	b, err := getLineValues(l.f)
+	if err != nil {
+		return false, err
+	}
+	return b[0], nil
+}
+
+func (l *gpioLnxEvent) read() (*int, error) {
 	e := gpioevent_data{}
-	err := binary.Read(f, binary.LittleEndian, &e)
+	err := binary.Read(l.f, binary.LittleEndian, &e)
 	if err == io.EOF {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("readEvent: %v", err)
 	}
-	return &e, nil
+
+	v := GPIO_EVENT_UNKNOWN
+	switch e.Id {
+	case GPIOEVENT_EVENT_FALLING_EDGE:
+		v = GPIO_EVENT_FALLING_EDGE
+	case GPIOEVENT_EVENT_RISING_EDGE:
+		v = GPIO_EVENT_RISING_EDGE
+	default:
+		return &v, fmt.Errorf("unknown event: %v", e)
+	}
+	return &v, nil
 }

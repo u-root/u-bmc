@@ -6,6 +6,7 @@ package platform
 
 import (
 	"log"
+	"time"
 
 	"github.com/u-root/u-bmc/pkg/ast2400"
 	"github.com/u-root/u-bmc/pkg/bmc"
@@ -16,38 +17,40 @@ import (
 
 type platform struct {
 	a *ast2400.Ast
+	g *bmc.GpioSystem
 	gpio.Gpio
 }
 
 func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
-	g.Monitor([]string{
-		"CPU0_FIVR_FAULT_N",
-		"CPU0_PROCHOT_N",
-		"CPU0_THERMTRIP_N",
-		"CPU1_FIVR_FAULT_N",
-		"CPU1_PROCHOT_N",
-		"CPU1_THERMTRIP_N",
-		"CPU_CATERR_N",
-		"MB_SLOT_ID",
-		"MEMAB_MEMHOT_N",
-		"MEMCD_MEMHOT_N",
-		"MEMEF_MEMHOT_N",
-		"MEMGH_MEMHOT_N",
-		"NMI_BTN_N",
-		"PCH_BMC_THERMTRIP_N",
-		"PCH_PWR_OK",
-		"PWR_BTN_N",
-		"RST_BTN_N",
-		"SKU0",
-		"SKU1",
-		"SKU2",
-		"SKU3",
-		"SLP_S3_N",
-		"SPI_SEL",
-		"SYS_PWR_OK",
-		"SYS_THROTTLE",
-		"UART_SELECT0",
-		"UART_SELECT1",
+	p.g = g
+	g.Monitor(map[string]bmc.GpioCallback{
+		"CPU0_FIVR_FAULT_N": bmc.LogGpio,
+		"CPU0_PROCHOT_N": bmc.LogGpio,
+		"CPU0_THERMTRIP_N": bmc.LogGpio,
+		"CPU1_FIVR_FAULT_N": bmc.LogGpio,
+		"CPU1_PROCHOT_N": bmc.LogGpio,
+		"CPU1_THERMTRIP_N": bmc.LogGpio,
+		"CPU_CATERR_N": bmc.LogGpio,
+		"MB_SLOT_ID": bmc.LogGpio,
+		"MEMAB_MEMHOT_N": bmc.LogGpio,
+		"MEMCD_MEMHOT_N": bmc.LogGpio,
+		"MEMEF_MEMHOT_N": bmc.LogGpio,
+		"MEMGH_MEMHOT_N": bmc.LogGpio,
+		"NMI_BTN_N": bmc.LogGpio,
+		"PCH_BMC_THERMTRIP_N": bmc.LogGpio,
+		"PCH_PWR_OK": bmc.LogGpio,
+		"PWR_BTN_N": p.PowerButtonHandler,
+		"RST_BTN_N": p.ResetButtonHandler,
+		"SKU0": bmc.LogGpio,
+		"SKU1": bmc.LogGpio,
+		"SKU2": bmc.LogGpio,
+		"SKU3": bmc.LogGpio,
+		"SLP_S3_N": bmc.LogGpio,
+		"SPI_SEL": bmc.LogGpio,
+		"SYS_PWR_OK": bmc.LogGpio,
+		"SYS_THROTTLE": bmc.LogGpio,
+		"UART_SELECT0": bmc.LogGpio,
+		"UART_SELECT1": bmc.LogGpio,
 	})
 
 	g.Hog(map[string]bool{
@@ -63,9 +66,35 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"UNKN_Q4": false,
 	})
 
-	go g.ManageButton("BMC_PWR_BTN_OUT_N", pb.Button_BUTTON_POWER)
-	go g.ManageButton("BMC_RST_BTN_OUT_N", pb.Button_BUTTON_RESET)
+	go g.ManageButton("BMC_PWR_BTN_OUT_N", pb.Button_BUTTON_POWER, bmc.GPIO_INVERTED)
+	go g.ManageButton("BMC_RST_BTN_OUT_N", pb.Button_BUTTON_RESET, bmc.GPIO_INVERTED)
 	return nil
+}
+
+func (p *platform) PowerButtonHandler(_ string, c chan bool) {
+	pushc := chan bool(nil)
+	for state := range c {
+		// Power button is inverted
+		pressed := !state
+		if pressed {
+			p.g.Button[pb.Button_BUTTON_POWER] <- pushc
+		}
+	}
+}
+
+func (p *platform) ResetButtonHandler(_ string, c chan bool) {
+	for state := range c {
+		// Reset button is inverted
+		pressed := !state
+		if pressed {
+			pushc := make(chan bool)
+			p.g.Button[pb.Button_BUTTON_RESET] <- pushc
+			pushc <- true
+			time.Sleep(time.Duration(100) * time.Millisecond)
+			pushc <- false
+			close(pushc)
+		}
+	}
 }
 
 func (p *platform) InitializeSystem() error {
@@ -131,6 +160,6 @@ func (p *platform) Close() {
 
 func Platform() *platform {
 	a := ast2400.Open()
-	p := platform{a, gpio.Gpio{}}
+	p := platform{a, nil, gpio.Gpio{}}
 	return &p
 }
