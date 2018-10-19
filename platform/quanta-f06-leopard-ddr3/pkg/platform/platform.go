@@ -54,7 +54,6 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"BMC_UART_SELECT_N":   bmc.LogGpio,
 		"UNKN_BOOT0":          bmc.LogGpio,
 		"UNKN_BOOT1":          bmc.LogGpio,
-		"UNKN_BOOT2":          bmc.LogGpio,
 	})
 
 	g.Hog(map[string]bool{

@@ -10,10 +10,9 @@ import (
 
 var (
 	linePortMap = map[string]uint32{
-		"UNKN_BOOT2":          ast2400.GpioPort("A2"),
+		"UNKN_BOOT1":          ast2400.GpioPort("A2"),
 		"UNKN_PWR_CAP":        ast2400.GpioPort("A3"),
 		"FAST_PROCHOT":        ast2400.GpioPort("B3"),
-		"UNKN_BOOT1":          ast2400.GpioPort("B4"),
 		"CPU0_THERMTRIP_N":    ast2400.GpioPort("B5"),
 		"CPU1_THERMTRIP_N":    ast2400.GpioPort("B6"),
 		"MEMAB_MEMHOT_N":      ast2400.GpioPort("C2"),
