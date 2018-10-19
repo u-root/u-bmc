@@ -121,6 +121,14 @@
 
 &i2c6 {
 	status = "okay";
+	tmp421@4e {
+		compatible = "ti,tmp421";
+		reg = <0x4e>;
+	};
+	tmp421@4f {
+		compatible = "ti,tmp421";
+		reg = <0x4f>;
+	};
 };
 
 &i2c7 {
