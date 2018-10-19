@@ -14,65 +14,103 @@ import (
 	pb "github.com/u-root/u-bmc/proto"
 )
 
+const (
+	GPIO_INVERTED = 0x1
+
+	GPIO_EVENT_UNKNOWN        = 0
+	GPIO_EVENT_RISING_EDGE    = 1
+	GPIO_EVENT_FALLING_EDGE   = 2
+)
+
 type GpioPlatform interface {
 	GpioNameToPort(string) (uint32, bool)
 	GpioPortToName(uint32) (string, bool)
 	InitializeGpio(g *GpioSystem) error
 }
 
+type gpioLineImpl interface {
+	getValues() ([]bool, error)
+	setValues(out []bool) error
+}
+
+type gpioEventImpl interface {
+	read() (*int, error)
+	getValue() (bool, error)
+}
+
+type gpioImpl interface {
+	requestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error)
+	getLineEvent(line uint32) (gpioEventImpl, error)
+}
+
 type GpioSystem struct {
 	p      GpioPlatform
-	f      *os.File
-	button map[pb.Button]chan push
+	impl   gpioImpl
+	Button map[pb.Button]chan chan bool
 }
 
-type push struct {
-	d   time.Duration
-	c   chan bool
-	ctx context.Context
+type GpioCallback func(line string, c chan bool)
+
+func LogGpio(line string, c chan bool) {
+	// The first value is the current value and that is already logged
+	<-c
+	for value := range c {
+		f := ""
+		if value {
+			f = "rising edge"
+		} else {
+			f = "falling edge"
+		}
+		log.Printf("%s: %s", line, f)
+	}
 }
 
-func (g *GpioSystem) monitorOne(line string) error {
+func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 	port, ok := g.p.GpioNameToPort(line)
 	if !ok {
 		return fmt.Errorf("Could not resolve GPIO %s", line)
 	}
-	e, err := getLineEvent(g.f, port, GPIOHANDLE_REQUEST_INPUT, GPIOEVENT_REQUEST_BOTH_EDGES)
+	e, err := g.impl.getLineEvent(port)
 	if err != nil {
 		return err
 	}
-	d, err := getLineValues(e)
+	d, err := e.getValue()
 	if err != nil {
 		return err
 	}
-	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d.values[0])
+
+	c := make(chan bool)
+	go cb(line, c)
+
+	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d)
+	c <- d
 	for {
-		ev, err := readEvent(e)
-		if err != nil {
+		ev, err := e.read()
+		if ev == nil && err != nil {
 			return err
 		}
 		if ev == nil {
 			break
 		}
-		f := ""
-		if ev.Id == GPIOEVENT_EVENT_FALLING_EDGE {
-			f = "falling edge"
-		} else if ev.Id == GPIOEVENT_EVENT_RISING_EDGE {
-			f = "rising edge"
-		} else {
-			f = fmt.Sprintf("unknown event %v", ev)
-		}
-		log.Printf("%s: %s", line, f)
 
+		switch *ev {
+		case GPIO_EVENT_FALLING_EDGE:
+			c <- false
+		case GPIO_EVENT_RISING_EDGE:
+			c <- true
+		default:
+			log.Printf("Received unknown event on GPIO line %s: %v", line, err)
+		}
 	}
+	close(c)
 	log.Printf("Monitoring stopped for GPIO line %s", line)
 	return nil
 }
 
-func (g *GpioSystem) Monitor(lines []string) {
-	for _, line := range lines {
+func (g *GpioSystem) Monitor(lines map[string]GpioCallback) {
+	for line, cb := range lines {
 		go func(l string) {
-			err := g.monitorOne(l)
+			err := g.monitorOne(l, cb)
 			if err != nil {
 				log.Printf("Monitor %s failed: %v", l, err)
 			}
@@ -102,7 +140,7 @@ func (g *GpioSystem) Hog(lines map[string]bool) {
 		i++
 	}
 
-	_, err := requestLineHandle(g.f, lidx, vals)
+	_, err := g.impl.requestLineHandle(lidx, vals)
 	if err != nil {
 		log.Printf("Hog failed: %v", err)
 	}
@@ -113,24 +151,42 @@ func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32)
 		return nil, fmt.Errorf("Maximum allowed depress duration is 10 seconds")
 	}
 	dur := time.Duration(durMs) * time.Millisecond
-	c, ok := g.button[b]
+	c, ok := g.Button[b]
 	if !ok {
 		return nil, fmt.Errorf("Unknown button %v", b)
 	}
+
 	cc := make(chan bool)
-	c <- push{dur, cc, ctx}
+	pushc := make(chan bool)
+	// Queue the push behind any other push currently in action
+	c <- pushc
+	go func() {
+		// Ensure the push has not been cancelled before starting
+		if ctx.Err() != nil {
+			close(pushc)
+			return
+		}
+		// Commit to the push, and signal completion best-effort
+		// as the caller might have gone away by the time the push is done
+		pushc <- true
+		time.Sleep(dur)
+		pushc <- false
+		close(pushc)
+		select {
+		case cc <- true:
+		default:
+		}
+	}()
 	return cc, nil
 }
 
-func (g *GpioSystem) ManageButton(line string, b pb.Button) {
-	// TODO(bluecmd): Assume the line is inverted for now, probably will
-	// always be the case in all platforms though
+func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
 	port, ok := g.p.GpioNameToPort(line)
 	if !ok {
 		log.Printf("Could not resolve GPIO %s", line)
 		return
 	}
-	l, err := requestLineHandle(g.f, []uint32{port}, []bool{true})
+	l, err := g.impl.requestLineHandle([]uint32{port}, []bool{true})
 	if err != nil {
 		log.Printf("ManageButton %s failed: %v", line, err)
 		return
@@ -138,20 +194,18 @@ func (g *GpioSystem) ManageButton(line string, b pb.Button) {
 	log.Printf("Initialized button %s", line)
 
 	for {
-		p := <-g.button[b]
-		if p.ctx.Err() != nil {
-			continue
-		}
-		log.Printf("Pressing button %s", line)
-		setLineValues(l, []bool{false})
+		pushc := <-g.Button[b]
 
-		time.Sleep(p.d)
-
-		log.Printf("Releasing button %s", line)
-		setLineValues(l, []bool{true})
-		select {
-		case p.c <- true:
-		default:
+		for p := range pushc {
+			if p {
+				log.Printf("Pressing button %s", line)
+			} else {
+				log.Printf("Releasing button %s", line)
+			}
+			if flags & GPIO_INVERTED != 0 {
+				p = !p
+			}
+			l.setValues([]bool{p})
 		}
 	}
 }
@@ -162,18 +216,24 @@ func startGpio(p GpioPlatform) (*GpioSystem, error) {
 		return nil, err
 	}
 
-	g := GpioSystem{
-		p: p,
-		f: f,
-		button: map[pb.Button]chan push{
-			pb.Button_BUTTON_POWER: make(chan push),
-			pb.Button_BUTTON_RESET: make(chan push),
-		},
-	}
+	g := NewGpioSystem(p, &gpioLnx{f})
 
-	err = p.InitializeGpio(&g)
+	err = p.InitializeGpio(g)
 	if err != nil {
 		return nil, fmt.Errorf("platform.InitializeGpio: %v", err)
 	}
-	return &g, nil
+	return g, nil
 }
+
+func NewGpioSystem(p GpioPlatform, impl gpioImpl) *GpioSystem {
+	g := GpioSystem{
+		p: p,
+		impl: impl,
+		Button: map[pb.Button]chan chan bool{
+			pb.Button_BUTTON_POWER: make(chan chan bool),
+			pb.Button_BUTTON_RESET: make(chan chan bool),
+		},
+	}
+	return &g
+}
+
