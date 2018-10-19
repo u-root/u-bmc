@@ -97,17 +97,16 @@ func main() {
 
 func call(ctx context.Context, ds grpcurl.DescriptorSource, c *grpc.ClientConn, method string, text string) {
 	method = fmt.Sprintf("%s.%s", service, method)
-	// TODO(https://github.com/fullstorydev/grpcurl/issues/51): Support plain text
 	sent := false
-	rd := func() ([]byte, error) {
+	rd := func(m proto.Message) error {
 		if sent || text == "" {
-			return nil, io.EOF
+			return io.EOF
 		}
 		sent = true
-		return []byte(text), nil
+		return proto.UnmarshalText(text, m)
 	}
 	h := &handler{}
-	if err := grpcurl.InvokeRpc(ctx, ds, c, method, []string{} /* headers */, h, rd); err != nil {
+	if err := grpcurl.InvokeRPC(ctx, ds, c, method, []string{} /* headers */, h, rd); err != nil {
 		log.Fatalf("grpcurl.InvokeRpc(%s) failed: %v", method, err)
 	}
 	if h.stat.Code() != codes.OK {
