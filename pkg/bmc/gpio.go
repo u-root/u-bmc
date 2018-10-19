@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	pb "github.com/u-root/u-bmc/proto"
 )
 
@@ -50,13 +51,32 @@ type GpioSystem struct {
 
 type GpioCallback func(line string, c chan bool, initial bool)
 
+var (
+	gpioLine = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "ubmc",
+		Subsystem: "gpio",
+		Name:      "line",
+		Help:      "Monitored u-bmc GPIO line",
+	}, []string{"line"})
+)
+
+func init() {
+	prometheus.MustRegister(gpioLine)
+}
+
 func LogGpio(line string, c chan bool, d bool) {
 	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d)
+	m := gpioLine.With(prometheus.Labels{"line": line})
+	if d {
+		m.Set(1)
+	}
 	for value := range c {
 		f := ""
 		if value {
+			m.Set(1)
 			f = "rising edge"
 		} else {
+			m.Set(0)
 			f = "falling edge"
 		}
 		log.Printf("%s: %s", line, f)

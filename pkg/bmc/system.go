@@ -22,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
 	"github.com/vishvananda/netlink"
@@ -45,13 +46,28 @@ const banner = `
  `
 
 var (
-	environ []string
+	environ       []string
+	systemVersion = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "ubmc",
+		Subsystem: "system",
+		Name:      "vesion",
+		Help:      "u-bmc version metric",
+	}, []string{"version"})
+	systemHasTime = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "ubmc",
+		Subsystem: "system",
+		Name:      "has_trusted_time",
+		Help:      "u-bmc has acquired trusted time",
+	})
 )
 
 func init() {
 	environ = append(os.Environ(), "USER=root")
 	environ = append(environ, "HOME=/root")
 	environ = append(environ, "TZ=UTC")
+
+	prometheus.MustRegister(systemVersion)
+	prometheus.MustRegister(systemHasTime)
 }
 
 type Platform interface {
@@ -231,6 +247,7 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	fmt.Printf("\n")
 	fmt.Printf(banner)
 	fmt.Printf("Welcome to u-bmc version %s\n\n", c.Version.Version)
+	systemVersion.With(prometheus.Labels{"version": c.Version.Version}).Inc()
 
 	// Seed the non-crypto random generator using the crypto one (which is
 	// hardware based). The non-crypto generator is used for random back-off
@@ -310,6 +327,12 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 		return err
 	}
 
+	log.Printf("Starting OpenMetrics interface")
+	if err := startMetrics(); err != nil {
+		log.Printf("startMetrics failed: %v", err)
+		return err
+	}
+
 	log.Printf("Starting gRPC interface")
 	rpc, err := startGrpc(gpio, fan, uart, &c.Version)
 	if err != nil {
@@ -320,6 +343,7 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	go func() {
 		// Before we enable remote calls, make sure we have acquired accurate time
 		<-timeAcquired
+		systemHasTime.Set(1)
 
 		log.Printf("Time has been verified, enabling remote RPCs")
 		if err := rpc.EnableRemote(); err != nil {
