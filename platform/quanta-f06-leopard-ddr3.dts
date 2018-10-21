@@ -10,7 +10,7 @@
 
 	chosen {
 		stdout-path = &uart5;
-		bootargs = "console=ttyS4,57600n8 earlyprintk panic=1 root=/dev/ram0 rdinit=/loader mtdparts=nor.flash:512k(u-boot),-(ubi) ubi.mtd=ubi";
+		bootargs = "console=ttyS4,57600n8 earlyprintk panic=1 root=/dev/ram0 rdinit=/loader mtdparts=nor.flash:512k(u-boot),-(ubi) ubi.mtd=ubi dyndbg=\"file net/ncsi/* +p\"";
 	};
 
 	memory@40000000 {
