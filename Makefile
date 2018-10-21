@@ -92,6 +92,9 @@ boot/%.dtb: platform/%.dts platform/ubmc-flash-layout.dtsi
 root.ubifs.img: initramfs.cpio boot.img boot/signer/signer
 	rm -fr root/
 	mkdir -p root/root root/etc root/boot
+	echo "nameserver 2001:4860:4860::8888" > root/etc/resolv.conf
+	echo "nameserver 2606:4700:4700::1111" >> root/etc/resolv.conf
+	echo "nameserver 8.8.8.8" >> root/etc/resolv.conf
 	cp -v boot.img root/boot/
 	cp -v $(ROOT_DIR)/boot/keys/u-bmc.pub root/etc/
 	ln -sf /bbin/bb.sig root/init.sig

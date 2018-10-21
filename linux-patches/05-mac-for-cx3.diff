@@ -1,0 +1,70 @@
+diff --git a/net/ncsi/internal.h b/net/ncsi/internal.h
+index 71670d3270f3..6dc306aab661 100644
+--- a/net/ncsi/internal.h
++++ b/net/ncsi/internal.h
+@@ -75,13 +75,12 @@ enum {
+ #define NCSI_OEM_BCM_CMD_GMA            0x01   /* CMD ID for Get MAC */
+ /* Mellanox specific OEM Command */
+ #define NCSI_OEM_MLX_CMD_GMA            0x00   /* CMD ID for Get MAC */
+-#define NCSI_OEM_MLX_CMD_GMA_PARAM      0x1b   /* Parameter for GMA  */
+ /* OEM Command payload lengths*/
+ #define NCSI_OEM_BCM_CMD_GMA_LEN        12
+-#define NCSI_OEM_MLX_CMD_GMA_LEN        8
++#define NCSI_OEM_MLX_CMD_GMA_LEN        7
+ /* Mac address offset in OEM response */
+ #define BCM_MAC_ADDR_OFFSET             28
+-#define MLX_MAC_ADDR_OFFSET             8
++#define MLX_MAC_ADDR_OFFSET             4
+ 
+ 
+ struct ncsi_channel_version {
+diff --git a/net/ncsi/ncsi-cmd.c b/net/ncsi/ncsi-cmd.c
+index 356af474e43c..9b7ebc6fe20c 100644
+--- a/net/ncsi/ncsi-cmd.c
++++ b/net/ncsi/ncsi-cmd.c
+@@ -54,6 +54,10 @@ static void ncsi_cmd_build_header(struct ncsi_pkt_hdr *h,
+ 	h->reserved1[0] = 0;
+ 	h->reserved1[1] = 0;
+ 
++	if (nca->type == NCSI_PKT_CMD_OEM) {
++		return;
++	}
++
+ 	/* Fill with calculated checksum */
+ 	checksum = ncsi_calculate_checksum((unsigned char *)h,
+ 					   sizeof(*h) + nca->payload);
+diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
+index 961ff26dfd4c..3def8531cf89 100644
+--- a/net/ncsi/ncsi-manage.c
++++ b/net/ncsi/ncsi-manage.c
+@@ -684,7 +684,6 @@ static void ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
+ 	memset(data, 0, NCSI_OEM_MLX_CMD_GMA_LEN);
+ 	*(unsigned int *)data = ntohl(NCSI_OEM_MFR_MLX_ID);
+ 	data[5] = NCSI_OEM_MLX_CMD_GMA;
+-	data[6] = NCSI_OEM_MLX_CMD_GMA_PARAM;
+ 
+ 	nca->data = data;
+ 
+diff --git a/net/ncsi/ncsi-rsp.c b/net/ncsi/ncsi-rsp.c
+index 56145f9fc92d..3ee5f18454ae 100644
+--- a/net/ncsi/ncsi-rsp.c
++++ b/net/ncsi/ncsi-rsp.c
+@@ -627,6 +627,8 @@ static int ncsi_rsp_handler_oem_mlx_gma(struct ncsi_request *nr)
+ 	saddr.sa_family = ndev->type;
+ 	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
+ 	memcpy(saddr.sa_data, &rsp->data[MLX_MAC_ADDR_OFFSET], ETH_ALEN);
++	/* Management MAC is reply +2 and does never appear to wrap byte boundary */
++	saddr.sa_data[5] += 2;
+ 	ret = ops->ndo_set_mac_address(ndev, &saddr);
+ 	if (ret < 0)
+ 		netdev_warn(ndev, "NCSI: Writing mac address to device failed\n");
+@@ -644,8 +646,7 @@ static int ncsi_rsp_handler_oem_mlx(struct ncsi_request *nr)
+ 	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
+ 	mlx = (struct ncsi_rsp_oem_mlx_pkt *)(rsp->data);
+ 
+-	if (mlx->cmd == NCSI_OEM_MLX_CMD_GMA &&
+-	    mlx->param == NCSI_OEM_MLX_CMD_GMA_PARAM)
++	if (mlx->cmd == NCSI_OEM_MLX_CMD_GMA)
+ 		return ncsi_rsp_handler_oem_mlx_gma(nr);
+ 	return 0;
+ }
