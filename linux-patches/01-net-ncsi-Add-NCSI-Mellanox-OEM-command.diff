@@ -1,5 +1,5 @@
 diff --git a/net/ncsi/internal.h b/net/ncsi/internal.h
-index 45883b32790e..d4558628a991 100644
+index 1dae77c54009..7f3eb1360b9b 100644
 --- a/net/ncsi/internal.h
 +++ b/net/ncsi/internal.h
 @@ -73,10 +73,15 @@ enum {
@@ -19,11 +19,11 @@ index 45883b32790e..d4558628a991 100644
  
  struct ncsi_channel_version {
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index 75504ccd1b95..9306fa464190 100644
+index bfc43b28c7a6..3e018db8c2d2 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -658,12 +658,34 @@ static void ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
- 			   nca->type);
+@@ -675,12 +675,34 @@ static int ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
+ 	return ret;
  }
  
 +static void ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
@@ -50,14 +50,14 @@ index 75504ccd1b95..9306fa464190 100644
  /* OEM Command handlers initialization */
  static struct ncsi_oem_gma_handler {
  	unsigned int	mfr_id;
- 	void		(*handler)(struct ncsi_cmd_arg *nca);
+ 	int		(*handler)(struct ncsi_cmd_arg *nca);
  } ncsi_oem_gma_handlers[] = {
 -	{ NCSI_OEM_MFR_BCM_ID, ncsi_oem_gma_handler_bcm }
 +	{ NCSI_OEM_MFR_BCM_ID, ncsi_oem_gma_handler_bcm },
 +	{ NCSI_OEM_MFR_MLX_ID, ncsi_oem_gma_handler_mlx }
  };
  
- #endif /* CONFIG_NCSI_OEM_CMD_GET_MAC */
+ static int ncsi_gma_handler(struct ncsi_cmd_arg *nca, unsigned int mf_id)
 diff --git a/net/ncsi/ncsi-pkt.h b/net/ncsi/ncsi-pkt.h
 index 4d3f06be38bd..2a6d83a596c9 100644
 --- a/net/ncsi/ncsi-pkt.h
@@ -79,10 +79,10 @@ index 4d3f06be38bd..2a6d83a596c9 100644
  struct ncsi_rsp_oem_bcm_pkt {
  	unsigned char           ver;         /* Payload Version   */
 diff --git a/net/ncsi/ncsi-rsp.c b/net/ncsi/ncsi-rsp.c
-index 31672e967db2..5158836796ce 100644
+index 77e07ba3f493..4680fb56e3d5 100644
 --- a/net/ncsi/ncsi-rsp.c
 +++ b/net/ncsi/ncsi-rsp.c
-@@ -596,6 +596,45 @@ static int ncsi_rsp_handler_snfc(struct ncsi_request *nr)
+@@ -611,6 +611,45 @@ static int ncsi_rsp_handler_snfc(struct ncsi_request *nr)
  	return 0;
  }
  
@@ -128,7 +128,7 @@ index 31672e967db2..5158836796ce 100644
  /* Response handler for Broadcom command Get Mac Address */
  static int ncsi_rsp_handler_oem_bcm_gma(struct ncsi_request *nr)
  {
-@@ -638,7 +677,7 @@ static struct ncsi_rsp_oem_handler {
+@@ -655,7 +694,7 @@ static struct ncsi_rsp_oem_handler {
  	unsigned int	mfr_id;
  	int		(*handler)(struct ncsi_request *nr);
  } ncsi_rsp_oem_handlers[] = {
