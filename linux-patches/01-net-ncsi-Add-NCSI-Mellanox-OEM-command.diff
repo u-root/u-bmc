@@ -19,14 +19,14 @@ index 1dae77c54009..7f3eb1360b9b 100644
  
  struct ncsi_channel_version {
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index bfc43b28c7a6..3e018db8c2d2 100644
+index bfc43b28c7a6..256401f3c3cf 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -675,12 +675,34 @@ static int ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
+@@ -675,12 +675,35 @@ static int ncsi_oem_gma_handler_bcm(struct ncsi_cmd_arg *nca)
  	return ret;
  }
  
-+static void ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
++static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
 +{
 +	int ret = 0;
 +	unsigned char data[NCSI_OEM_MLX_CMD_GMA_LEN];
@@ -45,6 +45,7 @@ index bfc43b28c7a6..3e018db8c2d2 100644
 +		netdev_err(nca->ndp->ndev.dev,
 +			   "NCSI: Failed to transmit cmd 0x%x during configure\n",
 +			   nca->type);
++	return ret;
 +}
 +
  /* OEM Command handlers initialization */

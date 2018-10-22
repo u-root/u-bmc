@@ -1,5 +1,5 @@
 diff --git a/net/ncsi/internal.h b/net/ncsi/internal.h
-index 71670d3270f3..6dc306aab661 100644
+index 7f3eb1360b9b..abb2ec2529be 100644
 --- a/net/ncsi/internal.h
 +++ b/net/ncsi/internal.h
 @@ -75,13 +75,12 @@ enum {
@@ -34,10 +34,10 @@ index 356af474e43c..9b7ebc6fe20c 100644
  	checksum = ncsi_calculate_checksum((unsigned char *)h,
  					   sizeof(*h) + nca->payload);
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index 961ff26dfd4c..3def8531cf89 100644
+index 256401f3c3cf..a91ee47e84b0 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -684,7 +684,6 @@ static void ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
+@@ -685,7 +685,6 @@ static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
  	memset(data, 0, NCSI_OEM_MLX_CMD_GMA_LEN);
  	*(unsigned int *)data = ntohl(NCSI_OEM_MFR_MLX_ID);
  	data[5] = NCSI_OEM_MLX_CMD_GMA;
@@ -46,7 +46,7 @@ index 961ff26dfd4c..3def8531cf89 100644
  	nca->data = data;
  
 diff --git a/net/ncsi/ncsi-rsp.c b/net/ncsi/ncsi-rsp.c
-index 56145f9fc92d..3ee5f18454ae 100644
+index 4680fb56e3d5..f65cd138b824 100644
 --- a/net/ncsi/ncsi-rsp.c
 +++ b/net/ncsi/ncsi-rsp.c
 @@ -627,6 +627,8 @@ static int ncsi_rsp_handler_oem_mlx_gma(struct ncsi_request *nr)
