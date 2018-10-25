@@ -89,7 +89,7 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 			{
 				Builder: builder.BusyBox,
 				Packages: []string{
-					"github.com/u-root/u-root/cmds/*",
+					"github.com/u-root/u-root/cmds/init",
 					path.Join("github.com/u-root/u-bmc/integration/testdata", uinitName, "uinit"),
 				},
 			},
