@@ -60,11 +60,6 @@ To give you some sense of what we want to create:
 Prerequisites:
 ```
 sudo apt-get install gcc-arm-none-eabi mtd-utils golang-1.10 fakeroot flex bison device-tree-compiler bc libssl-dev
-
-# Until u-root vendoring is working properly, also grab:
-go generate github.com/u-root/u-bmc/config
-go get -u github.com/u-root/u-bmc/boot/loader
-go get -u github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
 ```
 
 Clone:
@@ -72,8 +67,6 @@ Clone:
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
 git submodule init && git submodule update
-# Until https://github.com/u-root/u-root/issues/936 is fixed
-rm -r ~/go/src/github.com/u-root/u-root/vendor/google.golang.org/grpc/codes
 (cd linux/; ../linux-patches/apply.sh)
 ```
 
@@ -134,9 +127,6 @@ shutdown -r
 ```
 
 # Updating Dependencies
-
-**NOTE: Due to a [bug](https://github.com/u-root/u-root/issues/936) in
-u-root vendoring is temporarily disabled**
 
 ```
 Latest released version of dep is required:
