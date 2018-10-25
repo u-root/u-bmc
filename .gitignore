@@ -14,7 +14,7 @@ integration/serial/
 initramfs.cpio
 initramfs.cpio.tmp
 ssh_keys.pub
-u-root
+u-bmc
 linux.config.old
 module/.*.cmd
 module/.tmp_versions
