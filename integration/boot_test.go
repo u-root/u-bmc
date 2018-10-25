@@ -32,7 +32,7 @@ func TestVerifyFail(t *testing.T) {
 		t.Fatal(`expected "invalid signature: hash tag doesn't match", got error: `, err)
 	}
 	// Make sure the system rebooted in response to the error
-	if err := q.Expect("DRAM Init-DDR3"); err != nil {
-		t.Fatal(`expected reboot signature "DRAM Init-DDR3", got error: `, err)
+	if err := q.Expect("Hit any key to stop autoboot"); err != nil {
+		t.Fatal(`expected reboot signature "Hit any key to stop autoboot", got error: `, err)
 	}
 }
