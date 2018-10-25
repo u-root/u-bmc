@@ -121,10 +121,9 @@ func usage(ds grpcurl.DescriptorSource) {
 	}
 
 	for _, m := range methods {
-		s := fmt.Sprintf("%s.%s", service, m)
-		dsc, err := ds.FindSymbol(s)
+		dsc, err := ds.FindSymbol(m)
 		if err != nil {
-			log.Fatalf("FindSymbol(%s) failed: %v", s, err)
+			log.Fatalf("FindSymbol(%s) failed: %v", m, err)
 		}
 		mp := dsc.(*desc.MethodDescriptor)
 		inType := mp.GetInputType()
