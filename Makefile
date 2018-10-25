@@ -139,20 +139,13 @@ sim: flash.sim.img
 		-d guest_errors
 	stty sane
 
-u-root:
-	go get github.com/u-root/u-root
-	go build -o u-root github.com/u-root/u-root
+u-bmc:
+	go get
+	go build
 
-initramfs.cpio: u-root ssh_keys.pub $(shell find . -name \*.go -type f)
+initramfs.cpio: u-bmc ssh_keys.pub $(shell find . -name \*.go -type f)
 	go generate ./config/
-	GOARM=5 GOARCH=$(ARCH) ./u-root \
-		-build=bb \
-		-o "$@.tmp" \
-		core \
-		github.com/u-root/u-root/cmds/scp/ \
-		github.com/u-root/u-root/cmds/sshd/ \
-		github.com/u-root/u-bmc/cmd/*/ \
-		github.com/u-root/u-bmc/platform/$(PLATFORM)/cmd/*/
+	GOARM=5 GOARCH=$(ARCH) ./u-bmc -o "$@.tmp" -p "$(PLATFORM)"
 	mv "$@.tmp" "$@"
 
 clean:
