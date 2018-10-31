@@ -10,6 +10,7 @@ import (
 	"io"
 	"net"
 
+	"github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/u-root/u-bmc/config"
 	pb "github.com/u-root/u-bmc/proto"
 	"google.golang.org/grpc"
@@ -28,8 +29,8 @@ type rpcFanSystem interface {
 }
 
 type rpcUartSystem interface {
-	Read() []byte
-	Write([]byte)
+	NewReader(<-chan struct{}) <-chan []byte
+	NewWriter() chan<- []byte
 }
 
 type mgmtServer struct {
@@ -79,17 +80,23 @@ func (m *mgmtServer) SetFan(ctx context.Context, r *pb.SetFanRequest) (*pb.SetFa
 	return &pb.SetFanResponse{}, nil
 }
 
-func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer) error {
-	for {
-		err := stream.Send(&pb.ConsoleData{Data: m.uart.Read()})
+func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer, done <-chan struct{}) error {
+	r := m.uart.NewReader(done)
+	for d := range r {
+		err := stream.Send(&pb.ConsoleData{Data: d})
 		if err != nil {
 			return err
 		}
 	}
+	return nil
 }
 
 func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServer) error {
-	go m.streamIn(stream)
+	done := make(chan struct{})
+	go m.streamIn(stream, done)
+	w := m.uart.NewWriter()
+	defer close(done)
+	defer close(w)
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
@@ -98,7 +105,7 @@ func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServ
 		if err != nil {
 			return err
 		}
-		m.uart.Write(in.Data)
+		w <- in.Data
 	}
 }
 
@@ -117,8 +124,12 @@ func (m *mgmtServer) EnableRemote() error {
 }
 
 func (m *mgmtServer) newServer(l net.Listener) {
-	g := grpc.NewServer()
+	g := grpc.NewServer(
+		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+	)
 	pb.RegisterManagementServiceServer(g, m)
+	grpc_prometheus.Register(g)
 	reflection.Register(g)
 	go g.Serve(l)
 }
