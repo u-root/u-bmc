@@ -6,8 +6,9 @@ import (
 	"net"
 	"os"
 	"testing"
-	"time"
+	"runtime"
 
+	pt "github.com/prometheus/client_golang/prometheus/testutil"
 	pb "github.com/u-root/u-bmc/proto"
 	"google.golang.org/grpc"
 )
@@ -60,16 +61,15 @@ func TestMain(m *testing.M) {
 
 func TestStreamConsoleReceive(t *testing.T) {
 	c, conn := NewClient(t)
-	defer conn.Close()
 
 	sc, err := c.StreamConsole(context.Background())
 	if err != nil {
 		t.Fatalf("StreamConsole: %v", err)
 	}
 
-	// TODO(bluecmd): Add unit tests on the uart consumer metric
 	expected := "Testing"
 	go func() {
+		// Wait for connect to be processed
 		for {
 			us.m.Lock()
 			r := len(us.readers)
@@ -77,7 +77,10 @@ func TestStreamConsoleReceive(t *testing.T) {
 			if r > 0 {
 				break
 			}
-			time.Sleep(10 * time.Millisecond)
+			runtime.Gosched()
+		}
+		if v := pt.ToFloat64(uartConsumers); v != 1 {
+			t.Errorf("Expected UART consumers metric to be 1, was %v", v)
 		}
 		u.R <- []byte(expected)
 	}()
@@ -85,6 +88,23 @@ func TestStreamConsoleReceive(t *testing.T) {
 	m, err := sc.Recv()
 	if err != nil {
 		t.Fatalf("sc.Recv: %v", err)
+	}
+
+	conn.Close()
+
+	// Wait for disconnect to be processed
+	for {
+		us.m.Lock()
+		r := len(us.readers)
+		us.m.Unlock()
+		if r == 0 {
+			break
+		}
+		runtime.Gosched()
+	}
+
+	if v := pt.ToFloat64(uartConsumers); v != 0 {
+		t.Errorf("Expected UART consumers metric after disconnect to be 0, was %v", v)
 	}
 
 	if string(m.Data) != expected {
@@ -100,8 +120,6 @@ func TestStreamConsoleTransmit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StreamConsole: %v", err)
 	}
-
-	// TODO(bluecmd): Add unit tests on the uart consumer metric
 
 	expected := "Testing"
 	go func() {
