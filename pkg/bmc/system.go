@@ -25,7 +25,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
-	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
 
@@ -88,50 +87,6 @@ func newSshKey() []byte {
 		panic(err)
 	}
 	return pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: asn1})
-}
-
-func addIp(cidr string, iface string) {
-	l, err := netlink.LinkByName(iface)
-	if err != nil {
-		log.Printf("Unable to get interface %s: %v", iface, err)
-		return
-	}
-
-	addr, err := netlink.ParseAddr(cidr)
-	if err != nil {
-		log.Printf("netlink.ParseAddr %v: %v", cidr, err)
-		return
-	}
-
-	h, err := netlink.NewHandle(unix.NETLINK_ROUTE)
-	if err != nil {
-		log.Printf("netlink.NewHandle: %v", err)
-		return
-	}
-	defer h.Delete()
-	if err := h.AddrReplace(l, addr); err != nil {
-		log.Printf("AddrReplace(%v): %v", addr, err)
-		return
-	}
-}
-
-func setLinkUp(iface string) {
-	l, err := netlink.LinkByName(iface)
-	if err != nil {
-		log.Printf("Unable to get interface %s: %v", iface, err)
-		return
-	}
-
-	h, err := netlink.NewHandle(unix.NETLINK_ROUTE)
-	if err != nil {
-		log.Printf("netlink.NewHandle: %v", err)
-		return
-	}
-	defer h.Delete()
-	if err := h.LinkSetUp(l); err != nil {
-		log.Printf("handle.LinkSetUp: %v", err)
-		return
-	}
 }
 
 func createFile(file string, mode os.FileMode, c []byte) error {
@@ -221,9 +176,6 @@ func seedRandomGenerator() {
 	if err := binary.Read(buf, binary.LittleEndian, &seed); err != nil {
 		log.Fatalf("Unable to convert random seed, cannot safely continue: %v", err)
 	}
-	// TODO(bluecmd): Printing this for now to allow for manual sanity inspection
-	// that they are not the same across power cycles
-	log.Printf("Non-secret random seed set to %16x", seed)
 	rand.Seed(seed)
 }
 
@@ -264,16 +216,9 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	}
 
 	log.Printf("Loading system configuration")
-	unix.Sethostname([]byte("ubmc"))
-
-	// Fun story: if you don't have both IPv4 and IPv6 loopback configured
-	// golang binaries will not bind to :: but to 0.0.0.0 instead.
-	// Isn't that surprising?
-	addIp("127.0.0.1/8", "lo")
-	addIp("::1/32", "lo")
-	addIp("10.0.10.20/24", "eth0")
-	setLinkUp("lo")
-	setLinkUp("eth0")
+	if err := ConfigureInterfaces(); err != nil {
+		log.Printf("Failed to configure interfaces: %v", err)
+	}
 
 	timeAcquired := make(chan bool)
 	go func() {
