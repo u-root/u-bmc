@@ -32,9 +32,9 @@ var (
 	keyLifetimeSecs = uint32(86400 * 365 * 100) // 100 years
 
 	outputPath = flag.String("o", "", "Path to output initramfs file.")
-	build = flag.String("build", "", "Build is either 'u-bmc' or 'loader'.")
-	platform = flag.String("p", "", "Platform to target.")
-	packages = []string{
+	build      = flag.String("build", "", "Build is either 'u-bmc' or 'loader'.")
+	platform   = flag.String("p", "", "Platform to target.")
+	packages   = []string{
 		"github.com/u-root/u-bmc/cmd/fan",
 		"github.com/u-root/u-bmc/cmd/i2cwatcher",
 		"github.com/u-root/u-bmc/cmd/socreset",
@@ -131,7 +131,6 @@ type signedBuilder struct {
 	bb *builder.BBBuilder
 }
 
-
 func (b *signedBuilder) DefaultBinaryDir() string {
 	return b.bb.DefaultBinaryDir()
 }
@@ -164,7 +163,6 @@ func (b signedBuilder) Build(af *initramfs.Files, opts builder.Opts) error {
 	}
 	return nil
 }
-
 
 func (b signedBuilder) writeCryptoFiles(bb string, bbsig string, pk string) error {
 	bbf, err := os.Open(bb)
@@ -263,10 +261,10 @@ func BuildLoader(e *openpgp.Entity, env *golang.Environ) error {
 				Packages: pkgs,
 			},
 		},
-		BaseArchive:     baseFile,
-		TempDir:         tempDir,
-		OutputFile:      w,
-		InitCmd:         "loader",
+		BaseArchive: baseFile,
+		TempDir:     tempDir,
+		OutputFile:  w,
+		InitCmd:     "loader",
 	}
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 	return uroot.CreateInitramfs(logger, opts)
@@ -302,11 +300,11 @@ func BuildUBMC(e *openpgp.Entity, env *golang.Environ) error {
 				Packages: pkgs,
 			},
 		},
-		BaseArchive:     baseFile,
-		TempDir:         tempDir,
-		OutputFile:      w,
-		InitCmd:         "init",
-		DefaultShell:    "elvish",
+		BaseArchive:  baseFile,
+		TempDir:      tempDir,
+		OutputFile:   w,
+		InitCmd:      "init",
+		DefaultShell: "elvish",
 	}
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 	return uroot.CreateInitramfs(logger, opts)
