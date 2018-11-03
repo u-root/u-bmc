@@ -147,7 +147,7 @@ func ConfigureInterfaces() error {
 	if err := setLinkUp(iface); err != nil {
 		return err
 	}
-	if err := addIp("10.0.10.1/24", iface); err != nil {
+	if err := addIp("10.0.10.20/24", iface); err != nil {
 		return err
 	}
 	// If the MAC address changes on the interface the interface needs to be
