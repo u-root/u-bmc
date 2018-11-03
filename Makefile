@@ -9,27 +9,14 @@ CROSS_COMPILE ?= arm-none-eabi-
 MAKE_JOBS ?= -j8
 PLATFORM ?= quanta-f06-leopard-ddr3
 ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-# This is used to include garbage in the signing process to test verification
-# errors in the integration test. It should not be used for any real builds.
-TEST_EXTRA_SIGN ?= /dev/null
+# On WSL you might need to set this to 'sudo' since it doesn't implement
+# everything fakeroot needs
+BECOME_ROOT ?= fakeroot
 
 .PHONY: sim linux-modules
 
 flash.img: u-boot/u-boot-512.bin ubi.img
 	cat $^ > $@
-
-boot/signer/signer: boot/signer/main.go
-	go get ./boot/signer/
-	go build -o $@ ./boot/signer/
-
-boot/loader/loader: boot/loader/main.go
-	go get ./boot/loader/
-	GOARM=5 GOARCH=$(ARCH) go build -ldflags="-s -w" -o $@ ./boot/loader/
-
-boot/keys/u-bmc.pub: boot/signer/signer boot/keys/u-bmc.key
-	# Run signer to make sure the pub file is created
-	echo | boot/signer/signer > /dev/null
-	touch boot/keys/u-bmc.pub
 
 linux-modules: linux.config $(shell find module -name \*.c -type f) | boot/zImage
 	$(MAKE) $(MAKE_JOBS) \
@@ -45,12 +32,9 @@ linux-modules: linux.config $(shell find module -name \*.c -type f) | boot/zImag
 # TOOD(bluecmd): The cpio does not need to be compressed as it will be
 # compressed again later, but I did not manage to get the kernel to recognize
 # the initramfs unless it was compressed as well.
-boot/loader.cpio.gz: boot/loader/loader boot/keys/u-bmc.pub linux-modules
-	rm -f boot/loader.cpio.gz
-	sh -c "cd boot/loader/; echo loader | cpio -H newc -ov -F ../loader.cpio"
-	sh -c "cd boot/keys/; echo u-bmc.pub | cpio -H newc -oAv -F ../loader.cpio"
-	sh -c "cd module/; echo *.ko | cpio -H newc -oAv -F ../boot/loader.cpio"
-	gzip boot/loader.cpio
+loader.cpio.gz: loader.cpio
+	rm -f $@
+	gzip -k $<
 
 boot/keys/u-bmc.key:
 	mkdir -p boot/keys/
@@ -60,13 +44,14 @@ boot/keys/u-bmc.key:
 boot/keys/u-bmc.crt: boot/keys/u-bmc.key
 	openssl req -batch -new -x509 -key $< -out $@
 
-boot.img: boot/keys/u-bmc.key boot/keys/u-bmc.crt boot/zImage boot/$(PLATFORM).dtb boot/sign.its boot/loader.cpio.gz | u-boot/tools/mkimage
+boot.img: boot/keys/u-bmc.key boot/keys/u-bmc.crt boot/zImage boot/$(PLATFORM).dtb boot/sign.its loader.cpio.gz | u-boot/tools/mkimage
 	sed "s/PLATFORM/$(PLATFORM)/g" boot/sign.its > boot/sig.its.tmp
+	cp boot/$(PLATFORM).dtb boot/$(PLATFORM).signed.dtb
 	u-boot/tools/mkimage -f boot/sig.its.tmp $@
 	u-boot/tools/mkimage \
 		-F $@ \
 		-k boot/keys/ \
-		-K boot/$(PLATFORM).dtb \
+		-K boot/$(PLATFORM).signed.dtb \
 		-c $(shell git describe --tags --long) \
 		-r
 	rm -f boot/sig.its.tmp
@@ -90,17 +75,13 @@ boot/%.dtb: platform/%.dts platform/ubmc-flash-layout.dtsi
 	| dtc -O dtb -o $@ -
 
 root.ubifs.img: initramfs.cpio boot.img boot/signer/signer
-	rm -fr root/
+	$(BECOME_ROOT) rm -fr root/
 	mkdir -p root/root root/etc root/boot
 	echo "nameserver 2001:4860:4860::8888" > root/etc/resolv.conf
 	echo "nameserver 2606:4700:4700::1111" >> root/etc/resolv.conf
 	echo "nameserver 8.8.8.8" >> root/etc/resolv.conf
 	cp -v boot.img root/boot/
-	cp -v $(ROOT_DIR)/boot/keys/u-bmc.pub root/etc/
-	ln -sf /bbin/bb.sig root/init.sig
-	fakeroot sh -c "(cd root/; cpio -idv < ../$(<)) && \
-		cat root/bbin/bb $(TEST_EXTRA_SIGN) | \
-			$(ROOT_DIR)/boot/signer/signer > root/bbin/bb.sig && \
+	$(BECOME_ROOT) sh -c "(cd root/; cpio -idv < ../$(<)) && \
 		mkfs.ubifs -r root -R0 -m 1 -e ${LEB} -c 2047 -o $(@)"
 
 ubi.img: root.ubifs.img
@@ -139,20 +120,32 @@ sim: flash.sim.img
 		-d guest_errors
 	stty sane
 
-u-bmc:
+u-bmc: u-bmc.go
 	go get
 	go build
 
-initramfs.cpio: u-bmc ssh_keys.pub $(shell find . -name \*.go -type f)
+config/version.go: .git/index
 	go generate ./config/
-	GOARM=5 GOARCH=$(ARCH) ./u-bmc -o "$@.tmp" -p "$(PLATFORM)"
+
+config/ssh_keys.go: ssh_keys.pub
+	go generate ./config/
+
+initramfs.cpio: u-bmc boot/keys/u-bmc.key $(shell find . -name \*.go -type f)
+	./u-bmc -o "$@.tmp" -p "$(PLATFORM)" --build u-bmc
 	mv "$@.tmp" "$@"
+
+loader.cpio: u-bmc boot/keys/u-bmc.key $(shell find cmd/loader -name \*.go -type f) config/version.go
+	./u-bmc -o "$@.tmp" -p "$(PLATFORM)" --build loader
+	mv "$@.tmp" "$@"
+	#sh -c "cd boot/loader/; echo loader | cpio -H newc -ov -F ../loader.cpio"
+	#sh -c "cd root/etc/; echo u-bmc.pub | cpio -H newc -oAv -F ../../boot/loader.cpio"
+	#sh -c "cd module/; echo *.ko | cpio -H newc -oAv -F ../boot/loader.cpio"
+
 
 clean:
 	\rm -f initramfs.cpio u-root \
 	 flash.img flash.sim.img u-boot/u-boot.bin u-boot/u-boot-512.bin \
-	 root.ubifs.img boot.ubifs.img boot/zImage boot/*.dtb \
-	 boot.img ubi.img boot/loader/loader boot/signer/signer boot/loader.cpio.gz \
+	 root.ubifs.img boot/zImage boot/*.dtb boot.img ubi.img loader.cpio loader.cpio.gz \
 	 module/*.o module/*.mod.c module/*.ko module/.*.cmd module/modules.order \
 	 module/Module.symvers config/ssh_keys.go config/version.go
-	\rm -fr root/ boot/modules/ module/.tmp_versions/ boot/out
+	\rm -fr root/ boot/modules/ module/.tmp_versions/

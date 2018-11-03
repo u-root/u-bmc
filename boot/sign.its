@@ -28,7 +28,7 @@
 		};
 		ramdisk-1 {
 			description = "loader";
-			data = /incbin/("loader.cpio.gz");
+			data = /incbin/("../loader.cpio.gz");
 			type = "ramdisk";
 			arch = "arm";
 			compression = "none";
