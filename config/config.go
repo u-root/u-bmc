@@ -39,8 +39,11 @@ var (
 		// Instead, u-bmc will refuse to execute any remote actions until an accurate
 		// time source has been established.
 		RoughtimeServers: []ttime.RoughtimeServer{
-			{Protocol: "udp", Address: "roughtime.cloudflare.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "gD63hSj3ScS+wuOeGrubXlq35N1c5Lby/S+T7MNTjxo="},
-			{Protocol: "udp", Address: "roughtime.sandbox.google.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "etPaaIxcBMY1oUeGpwvPMCJMwlRVNxv51KK/tktoJTQ="},
+			// TODO(bluecmd): Doubled entries due to https://github.com/cloudflare/roughtime/issues/10
+			{Protocol: "udp4", Address: "roughtime.cloudflare.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "gD63hSj3ScS+wuOeGrubXlq35N1c5Lby/S+T7MNTjxo="},
+			{Protocol: "udp6", Address: "roughtime.cloudflare.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "gD63hSj3ScS+wuOeGrubXlq35N1c5Lby/S+T7MNTjxo="},
+			{Protocol: "udp4", Address: "roughtime.sandbox.google.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "etPaaIxcBMY1oUeGpwvPMCJMwlRVNxv51KK/tktoJTQ="},
+			{Protocol: "udp6", Address: "roughtime.sandbox.google.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "etPaaIxcBMY1oUeGpwvPMCJMwlRVNxv51KK/tktoJTQ="},
 		},
 		// While u-bmc has been granted 0.u-bmc.pool.ntp.org, they do not currently
 		// offer AAAA/IPv6 records. In the mean time use Google's leap smeared

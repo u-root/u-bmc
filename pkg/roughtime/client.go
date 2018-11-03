@@ -217,11 +217,11 @@ func ParseConfig(jsonData []byte) (servers []config.Server, skipped int, err err
 // configution.
 func serverUDPAddr(server *config.Server) (*net.UDPAddr, error) {
 	for _, addr := range server.Addresses {
-		if addr.Protocol != "udp" && addr.Protocol != "udp4" && addr.Protocol != "upd6" {
+		if addr.Protocol != "udp" && addr.Protocol != "udp4" && addr.Protocol != "udp6" {
 			continue
 		}
 
-		return net.ResolveUDPAddr("udp", addr.Address)
+		return net.ResolveUDPAddr(addr.Protocol, addr.Address)
 	}
 
 	return nil, nil
