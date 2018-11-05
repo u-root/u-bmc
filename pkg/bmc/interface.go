@@ -155,6 +155,13 @@ func ConfigureInterfaces() error {
 	// refreshed. MAC address changes happens when NC-SI reads the correct
 	// MAC address from the adapter, or a controller hotswap potentially.
 	go ipv6LinkFixer(iface)
+	go func() {
+		c := make(chan *RDNSSOption)
+		go rdnss(c)
+		for r := range c {
+			log.Printf("TODO: got RDNSS %v", r)
+		}
+	}()
 
 	return nil
 }

@@ -173,7 +173,7 @@ func seedRandomGenerator() {
 	}
 	buf := bytes.NewReader(b)
 	var seed int64
-	if err := binary.Read(buf, binary.LittleEndian, &seed); err != nil {
+	if err := binary.Read(buf, NativeEndian(), &seed); err != nil {
 		log.Fatalf("Unable to convert random seed, cannot safely continue: %v", err)
 	}
 	rand.Seed(seed)
