@@ -140,10 +140,7 @@ func Main() error {
 		log.Printf("GOOS is not linux. Did you mean to set GOOS=linux?")
 	}
 
-	builder, err := builder.GetBuilder("bb")
-	if err != nil {
-		return err
-	}
+	builder, err := builder.BBBuilder{}
 	archiver, err := initramfs.GetArchiver("cpio")
 	if err != nil {
 		return err
