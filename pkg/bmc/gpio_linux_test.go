@@ -14,7 +14,7 @@ func TestDecode(t *testing.T) {
 	e := gpioevent_data{}
 	a := []byte{173, 111, 34, 156, 101, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0}
 	f := bytes.NewBuffer(a)
-	err := binary.Read(f, binary.LittleEndian, &e)
+	err := binary.Read(f, NativeEndian(), &e)
 	if err != nil {
 		t.Errorf("Failed at decoding: %v\n", err)
 	}
