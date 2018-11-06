@@ -130,14 +130,6 @@
   revision = "2e37830c371e54b400461538ef95dae4d2d3279b"
 
 [[projects]]
-  digest = "1:b20d8767957e40b9302a8caaee88caa698513fbd972509a54555302c3aebfa04"
-  name = "github.com/miekg/dns"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "7064f7248f5fa5fd79382a76328b4e200b79e4ae"
-  version = "v1.0.15"
-
-[[projects]]
   branch = "master"
   digest = "1:8aa57b856572ad735c2d0fdbe5310a2f1533ad0d1720a089066cbf1e2cb83fb4"
   name = "github.com/prometheus/client_golang"
@@ -257,7 +249,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4fb560f83bc18e86007861c107b6f6e2a318aecdde9427555bebd618f309bb3c"
+  digest = "1:c8914cb7fddb35562a3051892148e9fdabc2c5cc29f6e7265bcd6e947c060fe1"
   name = "golang.org/x/net"
   packages = [
     "bpf",
@@ -270,7 +262,6 @@
     "internal/socket",
     "internal/timeseries",
     "ipv4",
-    "ipv6",
     "trace",
   ]
   pruneopts = "UT"
@@ -393,7 +384,6 @@
     "github.com/machinebox/progress",
     "github.com/mdlayher/genetlink",
     "github.com/mdlayher/netlink",
-    "github.com/miekg/dns",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/client_golang/prometheus/testutil",
@@ -406,6 +396,7 @@
     "github.com/u-root/u-root/pkg/uroot/builder",
     "github.com/u-root/u-root/pkg/uroot/initramfs",
     "github.com/vishvananda/netlink",
+    "github.com/vishvananda/netlink/nl",
     "golang.org/x/crypto/ed25519",
     "golang.org/x/crypto/openpgp",
     "golang.org/x/crypto/openpgp/errors",
