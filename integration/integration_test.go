@@ -38,7 +38,7 @@ func init() {
 // Returns temporary directory and QEMU instance.
 //
 // - `uinitName` is the name of a directory containing uinit found at
-//   `github.com/u-root/u-bmc/integration/testdata`.
+//   `github.com/u-root/u-bmc/integration/testcmd`.
 func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []string) (string, *qemu.QEMU) {
 	if _, ok := os.LookupEnv("UROOT_QEMU"); !ok {
 		t.Skip("test is skipped unless UROOT_QEMU is set")
@@ -90,7 +90,7 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 				Builder: builder.BusyBox,
 				Packages: []string{
 					"github.com/u-root/u-root/cmds/init",
-					path.Join("github.com/u-root/u-bmc/integration/testdata", uinitName, "uinit"),
+					path.Join("github.com/u-root/u-bmc/integration/testcmd", uinitName, "uinit"),
 				},
 			},
 		},
