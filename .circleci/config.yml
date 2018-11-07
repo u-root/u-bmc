@@ -68,18 +68,11 @@ jobs:
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
             go generate ./config/
       - run:
-          name: Get dependencies
-          command: |
-            go get -d github.com/u-root/u-bmc/boot/loader
-            go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
-            go get -d github.com/u-root/u-bmc/cmd/ubmcctl
-            go get -t -d github.com/u-root/u-bmc/integration
-      - run:
           name: Test all
-          command: go test -a -ldflags '-s' ./...
+          command: make test
       - run:
           name: Test coverage
-          command: go test -cover ./...
+          command: make test TESTFLAGS=-cover
   race:
     docker:
       - image: circleci/golang:1.11
@@ -94,15 +87,8 @@ jobs:
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
             go generate ./config/
       - run:
-          name: Get dependencies
-          command: |
-            go get -d github.com/u-root/u-bmc/boot/loader
-            go get -d github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/cmd/uinit
-            go get -d github.com/u-root/u-bmc/cmd/ubmcctl
-            go get -t -d github.com/u-root/u-bmc/integration
-      - run:
           name: Race detector
-          command: go test -race ./...
+          command: make test TESTFLAGS=-race
   compile:
     docker:
       - image: circleci/golang:1.11
@@ -120,12 +106,8 @@ jobs:
           name: build all commands
           command: |
             cd cmd
-            go get ./...
             go install -a ./...
             cd ../
-            go get ./boot/signer/
-            go get ./boot/loader/
-            go get ./platform/quanta-f06-leopard-ddr3/cmd/uinit
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
     docker:
@@ -138,12 +120,13 @@ jobs:
       - run:
           name: Install dependencies
           command:
-            sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio
+            sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch
       - run:
           name: Compile qemu
           command: |
             git clone https://github.com/openbmc/qemu.git --depth 1
             cd qemu
+            patch -p1 < ../qemu.patch
             mkdir build
             cd build
             ../configure --target-list=arm-softmmu
@@ -157,7 +140,7 @@ jobs:
       - run:
           name: Update submodules
           command: |
-            git submodule init && git submodule update u-boot
+            git submodule init
             # Since linux is huge and we're tracking a branch, submodules
             # take a long time and we cannot use depth. Fetch the latest zip
             # instead
@@ -166,16 +149,13 @@ jobs:
             rm dev-4.18.zip
             rm -rf linux/
             mv linux-dev-4.18/ linux/
+            (cd linux/; ../linux-patches/apply.sh)
+            # TODO(bluecmd): https://github.com/u-root/u-root/issues/1024
+            go get github.com/u-root/u-root
       - run:
           name: Build image
           command: |
             go generate ./config/
-            go get ./boot/loader/
-            go get ./platform/quanta-f06-leopard-ddr3/cmd/uinit
-            go get ./cmd/...
-            # Until https://github.com/u-root/u-root/issues/936 is fixed
-            go get github.com/u-root/u-root
-            rm -r $GOPATH/src/github.com/u-root/u-root/vendor/google.golang.org/grpc/codes
             make
       - store_artifacts:
           path: flash.img

@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/u-root/u-root/pkg/cp"
 	"github.com/u-root/u-root/pkg/golang"
 	"github.com/u-root/u-root/pkg/qemu"
 	"github.com/u-root/u-root/pkg/uroot"
@@ -23,8 +22,6 @@ import (
 )
 
 const (
-	ubootImage = "../u-boot/u-boot-512.bin"
-	bootImage  = "../boot.img"
 	// Serial output is written to this directory and picked up by circleci, or
 	// you, if you want to read the serial logs.
 	logDir = "serial"
@@ -43,11 +40,8 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 	if _, ok := os.LookupEnv("UROOT_QEMU"); !ok {
 		t.Skip("test is skipped unless UROOT_QEMU is set")
 	}
-	if _, err := os.Stat(ubootImage); err != nil {
-		t.Fatalf("u-boot not built, cannot test")
-	}
-	if _, err := os.Stat(bootImage); err != nil {
-		t.Fatalf("boot partition not built, cannot test")
+	if _, err := os.Stat("../boot/boot.bin"); err != nil {
+		t.Fatalf("u-bmc not built, cannot test")
 	}
 
 	// TempDir
@@ -68,20 +62,6 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 		t.Fatal(err)
 	}
 
-	// Copy build artifacts to our temp dir
-	if err := os.Mkdir(filepath.Join(tmpDir, "u-boot"), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := cp.Copy("../u-boot/u-boot-512.bin", filepath.Join(tmpDir, "u-boot", "u-boot-512.bin")); err != nil {
-		t.Fatal(err)
-	}
-	if err := cp.Copy("../boot.img", filepath.Join(tmpDir, "boot.img")); err != nil {
-		t.Fatal(err)
-	}
-	if err := cp.Copy("../ubi.cfg", filepath.Join(tmpDir, "ubi.cfg")); err != nil {
-		t.Fatal(err)
-	}
-
 	// Build u-root
 	opts := uroot.Opts{
 		Env: env,
@@ -98,7 +78,6 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 		BaseArchive:  uroot.DefaultRamfs.Reader(),
 		OutputFile:   w,
 		InitCmd:      "init",
-		DefaultShell: "elvish",
 	}
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 	if err := uroot.CreateInitramfs(logger, opts); err != nil {
@@ -142,11 +121,7 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 
 func build(t *testing.T, tmpDir string, makefile string, extraEnv []string) {
 	cmd := exec.Command(
-		"make", "-f", makefile, "flash.sim.img",
-		"-o", "u-boot/u-boot-512.bin",
-		"-o", "boot/signer/signer",
-		"-o", "boot.img",
-		"-o", "initramfs.cpio")
+		"make", "-f", makefile, "flash.sim.img", "-o", "initramfs.cpio")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = tmpDir

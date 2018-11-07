@@ -1,0 +1,27 @@
+Patches that are in the process of being upstreamed but are not yet so
+
+diff --git a/hw/ssi/aspeed_smc.c b/hw/ssi/aspeed_smc.c
+index 55ceffe100..9e86e9b54d 100644
+--- a/hw/ssi/aspeed_smc.c
++++ b/hw/ssi/aspeed_smc.c
+@@ -868,6 +868,7 @@ static void aspeed_smc_dma_rw(AspeedSMCState *s)
+          * When the DMA is on-going, the DMA registers are updated
+          * with the current working addresses and length.
+          */
++        s->regs[R_DMA_CHECKSUM] += data;
+         s->regs[R_DMA_FLASH_ADDR] += 4;
+         s->regs[R_DMA_DRAM_ADDR] += 4;
+         s->regs[R_DMA_LEN] -= 4;
+diff --git a/hw/timer/aspeed_timer.c b/hw/timer/aspeed_timer.c
+index 9acd1de485..1a54d85e9d 100644
+--- a/hw/timer/aspeed_timer.c
++++ b/hw/timer/aspeed_timer.c
+@@ -253,7 +253,7 @@ static void aspeed_timer_set_value(AspeedTimerCtrlState *s, int timer, int reg,
+             int64_t delta = (int64_t) value - (int64_t) calculate_ticks(t, now);
+             uint32_t rate = calculate_rate(t);
+ 
+-            t->start += muldiv64(delta, NANOSECONDS_PER_SECOND, rate);
++            t->start = (int64_t)t->start + ((__int128_t)delta * NANOSECONDS_PER_SECOND / rate);
+             aspeed_timer_mod(t);
+         }
+         break;

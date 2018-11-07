@@ -15,6 +15,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"time"
 
 	"github.com/machinebox/progress"
@@ -25,9 +26,13 @@ import (
 )
 
 const (
-	pubKeyPath  = "/u-bmc.pub"
-	initPath    = "/init"
-	initSigPath = "/init.sig"
+	pubKeyPath = "/u-bmc.pub"
+	// TODO(bluecmd): We cannot chroot into /mnt since we have to run /kexec
+	// for now.
+	initPath    = "/mnt/init"
+	initSigPath = "/mnt/init.sig"
+	kernelPath  = "/mnt/boot/zImage"
+	dtbPath     = "/mnt/boot/platform.dtb"
 )
 
 func main() {
@@ -42,17 +47,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Mkdir(/mnt/): %v", err)
 	}
-	err = unix.Mount("ubi0:root", "/mnt", "ubifs", 0, "")
+	err = unix.Mount("ubi0:root", "/mnt", "ubifs", unix.MS_RDONLY, "")
 	if err != nil {
 		log.Fatalf("Mount(ubi0:root): %v", err)
-	}
-	err = unix.Chroot("/mnt/")
-	if err != nil {
-		log.Fatalf("chroot: %v", err)
-	}
-	err = unix.Chdir("/")
-	if err != nil {
-		log.Fatalf("chroot: %v", err)
 	}
 	sigf, err := os.Open(initSigPath)
 	if err != nil {
@@ -70,9 +67,35 @@ func main() {
 		log.Fatalf("verify: %v", err)
 	}
 	log.Printf("Integrity check OK")
-	err = unix.Exec("/init", []string{"/init"}, os.Environ())
-	// This is only reached if Exec somehow failed
-	log.Fatalf("exec: %v", err)
+
+	// Load the real kernel
+	// TODO(bluecmd): Use u-root kexec package when it supports ARM
+	// https://github.com/u-root/u-root/issues/401
+	_ = unix.Mknod("/dev/null", unix.S_IFCHR|0600, 0x0103)
+	_ = unix.Mkdir("/proc", 0755)
+	_ = unix.Mkdir("/sys", 0755)
+	err = unix.Mount("proc", "/proc", "proc", 0, "")
+	if err != nil {
+		log.Fatalf("Mount(proc): %v", err)
+	}
+	err = unix.Mount("sysfs", "/sys", "sysfs", 0, "")
+	if err != nil {
+		log.Fatalf("Mount(sysfs): %v", err)
+	}
+
+	cmd := exec.Command("/kexec", "-d", "-l", kernelPath, "--dtb", dtbPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("cmd.Run(kexec -d -l %s --dtb %s): %v", kernelPath, dtbPath, err)
+	}
+
+	cmd = exec.Command("/kexec", "-e")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	// This is only reached if kexec somehow failed
+	log.Fatalf("cmd.Run(kexec -e): %v", err)
 }
 
 func readPublicSigningKey(keyf io.Reader) (*packet.PublicKey, error) {
@@ -119,14 +142,13 @@ func verifyDetachedSignature(key *packet.PublicKey, contentf, sigf *os.File) err
 
 	go func() {
 		ctx := context.Background()
-		progressChan := progress.NewTicker(ctx, r, size, 200 * time.Millisecond)
+		progressChan := progress.NewTicker(ctx, r, size, 200*time.Millisecond)
 		for p := range progressChan {
 			fmt.Printf("Verifying /init integrity: %d %%\r", int(p.Percent()))
 			os.Stdout.Sync()
 		}
 		fmt.Printf("Verifying /init integrity: complete\n")
 	}()
-
 
 	h := hashFunc.New()
 	if _, err := io.Copy(h, r); err != nil && err != io.EOF {

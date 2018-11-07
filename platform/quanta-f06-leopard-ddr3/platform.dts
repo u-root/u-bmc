@@ -2,19 +2,26 @@
 /dts-v1/;
 
 #include "aspeed-g4.dtsi"
+#include "config.h"
 #include <dt-bindings/gpio/aspeed-gpio.h>
 
 / {
 	model = "Quanta F06 Leopard DDR3 BMC";
 	compatible = "ocp,leopard-bmc", "aspeed,ast2400";
 
+	aliases {
+		con = &uart5;
+	};
 	chosen {
-		stdout-path = &uart5;
-		bootargs = "console=ttyS4,57600n8 earlyprintk panic=1 root=/dev/ram0 rdinit=/loader mtdparts=nor.flash:512k(u-boot),-(ubi) ubi.mtd=ubi dyndbg=\"file net/ncsi/* +p\"";
+		stdout-path = "con:57600n8";
+#ifdef BOOTLOADER
+		linux,initrd-start = <CONFIG_INITRD_START>;
+		linux,initrd-end = <CONFIG_INITRD_END>;
+#endif
 	};
 
 	memory@40000000 {
-		reg = <0x40000000 0x20000000>;
+		reg = <0x40000000 CONFIG_RAM_SIZE>;
 	};
 
 	// TODO(bluecmd): Remove when u-bmc sets the ilpc2ahb bits itself
@@ -62,6 +69,12 @@
 			&pinctrl_ddcclk_default &pinctrl_ddcdat_default>;
 };
 
+// /dev/ttyS4: BMC console UART
+&uart5 {
+	status = "okay";
+};
+
+#ifndef BOOTLOADER
 &pwm_tacho {
 	status = "okay";
 	pinctrl-names = "default";
@@ -78,11 +91,6 @@
 
 // /dev/ttyS2: Host's ttyS1
 &uart3 {
-	status = "okay";
-};
-
-// /dev/ttyS4: BMC console UART
-&uart5 {
 	status = "okay";
 };
 
@@ -157,3 +165,4 @@
 &rtc {
 	status = "okay";
 };
+#endif /* !BOOTLOADER */
