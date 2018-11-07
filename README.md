@@ -67,6 +67,8 @@ Clone:
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
 git submodule init && git submodule update
+# Until https://github.com/u-root/u-root/issues/1024 is fixed
+go get github.com/u-root/u-root
 (cd linux/; ../linux-patches/apply.sh)
 ```
 
@@ -83,9 +85,11 @@ signed with these keys.
 
 # Hacking
 
+To run the unit tests, run `make test`.
+
 To run the simulator and the integration test you need a special
 Qemu from https://github.com/openbmc/qemu. Using the upstream Qemu will
-work somewhat, but the integration tests will fail.
+not work predictably.
 
 ```
 make sim
@@ -128,9 +132,14 @@ shutdown -r
 
 # Updating Dependencies
 
+Latest released version of dep is required. One easy way, but not that secure,
+is to install it using their installation script.
+
 ```
-Latest released version of dep is required:
-curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+wget https://raw.githubusercontent.com/golang/dep/master/install.sh
+# Verify that it looks sane
+cat install.sh
+sh install.sh
 dep ensure
 ```
 

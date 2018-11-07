@@ -1,0 +1,117 @@
+From fb3b26177169b3389275447823507a72a9e1624e Mon Sep 17 00:00:00 2001
+From: Christian Svensson <bluecmd@google.com>
+Date: Sat, 10 Nov 2018 18:35:08 +0100
+Subject: [PATCH] arch: define aspeed SOC IO mapping
+
+Without this IO mapping early printk will simply not work after the
+paging and MMU has been setup.
+
+Signed-off-by: Christian Svensson <bluecmd@google.com>
+---
+ arch/arm/Makefile                 |  1 +
+ arch/arm/mach-aspeed/Makefile     |  1 +
+ arch/arm/mach-aspeed/aspeed_soc.c | 47 +++++++++++++++++++++++++++++++
+ arch/arm/mach-aspeed/iomap.h      | 17 +++++++++++
+ 4 files changed, 66 insertions(+)
+ create mode 100644 arch/arm/mach-aspeed/Makefile
+ create mode 100644 arch/arm/mach-aspeed/aspeed_soc.c
+ create mode 100644 arch/arm/mach-aspeed/iomap.h
+
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index fc26c3d7b9b6..f0e3ca392f8c 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -159,6 +159,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+ machine-$(CONFIG_ARCH_ACTIONS)		+= actions
+ machine-$(CONFIG_ARCH_ALPINE)		+= alpine
+ machine-$(CONFIG_ARCH_ARTPEC)		+= artpec
++machine-$(CONFIG_ARCH_ASPEED)		+= aspeed
+ machine-$(CONFIG_ARCH_AT91)		+= at91
+ machine-$(CONFIG_ARCH_AXXIA)		+= axxia
+ machine-$(CONFIG_ARCH_BCM)		+= bcm
+diff --git a/arch/arm/mach-aspeed/Makefile b/arch/arm/mach-aspeed/Makefile
+new file mode 100644
+index 000000000000..426952d47cc3
+--- /dev/null
++++ b/arch/arm/mach-aspeed/Makefile
+@@ -0,0 +1 @@
++obj-y := aspeed_soc.o
+diff --git a/arch/arm/mach-aspeed/aspeed_soc.c b/arch/arm/mach-aspeed/aspeed_soc.c
+new file mode 100644
+index 000000000000..187276c2813d
+--- /dev/null
++++ b/arch/arm/mach-aspeed/aspeed_soc.c
+@@ -0,0 +1,47 @@
++/*
++ * Copyright (C) 2018 Google, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/of_platform.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include "iomap.h"
++
++// This is needed for e.g. earlyprintk
++static struct map_desc io_desc[] __initdata = {
++	{
++		.virtual = AST_IO_VIRT,
++		.pfn = __phys_to_pfn(AST_IO_PHYS),
++		.length = AST_IO_SIZE,
++		.type = MT_DEVICE
++	}
++};
++
++static void __init aspeed_map_io(void)
++{
++	iotable_init(io_desc, ARRAY_SIZE(io_desc));
++}
++
++static const char * const aspeed_compat[] = {
++	"aspeed,ast2400",
++	"aspeed,ast2500",
++	NULL
++};
++
++DT_MACHINE_START(ASPEED_DT, "Aspeed SoC")
++	.map_io = aspeed_map_io,
++	.dt_compat = aspeed_compat,
++MACHINE_END
+diff --git a/arch/arm/mach-aspeed/iomap.h b/arch/arm/mach-aspeed/iomap.h
+new file mode 100644
+index 000000000000..7ea5276f3892
+--- /dev/null
++++ b/arch/arm/mach-aspeed/iomap.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (C) 2018 Google, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#define AST_IO_PHYS 0x1e600000
++#define AST_IO_VIRT 0xfe600000
++#define AST_IO_SIZE 0x00200000
+-- 
+2.19.1.930.g4563a0d9d0-goog
+

@@ -185,10 +185,9 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c91a7e83af2589c1cbf117a8c068abcb7389e39c68ff3bc37035e9d90f406e8b"
+  digest = "1:c9d92f025ba547ead954750f7f0aaa86abca859f95a2433ee3133acd51ad8b85"
   name = "github.com/u-root/u-root"
   packages = [
-    "pkg/cp",
     "pkg/cpio",
     "pkg/golang",
     "pkg/kmodule",
@@ -388,7 +387,6 @@
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/client_golang/prometheus/testutil",
     "github.com/tarm/serial",
-    "github.com/u-root/u-root/pkg/cp",
     "github.com/u-root/u-root/pkg/golang",
     "github.com/u-root/u-root/pkg/kmodule",
     "github.com/u-root/u-root/pkg/qemu",

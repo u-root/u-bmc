@@ -3,10 +3,12 @@ boot/keys
 boot/loader.cpio.gz
 boot/loader/loader
 boot/signer/signer
-boot/*.dtb
+boot/*.dtb.*
 boot/zImage*
 boot/modules
-build/*
+boot/boot.bin
+boot/boot-config.auto.h
+boot/kexec
 *.img
 .*.sw*
 root/
@@ -23,4 +25,4 @@ module/*.mod.c
 module/*.o
 module/modules.*
 module/Module.symvers
-
+vendor/**/.bb
