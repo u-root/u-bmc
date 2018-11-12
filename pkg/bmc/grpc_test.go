@@ -5,8 +5,8 @@ import (
 	"log"
 	"net"
 	"os"
-	"testing"
 	"runtime"
+	"testing"
 
 	pt "github.com/prometheus/client_golang/prometheus/testutil"
 	pb "github.com/u-root/u-bmc/proto"

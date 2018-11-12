@@ -183,7 +183,7 @@ func (l *gpioLnxEvent) getValue() (bool, error) {
 
 func (l *gpioLnxEvent) read() (*int, error) {
 	e := gpioevent_data{}
-	err := binary.Read(l.f, binary.LittleEndian, &e)
+	err := binary.Read(l.f, NativeEndian(), &e)
 	if err == io.EOF {
 		return nil, nil
 	}
