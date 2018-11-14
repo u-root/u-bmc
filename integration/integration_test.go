@@ -5,14 +5,13 @@
 package integration
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"testing"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 	"github.com/u-root/u-root/pkg/uroot"
 	"github.com/u-root/u-root/pkg/uroot/builder"
 	"github.com/u-root/u-root/pkg/uroot/initramfs"
+	urootint "github.com/u-root/u-root/integration"
 )
 
 const (
@@ -34,40 +34,39 @@ func init() {
 	qemu.DefaultTimeout = 30 * time.Second
 }
 
-// MakefileVars holds variables specified in u-bmc Makefile.
-type MakefileVars map[string]string
+type Options urootint.Options
 
-// ReadMakefile reads a map of variables from the Makefile.
-func ReadMakefile() (MakefileVars, error) {
-	cmd := exec.Command("make", "-C", "..", "vars")
-	cmd.Stderr = os.Stderr
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	re := regexp.MustCompile(`([^=\n]+)=([^\n]+)`)
-	m := MakefileVars{}
-	for _, v := range re.FindAllStringSubmatch(string(out), -1) {
-		m[v[1]] = v[2]
-	}
-	return m, nil
+type FlashDevice struct {
+	Image string
 }
 
-// Returns temporary directory and QEMU instance.
-//
-// - `uinitName` is the name of a directory containing uinit found at
-//   `github.com/u-root/u-bmc/integration/testcmd`.
-func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []string) (string, *qemu.QEMU) {
-	if _, ok := os.LookupEnv("UROOT_QEMU"); !ok {
-		t.Skip("test is skipped unless UROOT_QEMU is set")
+func (d FlashDevice) Cmdline() []string {
+	return []string{"-drive", "file=" + d.Image + ",format=raw,if=mtd"}
+}
+
+type MemoryDevice struct {
+	MB int
+}
+
+func (d MemoryDevice) Cmdline() []string {
+	return []string{"-m", fmt.Sprintf("%d", d.MB)}
+}
+
+type MachineDevice struct {
+	Board string
+}
+
+func (d MachineDevice) Cmdline() []string {
+	return []string{"-M", d.Board}
+}
+
+
+func BMCTest(t *testing.T, o *Options) (*qemu.VM, func()) {
+	if _, ok := os.LookupEnv("UBMC_QEMU"); !ok {
+		t.Skip("test is skipped unless UBMC_QEMU is set")
 	}
 	if _, err := os.Stat("../boot/boot.bin"); err != nil {
 		t.Fatalf("u-bmc not built, cannot test")
-	}
-
-	makeVars, err := ReadMakefile()
-	if err != nil {
-		t.Fatalf("unable to read Makefile: %v", err)
 	}
 
 	// TempDir
@@ -77,87 +76,144 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 	}
 
 	// Env
-	env := golang.Default()
-	env.CgoEnabled = false
-	env.GOARCH = "arm"
+	if o.Env == nil {
+		env := golang.Default()
+		env.CgoEnabled = false
+		env.GOARCH = "arm"
+		o.Env = &env
+	}
 
+	_ = buildInitramfs(t, tmpDir, o)
+	flash := buildFlash(t, tmpDir, o)
+	q := &qemu.Options{
+		QEMUPath:  os.Getenv("UBMC_QEMU"),
+		// TODO(bluecmd): Right now only one platform is supported for tests
+		Devices: []qemu.Device{
+			MachineDevice{"palmetto-bmc"},
+			MemoryDevice{128},
+			FlashDevice{flash},
+		},
+	}
+	vm, vmCleanup := qemuTest(t, q, o)
+
+	return vm, func() {
+		vmCleanup()
+		dirCleanup(t, tmpDir)
+	}
+}
+
+func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
+	if _, ok := os.LookupEnv("UBMC_NATIVE_QEMU"); !ok {
+		t.Skip("test is skipped unless UBMC_NATIVE_QEMU is set")
+	}
+	if _, ok := os.LookupEnv("UBMC_NATIVE_BZIMAGE"); !ok {
+		t.Skip("test is skipped unless UBMC_NATIVE_BZIMAGE is set")
+	}
+
+	// TempDir
+	tmpDir, err := ioutil.TempDir("", "ubmc-integration")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Env
+	if o.Env == nil {
+		env := golang.Default()
+		env.CgoEnabled = false
+		o.Env = &env
+	}
+
+	i := buildInitramfs(t, tmpDir, o)
+	q := &qemu.Options{
+		Initramfs: i,
+		Kernel:    os.Getenv("UBMC_NATIVE_BZIMAGE"),
+		QEMUPath:  os.Getenv("UBMC_NATIVE_QEMU"),
+
+	}
+	vm, vmCleanup := qemuTest(t, q, o)
+
+	return vm, func() {
+		vmCleanup()
+		dirCleanup(t, tmpDir)
+	}
+}
+
+func buildInitramfs(t *testing.T, tmpDir string, o *Options) string {
 	// OutputFile
+	logger := log.New(os.Stderr, "", log.LstdFlags)
 	outputFile := filepath.Join(tmpDir, "initramfs.cpio")
-	w, err := initramfs.CPIO.OpenWriter(outputFile, "", "")
+	w, err := initramfs.CPIO.OpenWriter(logger, outputFile, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Build u-root
 	opts := uroot.Opts{
-		Env: env,
+		Env: *o.Env,
 		Commands: []uroot.Commands{
 			{
 				Builder: builder.BusyBox,
-				Packages: []string{
-					"github.com/u-root/u-root/cmds/init",
-					path.Join("github.com/u-root/u-bmc/integration/testcmd", uinitName, "uinit"),
-				},
+				Packages: o.Cmds,
 			},
 		},
-		TempDir:     tmpDir,
-		BaseArchive: uroot.DefaultRamfs.Reader(),
-		OutputFile:  w,
-		InitCmd:     "init",
+		TempDir:      tmpDir,
+		BaseArchive:  uroot.DefaultRamfs.Reader(),
+		OutputFile:   w,
+		InitCmd:      "init",
 	}
-	logger := log.New(os.Stderr, "", log.LstdFlags)
 	if err := uroot.CreateInitramfs(logger, opts); err != nil {
 		t.Fatal(err)
 	}
+	return outputFile
+}
 
+func qemuTest(t *testing.T, q *qemu.Options, o *Options) (*qemu.VM, func()) {
+	// Create file for serial logs.
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Fatalf("could not create serial log directory: %v", err)
+	}
+	logFile, err := os.Create(path.Join(logDir, o.Name+".log"))
+	if err != nil {
+		t.Fatalf("could not create log file: %v", err)
+	}
+
+	q.SerialOutput = logFile
+	if q.Devices != nil {
+		q.Devices = append(q.Devices, o.Network)
+	} else {
+		q.Devices = []qemu.Device{o.Network}
+	}
+
+	vm, err := q.Start()
+	if err != nil {
+		t.Fatalf("Failed to start QEMU VM %s: %v", o.Name, err)
+	}
+	t.Logf("QEMU command line for %s:\n%s", o.Name, vm.CmdlineQuoted())
+	return vm, func() {
+		vm.Close()
+	}
+}
+
+func buildFlash(t *testing.T, tmpDir string, o *Options) string {
 	makefile, err := filepath.Abs("../Makefile")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	build(t, tmpDir, makefile, extraEnv)
-
-	flash := filepath.Join(tmpDir, "flash.sim.img")
-	flags := makeVars["QEMUFLAGS"]
-	flags = strings.Replace(flags, "flash.sim.img", flash, 1)
-	extraArgs := strings.Fields(flags)
-
-	// Create file for serial logs.
-	if err := os.MkdirAll(logDir, 0755); err != nil {
-		t.Fatalf("could not create serial log directory: %v", err)
-	}
-	logFile, err := os.Create(path.Join(logDir, logName+".log"))
-	if err != nil {
-		t.Fatalf("could not create log file: %v", err)
-	}
-
-	// Start QEMU
-	q := &qemu.QEMU{
-		ExtraArgs:    extraArgs,
-		SerialOutput: logFile,
-	}
-	t.Logf("command line:\n%s", q.CmdLineQuoted())
-	if err := q.Start(); err != nil {
-		t.Fatal("could not spawn QEMU: ", err)
-	}
-	return tmpDir, q
-}
-
-func build(t *testing.T, tmpDir string, makefile string, extraEnv []string) {
 	cmd := exec.Command(
 		"make", "-f", makefile, "flash.sim.img", "-o", "initramfs.cpio")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Dir = tmpDir
-	cmd.Env = append(os.Environ(), extraEnv...)
-	err := cmd.Run()
+	cmd.Env = append(os.Environ(), o.ExtraBuildEnv...)
+	err = cmd.Run()
 	if err != nil {
 		t.Fatal(err)
 	}
+	return filepath.Join(tmpDir, "flash.sim.img")
 }
 
-func cleanup(t *testing.T, tmpDir string, q *qemu.QEMU) {
-	q.Close()
+func dirCleanup(t *testing.T, tmpDir string) {
 	if t.Failed() {
 		t.Log("keeping temp dir: ", tmpDir)
 	} else {

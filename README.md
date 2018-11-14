@@ -97,7 +97,7 @@ make sim
 
 To run the integration tests:
 ```
-export UROOT_QEMU=qemu-system-arm
+export UBMC_QEMU=qemu-system-arm
 cd integration
 go test
 ```

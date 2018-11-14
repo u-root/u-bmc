@@ -152,7 +152,8 @@ func Main() error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	w, err := archiver.OpenWriter(*outputPath, env.GOOS, env.GOARCH)
+	logger := log.New(os.Stderr, "", log.LstdFlags)
+	w, err := archiver.OpenWriter(logger, *outputPath, env.GOOS, env.GOARCH)
 	if err != nil {
 		return err
 	}
@@ -175,6 +176,5 @@ func Main() error {
 		InitCmd:         "init",
 		DefaultShell:    "elvish",
 	}
-	logger := log.New(os.Stderr, "", log.LstdFlags)
 	return uroot.CreateInitramfs(logger, opts)
 }

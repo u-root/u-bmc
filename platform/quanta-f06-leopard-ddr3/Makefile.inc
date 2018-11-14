@@ -4,6 +4,8 @@
 # license that can be found in the LICENSE file
 
 SOC := ast2400
+# TODO(bluecmd): Read these from the platform Go definition to share
+# between tests and simulation
 QEMUFLAGS += -m 128 -M palmetto-bmc
 
 # TODO(bluecmd): The real machine has 8MB of VGA RAM but the QEMU platform has

@@ -22,17 +22,17 @@ func main() {
 	defer a.Close()
 
 	if err := bmc.Startup(p); err != nil {
-		fmt.Printf("BOOT_TEST_FAILED: %v\n", err)
+		fmt.Printf("TEST_FAILED: %v\n", err)
 	} else {
 		// Verify that the power button is set to an output for sanity
 		time.Sleep(3 * time.Second)
 		s := a.SnapshotGpio()
 		port, _ := p.GpioNameToPort("BMC_PWR_BTN_OUT_N")
 		if !s.PortDirection(port) {
-			fmt.Printf("BOOT_TEST_FAILED: BMC_PWR_BTN_OUT_N not output\n")
+			fmt.Printf("TEST_FAILED: BMC_PWR_BTN_OUT_N not output\n")
 		} else {
 			for {
-				fmt.Printf("BOOT_TEST_OK\n")
+				fmt.Printf("TEST_OK\n")
 			}
 		}
 	}
