@@ -177,7 +177,7 @@ jobs:
       - run:
           name: Run integration tests
           command: |
-            export UROOT_QEMU=qemu-system-arm
+            export UBMC_QEMU=qemu-system-arm
             cd integration/
             go test
       - store_artifacts:

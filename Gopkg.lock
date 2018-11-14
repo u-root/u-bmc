@@ -27,11 +27,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:341f9d44bc3b36b88d4b2ecfae8c9ecc7b344bc34b5e92342999a8522e6f388a"
+  digest = "1:cdb9dba2225e07678efa150cbb23256f9e8abaf63348461bc8959cdf6d14450f"
   name = "github.com/fullstorydev/grpcurl"
   packages = ["."]
   pruneopts = "UT"
-  revision = "1e8e50f4f86c755c1a1147a929d9d51058f3bd1d"
+  revision = "0dea37ee70ab8bfc082bfe980e11c02e92947d8a"
 
 [[projects]]
   digest = "1:36ec276c7f6fad2a465e547cd936266ab57f73cf350f261608592004ab331248"
@@ -131,7 +131,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:8aa57b856572ad735c2d0fdbe5310a2f1533ad0d1720a089066cbf1e2cb83fb4"
+  digest = "1:22945881e448058b73c1e2ac7b508ef3e4de9313e7f2e6d79c7a471adba4ef0d"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
@@ -140,7 +140,7 @@
     "prometheus/testutil",
   ]
   pruneopts = "UT"
-  revision = "16f375c74db6ccf880e1cd9c6c6087a6d58e5d12"
+  revision = "ca9acd2391c21ed243ef577fc3aaa856aaae1acf"
 
 [[projects]]
   branch = "master"
@@ -160,7 +160,7 @@
     "model",
   ]
   pruneopts = "UT"
-  revision = "7e9e6cabbd393fc208072eedef99188d0ce788b6"
+  revision = "41aa239b4cce3c56ab88fc366ae8b0a6423fa239"
 
 [[projects]]
   branch = "master"
@@ -185,9 +185,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c9d92f025ba547ead954750f7f0aaa86abca859f95a2433ee3133acd51ad8b85"
+  digest = "1:09abea8b3a58e5a374839129d313dbbf58f54158d71a531a0f3662a6d4bece39"
   name = "github.com/u-root/u-root"
   packages = [
+    "integration",
+    "pkg/cp",
     "pkg/cpio",
     "pkg/golang",
     "pkg/kmodule",
@@ -195,25 +197,27 @@
     "pkg/lockfile",
     "pkg/ls",
     "pkg/qemu",
+    "pkg/ubinary",
     "pkg/uio",
     "pkg/uroot",
     "pkg/uroot/builder",
     "pkg/uroot/builder/bb",
     "pkg/uroot/initramfs",
+    "pkg/uroot/logger",
   ]
   pruneopts = "UT"
-  revision = "d7225b1d0ded4276b5443e7c70f579dadd8e8060"
+  revision = "87d39765cda02b84f301d4436660d5e547523a54"
 
 [[projects]]
   branch = "master"
-  digest = "1:63734abf36e0b92a480a1a1e74e5ed561fe0578070355542cf42a59a150439bd"
+  digest = "1:430584272d367e3d3228e6fc3eb78ebad4c6bf9024d1dac6d3d08e7e1b02293d"
   name = "github.com/vishvananda/netlink"
   packages = [
     ".",
     "nl",
   ]
   pruneopts = "UT"
-  revision = "02a383156adbec12c5c95213fc92c94ab345c012"
+  revision = "023a6dafdcdfa7068ac83b260ab7f03cd4131aca"
 
 [[projects]]
   branch = "master"
@@ -225,7 +229,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a0780822078ef9a6acfd825f5f6fa8a2d9f84e8e55987fffea7a19269537f014"
+  digest = "1:f074f4b44932064503c6ce83c9d809f2c2a5310693fc1f1e9f2ec62fde37da71"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
@@ -244,11 +248,11 @@
     "ssh",
   ]
   pruneopts = "UT"
-  revision = "85e1b3f9139abd58575d728a509643924e3b2ebf"
+  revision = "3d3f9f413869b949e48070b5bc593aa22cc2b8f2"
 
 [[projects]]
   branch = "master"
-  digest = "1:c8914cb7fddb35562a3051892148e9fdabc2c5cc29f6e7265bcd6e947c060fe1"
+  digest = "1:744dd02ef2f2422021e8b6e42b09ecee10ccdaf44a75100d422dc966f60e7582"
   name = "golang.org/x/net"
   packages = [
     "bpf",
@@ -264,23 +268,23 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "9b4f9f5ad5197c79fd623a3638e70d8b26cef344"
+  revision = "88d92db4c548972d942ac2a3531a8a9a34c82ca6"
 
 [[projects]]
   branch = "master"
-  digest = "1:39ebcc2b11457b703ae9ee2e8cca0f68df21969c6102cb3b705f76cca0ea0239"
+  digest = "1:b521f10a2d8fa85c04a8ef4e62f2d1e14d303599a55d64dabf9f5a02f84d35eb"
   name = "golang.org/x/sync"
   packages = ["errgroup"]
   pruneopts = "UT"
-  revision = "1d60e4601c6fd243af51cc01ddf169918a5407ca"
+  revision = "42b317875d0fa942474b76e1b46a6060d720ae6e"
 
 [[projects]]
   branch = "master"
-  digest = "1:008fb9f84ae9bf7994228b9c78810d44162071ec13caf28291677897dca819ee"
+  digest = "1:7ba061af4131fb44b30448572acd0d6fefbf63a61b97b7ef1dea0be5871c2742"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "d989b31c87461dc8ab2f1cac6792814e27fadea9"
+  revision = "66b7b1311ac80bbafcd2daeef9a5e6e2cd1e2399"
 
 [[projects]]
   digest = "1:a2ab62866c75542dd18d2b069fec854577a20211d7c0ea6ae746072a1dccdd18"
@@ -307,7 +311,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3a04778e417b28bba5d30f0af919206b4869f57a1d5e152c4c2f29bf18889dce"
+  digest = "1:6511064c08bff306dd24fa83ea82e160009fa7572240b70173b25d1dbc3e1872"
   name = "golang.org/x/tools"
   packages = [
     "go/ast/astutil",
@@ -316,7 +320,7 @@
     "internal/gopathwalk",
   ]
   pruneopts = "UT"
-  revision = "a2dc47679d30b6c496245bafc6a166b46c5fe318"
+  revision = "99072bc9d7ade6fc470d6c040de25d2edeac78c4"
 
 [[projects]]
   branch = "master"
@@ -330,7 +334,7 @@
     "protobuf/source_context",
   ]
   pruneopts = "UT"
-  revision = "94acd270e44e65579b9ee3cdab25034d33fed608"
+  revision = "b5d43981345bdb2c233eb4bf3277847b48c6fdc6"
 
 [[projects]]
   digest = "1:e72ebff67b73d31785959af0660215213c58ab50d7b7d61aac0f1a6834c07e8c"
@@ -387,6 +391,7 @@
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/client_golang/prometheus/testutil",
     "github.com/tarm/serial",
+    "github.com/u-root/u-root/integration",
     "github.com/u-root/u-root/pkg/golang",
     "github.com/u-root/u-root/pkg/kmodule",
     "github.com/u-root/u-root/pkg/qemu",

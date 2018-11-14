@@ -7,7 +7,6 @@ package uroot
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -18,6 +17,7 @@ import (
 	"github.com/u-root/u-root/pkg/ldd"
 	"github.com/u-root/u-root/pkg/uroot/builder"
 	"github.com/u-root/u-root/pkg/uroot/initramfs"
+	"github.com/u-root/u-root/pkg/uroot/logger"
 )
 
 // These constants are used in DefaultRamfs.
@@ -172,7 +172,7 @@ type Opts struct {
 }
 
 // CreateInitramfs creates an initramfs built to opts' specifications.
-func CreateInitramfs(logger *log.Logger, opts Opts) error {
+func CreateInitramfs(logger logger.Logger, opts Opts) error {
 	if _, err := os.Stat(opts.TempDir); os.IsNotExist(err) {
 		return fmt.Errorf("temp dir %q must exist: %v", opts.TempDir, err)
 	}
@@ -206,7 +206,7 @@ func CreateInitramfs(logger *log.Logger, opts Opts) error {
 			BinaryDir: cmds.TargetDir(),
 		}
 		if err := cmds.Builder.Build(files, bOpts); err != nil {
-			return fmt.Errorf("error building %#v: %v", bOpts, err)
+			return fmt.Errorf("error building: %v", err)
 		}
 	}
 
@@ -221,16 +221,34 @@ func CreateInitramfs(logger *log.Logger, opts Opts) error {
 	if len(opts.DefaultShell) > 0 {
 		if target, err := resolveCommandOrPath(opts.DefaultShell, opts.Commands); err != nil {
 			logger.Printf("No default shell: %v", err)
-		} else if err := archive.AddRecord(cpio.Symlink("bin/defaultsh", target)); err != nil {
-			return err
+		} else {
+			rtarget, err := filepath.Rel("/", target)
+			if err != nil {
+				return err
+			}
+
+			if err := archive.AddRecord(cpio.Symlink("bin/defaultsh", filepath.Join("..", rtarget))); err != nil {
+				return err
+			}
+			if err := archive.AddRecord(cpio.Symlink("bin/sh", filepath.Join("..", rtarget))); err != nil {
+				return err
+			}
 		}
 	}
 
 	if len(opts.InitCmd) > 0 {
 		if target, err := resolveCommandOrPath(opts.InitCmd, opts.Commands); err != nil {
-			return fmt.Errorf("could not find init: %v", err)
-		} else if err := archive.AddRecord(cpio.Symlink("init", target)); err != nil {
-			return err
+			if opts.Commands != nil {
+				return fmt.Errorf("could not find init: %v", err)
+			}
+		} else {
+			rtarget, err := filepath.Rel("/", target)
+			if err != nil {
+				return err
+			}
+			if err := archive.AddRecord(cpio.Symlink("init", rtarget)); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -246,7 +264,7 @@ func CreateInitramfs(logger *log.Logger, opts Opts) error {
 }
 
 // resolvePackagePath finds import paths for a single import path or directory string
-func resolvePackagePath(logger *log.Logger, env golang.Environ, pkg string) ([]string, error) {
+func resolvePackagePath(logger logger.Logger, env golang.Environ, pkg string) ([]string, error) {
 	// Search the current working directory, as well GOROOT and GOPATHs
 	prefixes := append([]string{""}, env.SrcDirs()...)
 	// Resolve file system paths to package import paths.
@@ -320,7 +338,7 @@ func resolveCommandOrPath(cmd string, cmds []Commands) (string, error) {
 //
 // Directories may be relative or absolute, with or without globs.
 // Globs are resolved using filepath.Glob.
-func ResolvePackagePaths(logger *log.Logger, env golang.Environ, pkgs []string) ([]string, error) {
+func ResolvePackagePaths(logger logger.Logger, env golang.Environ, pkgs []string) ([]string, error) {
 	var importPaths []string
 	for _, pkg := range pkgs {
 		paths, err := resolvePackagePath(logger, env, pkg)
@@ -342,7 +360,7 @@ func ResolvePackagePaths(logger *log.Logger, env golang.Environ, pkgs []string) 
 //   - "/home/foo" is equivalent to "/home/foo:home/foo".
 //
 // ParseExtraFiles will also add ldd-listed dependencies if lddDeps is true.
-func ParseExtraFiles(logger *log.Logger, archive *initramfs.Files, extraFiles []string, lddDeps bool) error {
+func ParseExtraFiles(logger logger.Logger, archive *initramfs.Files, extraFiles []string, lddDeps bool) error {
 	var err error
 	// Add files from command line.
 	for _, file := range extraFiles {
@@ -371,7 +389,7 @@ func ParseExtraFiles(logger *log.Logger, archive *initramfs.Files, extraFiles []
 		if err != nil {
 			return fmt.Errorf("couldn't find absolute path for %q: %v", src, err)
 		}
-		if err := archive.AddFile(src, dst); err != nil {
+		if err := archive.AddFileNoFollow(src, dst); err != nil {
 			return fmt.Errorf("couldn't add %q to archive: %v", file, err)
 		}
 
@@ -384,7 +402,13 @@ func ParseExtraFiles(logger *log.Logger, archive *initramfs.Files, extraFiles []
 				continue
 			}
 			for _, lib := range libs {
-				if err := archive.AddFile(lib, lib[1:]); err != nil {
+				// N.B.: we already added information about the src.
+				// Don't add it twice. We have to do this check here in
+				// case we're renaming the src to a different dest.
+				if lib == src {
+					continue
+				}
+				if err := archive.AddFileNoFollow(lib, lib[1:]); err != nil {
 					logger.Printf("WARNING: couldn't add ldd dependencies for %q: %v", lib, err)
 				}
 			}
