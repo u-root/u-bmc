@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"github.com/machinebox/progress"
@@ -29,10 +30,12 @@ const (
 	pubKeyPath = "/u-bmc.pub"
 	// TODO(bluecmd): We cannot chroot into /mnt since we have to run /kexec
 	// for now.
-	initPath    = "/mnt/init"
-	initSigPath = "/mnt/init.sig"
 	kernelPath  = "/mnt/boot/zImage"
 	dtbPath     = "/mnt/boot/platform.dtb"
+)
+
+var (
+	verify = []string{"/mnt/init", kernelPath, dtbPath}
 )
 
 func main() {
@@ -43,6 +46,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Open(%s): %v", pubKeyPath, err)
 	}
+	key, err := readPublicSigningKey(keyf)
+	if err != nil {
+		log.Fatalf("readPublicSigningKey(%s): %v", pubKeyPath, err)
+	}
+
 	err = unix.Mkdir("/mnt/", 0755)
 	if err != nil {
 		log.Fatalf("Mkdir(/mnt/): %v", err)
@@ -51,20 +59,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Mount(ubi0:root): %v", err)
 	}
-	sigf, err := os.Open(initSigPath)
-	if err != nil {
-		log.Fatalf("Open(%s): %v", initSigPath, err)
-	}
-	contentf, err := os.Open(initPath)
-	if err != nil {
-		log.Fatalf("Open(%s): %v", initPath, err)
-	}
-	key, err := readPublicSigningKey(keyf)
-	if err != nil {
-		log.Fatalf("readPublicSigningKey: %v", err)
-	}
-	if err = verifyDetachedSignature(key, contentf, sigf); err != nil {
-		log.Fatalf("verify: %v", err)
+	for _, path := range verify {
+		f, err := openAndVerify(path, key)
+		if err != nil {
+			log.Fatalf("openAndVerify(%s): %v", path, err)
+		}
+		f.Close()
 	}
 	log.Printf("Integrity check OK")
 
@@ -98,6 +98,22 @@ func main() {
 	log.Fatalf("cmd.Run(kexec -e): %v", err)
 }
 
+func openAndVerify(path string, key *packet.PublicKey) (*os.File, error) {
+	sigf, err := os.Open(path + ".gpg")
+	if err != nil {
+		return nil, err
+	}
+	defer sigf.Close()
+	contentf, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	if err = verifyDetachedSignature(contentf, sigf, key); err != nil {
+		return nil, err
+	}
+	return contentf, nil
+}
+
 func readPublicSigningKey(keyf io.Reader) (*packet.PublicKey, error) {
 	keypackets := packet.NewReader(keyf)
 	p, err := keypackets.Next()
@@ -113,7 +129,7 @@ func readPublicSigningKey(keyf io.Reader) (*packet.PublicKey, error) {
 	return nil, errors.StructuralError("expected first packet to be PublicKey")
 }
 
-func verifyDetachedSignature(key *packet.PublicKey, contentf, sigf *os.File) error {
+func verifyDetachedSignature(contentf, sigf *os.File, key *packet.PublicKey) error {
 	var hashFunc crypto.Hash
 
 	packets := packet.NewReader(sigf)
@@ -139,16 +155,22 @@ func verifyDetachedSignature(key *packet.PublicKey, contentf, sigf *os.File) err
 	}
 
 	r := progress.NewReader(contentf)
+	c := make(chan struct{})
 
-	go func() {
+	go func(path string) {
 		ctx := context.Background()
+		path, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			path = fmt.Sprintf("{%v}", err)
+		}
 		progressChan := progress.NewTicker(ctx, r, size, 200*time.Millisecond)
 		for p := range progressChan {
-			fmt.Printf("Verifying /init integrity: %d %%\r", int(p.Percent()))
+			fmt.Printf("Verifying %s integrity: %d %%\r", path, int(p.Percent()))
 			os.Stdout.Sync()
 		}
-		fmt.Printf("Verifying /init integrity: complete\n")
-	}()
+		fmt.Printf("Verifying %s integrity: complete\n", path)
+		close(c)
+	}(contentf.Name())
 
 	h := hashFunc.New()
 	if _, err := io.Copy(h, r); err != nil && err != io.EOF {
@@ -162,6 +184,8 @@ func verifyDetachedSignature(key *packet.PublicKey, contentf, sigf *os.File) err
 	default:
 		panic("unreachable")
 	}
+	// Wait for the final status printout to not mess up the log
+	_ = <-c
 	return err
 }
 

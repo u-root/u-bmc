@@ -10,10 +10,5 @@ SOC := ast2400
 RAM_SIZE := 0x7000000  # 128 MB - 16 MB (VGA)
 
 sim: flash.sim.img
-	qemu-system-arm \
-		-m 128 \
-		-M palmetto-bmc \
-		-nographic \
-		-drive file=$<,format=raw,if=mtd \
-		-d guest_errors,unimp
+	$(QEMU) -m 128  -M palmetto-bmc $(QEMUFLAGS)
 	stty sane

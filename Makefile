@@ -7,6 +7,10 @@ PLATFORM ?= quanta-f06-leopard-ddr3
 
 LEB := 65408
 CROSS_COMPILE ?= arm-none-eabi-
+QEMU ?= qemu-system-arm
+QEMUFLAGS ?= -nographic \
+	-drive file=flash.sim.img,format=raw,if=mtd \
+	-d guest_errors,unimp
 MAKE_JOBS ?= -j8
 ABS_ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))/
 # This is used to include garbage in the signing process to test verification
@@ -17,6 +21,7 @@ TEST_EXTRA_SIGN ?= /dev/null
 # The bootloader for ast2400 is something like 10KiB, and the DTB is 25 KiB.
 # Here we give the extra space a total of 100 KiB to have some space.
 EXTRA_BOOT_SPACE ?= 102400
+GIT_VERSION=$(shell (cd $(ABS_ROOT_DIR); git describe --tags --long))
 
 # This is to allow integration tests that build new root filesystems outside
 # of the source root
@@ -180,17 +185,22 @@ root.ubifs.img: initramfs.cpio $(ROOT_DIR)boot/zImage.full $(ROOT_DIR)boot/signe
 	echo "nameserver 2001:4860:4860::8888" > root/etc/resolv.conf
 	echo "nameserver 2606:4700:4700::1111" >> root/etc/resolv.conf
 	echo "nameserver 8.8.8.8" >> root/etc/resolv.conf
-	# TODO(bluecmd): Kernel version in filename and have zImage as a symlink?
-	cp -v $(ROOT_DIR)boot/zImage.full root/boot/zImage
-	cp -v $(ROOT_DIR)boot/platform.dtb.full root/boot/platform.dtb
+	cp -v $(ROOT_DIR)boot/zImage.full root/boot/zImage-$(GIT_VERSION)
+	cat $(ROOT_DIR)boot/zImage.full | $(ROOT_DIR)boot/signer/signer > root/boot/zImage-$(GIT_VERSION).gpg
+	cp -v $(ROOT_DIR)boot/platform.dtb.full root/boot/platform-$(GIT_VERSION).dtb
+	cat $(ROOT_DIR)boot/platform.dtb.full | $(ROOT_DIR)boot/signer/signer > root/boot/platform-$(GIT_VERSION).dtb.gpg
+	ln -sf zImage-$(GIT_VERSION) root/boot/zImage
+	ln -sf zImage-$(GIT_VERSION).gpg root/boot/zImage.gpg
+	ln -sf platform-$(GIT_VERSION).dtb root/boot/platform.dtb
+	ln -sf platform-$(GIT_VERSION).dtb.gpg root/boot/platform.dtb.gpg
 	cp -v $(ROOT_DIR)boot/keys/u-bmc.pub root/etc/
-	ln -sf bbin/bb.sig root/init.sig
+	ln -sf bbin/bb.gpg root/init.gpg
 	# Rewrite the symlink to a non-absolute to allow non-chrooted following.
 	# This is a workaround for the fact that the loader cannot chroot currently.
 	ln -sf bbin/bb root/init
 	fakeroot sh -c "(cd root/; cpio -idv < ../$(<)) && \
 		cat root/bbin/bb $(TEST_EXTRA_SIGN) | \
-			$(ROOT_DIR)boot/signer/signer > root/bbin/bb.sig && \
+			$(ROOT_DIR)boot/signer/signer > root/bbin/bb.gpg && \
 		mkfs.ubifs -r root -R0 -m 1 -e ${LEB} -c 2047 -o $(@)"
 
 ubi.img: root.ubifs.img $(ROOT_DIR)ubi.cfg
