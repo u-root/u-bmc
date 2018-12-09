@@ -24,6 +24,9 @@ workflows:
             branches:
               only:
                 - master
+    jobs:
+      - compile
+      - image
 jobs:
   clean-code:
     docker:
