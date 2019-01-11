@@ -8,9 +8,14 @@ PLATFORM ?= quanta-f06-leopard-ddr3
 LEB := 65408
 CROSS_COMPILE ?= arm-none-eabi-
 QEMU ?= qemu-system-arm
+# Some useful debug flags:
+# - in_asm, show ASM as it's being fed into QEMU
+# - unimp, show things that the VM tries to do but isn't implemented in QEMU
+# Run "make QEMUDEBUGFLAGS='-d help' sim" for more flags
+QEMUDEBUGFLAGS ?= -d guest_errors
 QEMUFLAGS ?= -nographic \
 	-drive file=flash.sim.img,format=raw,if=mtd \
-	-d guest_errors,unimp
+	${QEMUDEBUGFLAGS}
 MAKE_JOBS ?= -j8
 ABS_ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))/
 # This is used to include garbage in the signing process to test verification
@@ -178,7 +183,7 @@ boot/%.dtb.full: platform/$(PLATFORM)/%.dts boot/%.dtb.boot
 		$< \
 	| dtc -O dtb -o $@ -
 
-root.ubifs.img: initramfs.cpio $(ROOT_DIR)boot/zImage.full $(ROOT_DIR)boot/signer/signer $(ROOT_DIR)boot/platform.dtb.full
+root.ubifs.img: initramfs.cpio $(ROOT_DIR)boot/zImage.full $(ROOT_DIR)boot/signer/signer $(ROOT_DIR)boot/platform.dtb.full $(ROOT_DIR)proto/system.textpb.default
 	rm -fr root/
 	mkdir -p root/root root/etc root/boot
 	# TOOD(bluecmd): Move to u-bmc system startup
@@ -195,6 +200,8 @@ root.ubifs.img: initramfs.cpio $(ROOT_DIR)boot/zImage.full $(ROOT_DIR)boot/signe
 	ln -sf platform-$(GIT_VERSION).dtb.gpg root/boot/platform.dtb.gpg
 	cp -v $(ROOT_DIR)boot/keys/u-bmc.pub root/etc/
 	ln -sf bbin/bb.gpg root/init.gpg
+	mkdir root/config
+	cp $(ROOT_DIR)proto/system.textpb.default root/config/system.textpb
 	# Rewrite the symlink to a non-absolute to allow non-chrooted following.
 	# This is a workaround for the fact that the loader cannot chroot currently.
 	ln -sf bbin/bb root/init
@@ -210,7 +217,7 @@ flash.sim.img: flash.img
 	( cat $^ ; perl -e 'print chr(0xFF)x1024 while 1' ) \
 		| dd bs=1M count=32 iflag=fullblock > $@
 
-initramfs.cpio: u-bmc ssh_keys.pub $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)pkg -name \*.go -type f)
+initramfs.cpio: u-bmc ssh_keys.pub $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)pkg $(ROOT_DIR)proto -name \*.go -type f)
 	go generate ./config/
 	GOARM=5 GOARCH=$(ARCH) ./u-bmc -o "$@.tmp" -p "$(PLATFORM)"
 	mv "$@.tmp" "$@"
