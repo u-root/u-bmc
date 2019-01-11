@@ -18,10 +18,10 @@ Signed-off-by: Christian Svensson <bluecmd@google.com>
  create mode 100644 arch/arm/mach-aspeed/iomap.h
 
 diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index fc26c3d7b9b6..f0e3ca392f8c 100644
+index d1516f85f25d..360734ef70f2 100644
 --- a/arch/arm/Makefile
 +++ b/arch/arm/Makefile
-@@ -159,6 +159,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
+@@ -156,6 +156,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
  machine-$(CONFIG_ARCH_ACTIONS)		+= actions
  machine-$(CONFIG_ARCH_ALPINE)		+= alpine
  machine-$(CONFIG_ARCH_ARTPEC)		+= artpec

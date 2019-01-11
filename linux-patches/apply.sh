@@ -8,5 +8,6 @@ dir=$(dirname $0)
 
 for i in $(ls ${dir}/*.diff)
 do
+  echo "=> Applying ${i}"
   patch -p1 < $i
 done
