@@ -36,7 +36,6 @@ var Button_name = map[int32]string{
 	1: "BUTTON_POWER",
 	2: "BUTTON_RESET",
 }
-
 var Button_value = map[string]int32{
 	"BUTTON_UNSPEC": 0,
 	"BUTTON_POWER":  1,
@@ -46,9 +45,8 @@ var Button_value = map[string]int32{
 func (x Button) String() string {
 	return proto.EnumName(Button_name, int32(x))
 }
-
 func (Button) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{0}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{0}
 }
 
 type FanMode int32
@@ -62,7 +60,6 @@ var FanMode_name = map[int32]string{
 	0: "FAN_MODE_UNSPEC",
 	1: "FAN_MODE_PERCENTAGE",
 }
-
 var FanMode_value = map[string]int32{
 	"FAN_MODE_UNSPEC":     0,
 	"FAN_MODE_PERCENTAGE": 1,
@@ -71,9 +68,8 @@ var FanMode_value = map[string]int32{
 func (x FanMode) String() string {
 	return proto.EnumName(FanMode_name, int32(x))
 }
-
 func (FanMode) EnumDescriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{1}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{1}
 }
 
 type ButtonPressRequest struct {
@@ -90,7 +86,7 @@ func (m *ButtonPressRequest) Reset()         { *m = ButtonPressRequest{} }
 func (m *ButtonPressRequest) String() string { return proto.CompactTextString(m) }
 func (*ButtonPressRequest) ProtoMessage()    {}
 func (*ButtonPressRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{0}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{0}
 }
 func (m *ButtonPressRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ButtonPressRequest.Unmarshal(m, b)
@@ -98,8 +94,8 @@ func (m *ButtonPressRequest) XXX_Unmarshal(b []byte) error {
 func (m *ButtonPressRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ButtonPressRequest.Marshal(b, m, deterministic)
 }
-func (m *ButtonPressRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ButtonPressRequest.Merge(m, src)
+func (dst *ButtonPressRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ButtonPressRequest.Merge(dst, src)
 }
 func (m *ButtonPressRequest) XXX_Size() int {
 	return xxx_messageInfo_ButtonPressRequest.Size(m)
@@ -134,7 +130,7 @@ func (m *ButtonPressResponse) Reset()         { *m = ButtonPressResponse{} }
 func (m *ButtonPressResponse) String() string { return proto.CompactTextString(m) }
 func (*ButtonPressResponse) ProtoMessage()    {}
 func (*ButtonPressResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{1}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{1}
 }
 func (m *ButtonPressResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ButtonPressResponse.Unmarshal(m, b)
@@ -142,8 +138,8 @@ func (m *ButtonPressResponse) XXX_Unmarshal(b []byte) error {
 func (m *ButtonPressResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ButtonPressResponse.Marshal(b, m, deterministic)
 }
-func (m *ButtonPressResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ButtonPressResponse.Merge(m, src)
+func (dst *ButtonPressResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ButtonPressResponse.Merge(dst, src)
 }
 func (m *ButtonPressResponse) XXX_Size() int {
 	return xxx_messageInfo_ButtonPressResponse.Size(m)
@@ -170,7 +166,7 @@ func (m *SetFanRequest) Reset()         { *m = SetFanRequest{} }
 func (m *SetFanRequest) String() string { return proto.CompactTextString(m) }
 func (*SetFanRequest) ProtoMessage()    {}
 func (*SetFanRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{2}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{2}
 }
 func (m *SetFanRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetFanRequest.Unmarshal(m, b)
@@ -178,8 +174,8 @@ func (m *SetFanRequest) XXX_Unmarshal(b []byte) error {
 func (m *SetFanRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetFanRequest.Marshal(b, m, deterministic)
 }
-func (m *SetFanRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SetFanRequest.Merge(m, src)
+func (dst *SetFanRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SetFanRequest.Merge(dst, src)
 }
 func (m *SetFanRequest) XXX_Size() int {
 	return xxx_messageInfo_SetFanRequest.Size(m)
@@ -221,7 +217,7 @@ func (m *SetFanResponse) Reset()         { *m = SetFanResponse{} }
 func (m *SetFanResponse) String() string { return proto.CompactTextString(m) }
 func (*SetFanResponse) ProtoMessage()    {}
 func (*SetFanResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{3}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{3}
 }
 func (m *SetFanResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SetFanResponse.Unmarshal(m, b)
@@ -229,8 +225,8 @@ func (m *SetFanResponse) XXX_Unmarshal(b []byte) error {
 func (m *SetFanResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SetFanResponse.Marshal(b, m, deterministic)
 }
-func (m *SetFanResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SetFanResponse.Merge(m, src)
+func (dst *SetFanResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SetFanResponse.Merge(dst, src)
 }
 func (m *SetFanResponse) XXX_Size() int {
 	return xxx_messageInfo_SetFanResponse.Size(m)
@@ -251,7 +247,7 @@ func (m *GetFansRequest) Reset()         { *m = GetFansRequest{} }
 func (m *GetFansRequest) String() string { return proto.CompactTextString(m) }
 func (*GetFansRequest) ProtoMessage()    {}
 func (*GetFansRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{4}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{4}
 }
 func (m *GetFansRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetFansRequest.Unmarshal(m, b)
@@ -259,8 +255,8 @@ func (m *GetFansRequest) XXX_Unmarshal(b []byte) error {
 func (m *GetFansRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetFansRequest.Marshal(b, m, deterministic)
 }
-func (m *GetFansRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetFansRequest.Merge(m, src)
+func (dst *GetFansRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetFansRequest.Merge(dst, src)
 }
 func (m *GetFansRequest) XXX_Size() int {
 	return xxx_messageInfo_GetFansRequest.Size(m)
@@ -285,7 +281,7 @@ func (m *Fan) Reset()         { *m = Fan{} }
 func (m *Fan) String() string { return proto.CompactTextString(m) }
 func (*Fan) ProtoMessage()    {}
 func (*Fan) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{5}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{5}
 }
 func (m *Fan) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Fan.Unmarshal(m, b)
@@ -293,8 +289,8 @@ func (m *Fan) XXX_Unmarshal(b []byte) error {
 func (m *Fan) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Fan.Marshal(b, m, deterministic)
 }
-func (m *Fan) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Fan.Merge(m, src)
+func (dst *Fan) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Fan.Merge(dst, src)
 }
 func (m *Fan) XXX_Size() int {
 	return xxx_messageInfo_Fan.Size(m)
@@ -344,7 +340,7 @@ func (m *GetFansResponse) Reset()         { *m = GetFansResponse{} }
 func (m *GetFansResponse) String() string { return proto.CompactTextString(m) }
 func (*GetFansResponse) ProtoMessage()    {}
 func (*GetFansResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{6}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{6}
 }
 func (m *GetFansResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetFansResponse.Unmarshal(m, b)
@@ -352,8 +348,8 @@ func (m *GetFansResponse) XXX_Unmarshal(b []byte) error {
 func (m *GetFansResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetFansResponse.Marshal(b, m, deterministic)
 }
-func (m *GetFansResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetFansResponse.Merge(m, src)
+func (dst *GetFansResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetFansResponse.Merge(dst, src)
 }
 func (m *GetFansResponse) XXX_Size() int {
 	return xxx_messageInfo_GetFansResponse.Size(m)
@@ -382,7 +378,7 @@ func (m *ConsoleData) Reset()         { *m = ConsoleData{} }
 func (m *ConsoleData) String() string { return proto.CompactTextString(m) }
 func (*ConsoleData) ProtoMessage()    {}
 func (*ConsoleData) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{7}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{7}
 }
 func (m *ConsoleData) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ConsoleData.Unmarshal(m, b)
@@ -390,8 +386,8 @@ func (m *ConsoleData) XXX_Unmarshal(b []byte) error {
 func (m *ConsoleData) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ConsoleData.Marshal(b, m, deterministic)
 }
-func (m *ConsoleData) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_ConsoleData.Merge(m, src)
+func (dst *ConsoleData) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ConsoleData.Merge(dst, src)
 }
 func (m *ConsoleData) XXX_Size() int {
 	return xxx_messageInfo_ConsoleData.Size(m)
@@ -419,7 +415,7 @@ func (m *GetVersionRequest) Reset()         { *m = GetVersionRequest{} }
 func (m *GetVersionRequest) String() string { return proto.CompactTextString(m) }
 func (*GetVersionRequest) ProtoMessage()    {}
 func (*GetVersionRequest) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{8}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{8}
 }
 func (m *GetVersionRequest) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetVersionRequest.Unmarshal(m, b)
@@ -427,8 +423,8 @@ func (m *GetVersionRequest) XXX_Unmarshal(b []byte) error {
 func (m *GetVersionRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetVersionRequest.Marshal(b, m, deterministic)
 }
-func (m *GetVersionRequest) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetVersionRequest.Merge(m, src)
+func (dst *GetVersionRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetVersionRequest.Merge(dst, src)
 }
 func (m *GetVersionRequest) XXX_Size() int {
 	return xxx_messageInfo_GetVersionRequest.Size(m)
@@ -451,7 +447,7 @@ func (m *GetVersionResponse) Reset()         { *m = GetVersionResponse{} }
 func (m *GetVersionResponse) String() string { return proto.CompactTextString(m) }
 func (*GetVersionResponse) ProtoMessage()    {}
 func (*GetVersionResponse) Descriptor() ([]byte, []int) {
-	return fileDescriptor_491517c5ad0de192, []int{9}
+	return fileDescriptor_bmc_38e3e9ddd88e3820, []int{9}
 }
 func (m *GetVersionResponse) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_GetVersionResponse.Unmarshal(m, b)
@@ -459,8 +455,8 @@ func (m *GetVersionResponse) XXX_Unmarshal(b []byte) error {
 func (m *GetVersionResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_GetVersionResponse.Marshal(b, m, deterministic)
 }
-func (m *GetVersionResponse) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_GetVersionResponse.Merge(m, src)
+func (dst *GetVersionResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_GetVersionResponse.Merge(dst, src)
 }
 func (m *GetVersionResponse) XXX_Size() int {
 	return xxx_messageInfo_GetVersionResponse.Size(m)
@@ -737,9 +733,9 @@ var _ManagementService_serviceDesc = grpc.ServiceDesc{
 	Metadata: "bmc.proto",
 }
 
-func init() { proto.RegisterFile("bmc.proto", fileDescriptor_491517c5ad0de192) }
+func init() { proto.RegisterFile("bmc.proto", fileDescriptor_bmc_38e3e9ddd88e3820) }
 
-var fileDescriptor_491517c5ad0de192 = []byte{
+var fileDescriptor_bmc_38e3e9ddd88e3820 = []byte{
 	// 508 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xb4, 0x93, 0x4d, 0x8f, 0xda, 0x3c,
 	0x10, 0x80, 0x09, 0x20, 0x58, 0x86, 0x8f, 0x0d, 0xc3, 0xfb, 0x96, 0x34, 0x87, 0x96, 0xba, 0x17,

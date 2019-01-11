@@ -1,0 +1,55 @@
+// Copyright 2019 the u-root Authors. All rights reserved
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+syntax = "proto3";
+
+package bmc;
+
+message Route {
+  // Destination network
+  // Example: 192.168.0.100/24
+  string destination = 1;
+  string via = 2;
+  string interface = 3;
+}
+
+message Interface {
+  // VLAN ID to tag traffic with
+  // Default: all traffic is untagged
+  uint32 vlan = 1;
+
+  // Additional static IPv4 address(es) to set
+  // Example: 192.168.0.100/24
+  // Default: No additional IPv4 addresses
+  repeated string ipv4_address = 2;
+
+  // Additional static IPv6 address(es) to set
+  // Example: fec0::100/64
+  // Default: No additional IPv6 addresses
+  repeated string ipv6_address = 3;
+
+}
+
+message Network {
+  // System's fully qualified hostname
+  // Example: rack01server02.mycompany.org
+  // Default: Get hostname from DHCPv4 or reverse DNS lookup
+  string hostname = 1;
+
+  // Network interface configuration mapped by interface name
+  // Default: Auto-configure eth0
+  map<string, Interface> interface = 2;
+
+  // Static IPv4 routes
+  // Default: No static IPv4 routes
+  repeated Route ipv4_route = 3;
+
+  // Static IPv6 routes
+  // Default: No static IPv6 routes
+  repeated Route ipv6_route = 4;
+}
+
+message SystemConfig {
+  Network network = 1;
+}

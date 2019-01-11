@@ -1,0 +1,16 @@
+# Example configuration
+network {
+  hostname: "ubmc.example.com"
+  interface {
+    key: "eth0"
+    value {
+      # vlan: 100
+      ipv4_address: "10.0.10.20/24"
+      # ipv6_address: "fd00::cafe/48"
+    }
+  }
+  ipv4_route {
+    destination: "0.0.0.0/0"
+    via: "10.0.10.1"
+  }
+}

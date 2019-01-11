@@ -1,4 +1,4 @@
-all: bmc.pb.go
+all: bmc.pb.go config.pb.go
 
-bmc.pb.go: bmc.proto
+%.pb.go: %.proto
 	protoc --go_out=plugins=grpc:. $?

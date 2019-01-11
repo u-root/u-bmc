@@ -11,6 +11,7 @@ import (
 	"net"
 	"time"
 
+	pb "github.com/u-root/u-bmc/proto"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -127,8 +128,17 @@ func ipv6LinkFixer(iface string) {
 	}
 }
 
-func ConfigureInterfaces() error {
-	unix.Sethostname([]byte("ubmc"))
+func ConfigureNetwork(config *pb.Network) error {
+	if config == nil {
+		log.Printf("No network configuration detected, using defaults")
+		config = &pb.Network{}
+	}
+
+	if config.Hostname != "" {
+		unix.Sethostname([]byte(config.Hostname))
+	} else {
+		unix.Sethostname([]byte("ubmc"))
+	}
 
 	// Fun story: if you don't have both IPv4 and IPv6 loopback configured
 	// golang binaries will not bind to :: but to 0.0.0.0 instead.
@@ -143,18 +153,37 @@ func ConfigureInterfaces() error {
 		return err
 	}
 
-	iface := "eth0"
-	if err := setLinkUp(iface); err != nil {
-		return err
+	for iface, ic := range config.Interface {
+		if ic.Vlan != 0 {
+			log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
+			continue
+		}
+		if err := setLinkUp(iface); err != nil {
+			return err
+		}
+
+		for _, ipv4 := range ic.Ipv4Address {
+			if err := addIp(ipv4, iface); err != nil {
+				log.Printf("Error adding IPv4 %s to interface %s: %v", ipv4, iface, err)
+			}
+		}
+		for _, ipv6 := range ic.Ipv6Address {
+			if err := addIp(ipv6, iface); err != nil {
+				log.Printf("Error adding IPv6 %s to interface %s: %v", ipv6, iface, err)
+			}
+		}
+
+		// If the MAC address changes on the interface the interface needs to be
+		// taken down and up again in order for all IPv6 addresses and things to be
+		// refreshed. MAC address changes happens when NC-SI reads the correct
+		// MAC address from the adapter, or a controller hotswap potentially.
+		go ipv6LinkFixer(iface)
 	}
-	if err := addIp("10.0.10.20/24", iface); err != nil {
-		return err
+
+	if len(config.Ipv4Route)+len(config.Ipv6Route) > 0 {
+		log.Printf("TODO: IP routes are configured but not supported yet")
 	}
-	// If the MAC address changes on the interface the interface needs to be
-	// taken down and up again in order for all IPv6 addresses and things to be
-	// refreshed. MAC address changes happens when NC-SI reads the correct
-	// MAC address from the adapter, or a controller hotswap potentially.
-	go ipv6LinkFixer(iface)
+
 	go func() {
 		c := make(chan *RDNSSOption)
 		go rdnss(c)
