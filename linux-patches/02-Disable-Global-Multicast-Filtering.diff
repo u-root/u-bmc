@@ -12,10 +12,10 @@ Signed-off-by: Christian Svensson <bluecmd@google.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index a91ee47e84b0..ae67b4f9a48b 100644
+index b5faf39812f5..3389b964af2b 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -868,7 +868,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
+@@ -871,7 +871,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
  			nca.type = NCSI_PKT_CMD_EBF;
  			nca.dwords[0] = nc->caps[NCSI_CAP_BC].cap;
  			nd->state = ncsi_dev_state_config_ecnt;
@@ -24,7 +24,7 @@ index a91ee47e84b0..ae67b4f9a48b 100644
  			if (ndp->inet6_addr_num > 0 &&
  			    (nc->caps[NCSI_CAP_GENERIC].cap &
  			     NCSI_CAP_GENERIC_MC))
-@@ -1370,7 +1370,7 @@ static int ncsi_inet6addr_event(struct notifier_block *this,
+@@ -1373,7 +1373,7 @@ static int ncsi_inet6addr_event(struct notifier_block *this,
  	switch (event) {
  	case NETDEV_UP:
  		action = (++ndp->inet6_addr_num) == 1;

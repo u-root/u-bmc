@@ -34,19 +34,19 @@ index 356af474e43c..9b7ebc6fe20c 100644
  	checksum = ncsi_calculate_checksum((unsigned char *)h,
  					   sizeof(*h) + nca->payload);
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index 256401f3c3cf..a91ee47e84b0 100644
+index 2c9bcb705460..b5faf39812f5 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -685,7 +685,6 @@ static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
- 	memset(data, 0, NCSI_OEM_MLX_CMD_GMA_LEN);
- 	*(unsigned int *)data = ntohl(NCSI_OEM_MFR_MLX_ID);
- 	data[5] = NCSI_OEM_MLX_CMD_GMA;
--	data[6] = NCSI_OEM_MLX_CMD_GMA_PARAM;
+@@ -688,7 +688,6 @@ static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
+ 	memset(&u, 0, sizeof(u));
+ 	u.data_u32[0] = ntohl(NCSI_OEM_MFR_MLX_ID);
+ 	u.data_u8[5] = NCSI_OEM_MLX_CMD_GMA;
+-	u.data_u8[6] = NCSI_OEM_MLX_CMD_GMA_PARAM;
  
- 	nca->data = data;
+ 	nca->data = u.data_u8;
  
 diff --git a/net/ncsi/ncsi-rsp.c b/net/ncsi/ncsi-rsp.c
-index 4680fb56e3d5..f65cd138b824 100644
+index ba9a4ba97c64..dcacc20cf804 100644
 --- a/net/ncsi/ncsi-rsp.c
 +++ b/net/ncsi/ncsi-rsp.c
 @@ -627,6 +627,8 @@ static int ncsi_rsp_handler_oem_mlx_gma(struct ncsi_request *nr)
@@ -57,7 +57,7 @@ index 4680fb56e3d5..f65cd138b824 100644
 +	saddr.sa_data[5] += 2;
  	ret = ops->ndo_set_mac_address(ndev, &saddr);
  	if (ret < 0)
- 		netdev_warn(ndev, "NCSI: Writing mac address to device failed\n");
+ 		netdev_warn(ndev, "NCSI: 'Writing mac address to device failed\n");
 @@ -644,8 +646,7 @@ static int ncsi_rsp_handler_oem_mlx(struct ncsi_request *nr)
  	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
  	mlx = (struct ncsi_rsp_oem_mlx_pkt *)(rsp->data);

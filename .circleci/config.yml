@@ -153,11 +153,11 @@ jobs:
             # Since linux is huge and we're tracking a branch, submodules
             # take a long time and we cannot use depth. Fetch the latest zip
             # instead
-            wget https://github.com/openbmc/linux/archive/dev-4.18.zip
-            unzip dev-4.18.zip
-            rm dev-4.18.zip
+            wget https://github.com/openbmc/linux/archive/dev-4.19.zip
+            unzip dev-4.19.zip
+            rm dev-4.19.zip
             rm -rf linux/
-            mv linux-dev-4.18/ linux/
+            mv linux-dev-4.19/ linux/
             (cd linux/; ../linux-patches/apply.sh)
             # TODO(bluecmd): https://github.com/u-root/u-root/issues/1024
             go get github.com/u-root/u-root
