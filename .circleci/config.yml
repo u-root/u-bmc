@@ -136,10 +136,8 @@ jobs:
           name: Compile qemu
           command: |
             git clone https://github.com/openbmc/qemu.git --depth 1
-            cd qemu
-            patch -p1 < ../qemu.patch
-            mkdir build
-            cd build
+            mkdir qemu/build
+            cd qemu/build
             ../configure --target-list=arm-softmmu
             make -j8
             sudo make install
