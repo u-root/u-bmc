@@ -11,8 +11,8 @@ Card](https://goreportcard.com/badge/github.com/u-root/u-bmc)](https://goreportc
 u-bmc uses u-root to create a Linux OS distribution that is fully open-source.
 
 u-bmc borrows and contributes to [OpenBMC](https://github.com/openbmc/openbmc) which has
-similar high-level goals, but chooses to pursue industry-standard compliance. Where
-OpenBMC uses IPMI, u-bmc uses gRPC.
+similar high-level goals. The main difference is that u-bmc chooses to challenge the industry status quo.
+E.g. where OpenBMC uses IPMI, u-bmc uses gRPC.
 
 # Demo
 
