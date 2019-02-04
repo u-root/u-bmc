@@ -1,8 +1,8 @@
-// Copyright 2018 the u-root Authors. All rights reserved
+// Copyright 2018-2019 the u-root Authors. All rights reserved
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Library for accessing AST2400 series BMC functions
+// Library for accessing AST2400/AST2500 series BMC functions
 //
 // Usually packages like these contain a notice to say use on your own risk
 // but this time, it's for real. During development of this library a lot of
@@ -14,7 +14,7 @@
 // is to call FreezeCpu(), do your thing, UnfreezeCpu() + ResetCpu(). That
 // should avoid any complications.
 //
-// Call ast2400.Open() and ast2400.Close() as the first and last thing
+// Call aspeed.Open() and aspeed.Close() as the first and last thing
 // before and after you want to run any library commands.
 //
 // The library supports being run both on the host CPU and the BMC CPU.
@@ -22,9 +22,11 @@
 // of the SuperIO. If that has been disabled, running on the host CPU will
 // not work.
 
-package ast2400
+package aspeed
 
-import ()
+import (
+	"fmt"
+)
 
 type Ast struct {
 	mem memProvider
@@ -34,8 +36,8 @@ func Open() *Ast {
 	mem := openMem()
 	a := &Ast{mem}
 
-	if a.ModelName() == "" {
-		panic("Could not detect supported SOC")
+	if _, err := a.ModelName(); err != nil {
+		panic(fmt.Sprintf("Could not detect supported SOC: %v", err))
 	}
 	return a
 }

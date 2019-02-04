@@ -1,4 +1,4 @@
-// Copyright 2018 the u-root Authors. All rights reserved
+// Copyright 2019 the u-root Authors. All rights reserved
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -12,7 +12,7 @@ var (
 	linePortMap = map[string]uint32{
 		"UNKN_BOOT1":          aspeed.GpioPort("A2"),
 		"UNKN_PWR_CAP":        aspeed.GpioPort("A3"),
-		"FAST_PROCHOT":        aspeed.GpioPort("B3"),
+		"Faspeed":             aspeed.GpioPort("B3"),
 		"CPU0_THERMTRIP_N":    aspeed.GpioPort("B5"),
 		"CPU1_THERMTRIP_N":    aspeed.GpioPort("B6"),
 		"MEMAB_MEMHOT_N":      aspeed.GpioPort("C2"),

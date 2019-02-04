@@ -1,0 +1,172 @@
+// SPDX-License-Identifier: GPL-2.0+
+/dts-v1/;
+
+#include "aspeed-g5.dtsi"
+#include "config.h"
+#include <dt-bindings/gpio/aspeed-gpio.h>
+
+/ {
+	model = "Tyan S1706";
+	compatible = "ocp,leopard-bmc", "aspeed,ast2500";
+
+	aliases {
+		con = &uart5;
+	};
+	chosen {
+		stdout-path = "con:57600n8";
+#ifdef BOOTLOADER
+		linux,initrd-start = <CONFIG_INITRD_START>;
+		linux,initrd-end = <CONFIG_INITRD_END>;
+#endif
+	};
+
+	memory@80000000 {
+		reg = <0x80000000 CONFIG_RAM_SIZE>;
+	};
+
+	// TODO(bluecmd): Remove when u-bmc sets the ilpc2ahb bits itself
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		flash_memory: region@98000000 {
+			no-map;
+			reg = <0x98000000 0x01000000>; /* 16MB */
+		};
+	};
+};
+
+&fmc {
+	status = "okay";
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		label = "bmc";
+		spi-max-frequency = <50000000>;
+#include "ubmc-flash-layout.dtsi"
+	};
+};
+
+#if 0
+&spi {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_spi1debug_default>;
+
+	flash@0 {
+		status = "okay";
+		m25p,fast-read;
+		spi-max-frequency = <50000000>;
+		label = "pnor";
+	};
+};
+
+&pinctrl {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_flbusy_default &pinctrl_flwp_default
+
+			&pinctrl_vgahs_default &pinctrl_vgavs_default
+			&pinctrl_ddcclk_default &pinctrl_ddcdat_default>;
+};
+#endif
+
+// /dev/ttyS4: BMC console UART
+&uart5 {
+	status = "okay";
+};
+
+#ifndef BOOTLOADER
+&pwm_tacho {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default>;
+	fan@0 {
+		reg = <0x00>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x00>;
+	};
+	fan@1 {
+		reg = <0x01>;
+		aspeed,fan-tach-ch = /bits/ 8 <0x02>;
+	};
+};
+
+// /dev/ttyS2: Host's ttyS1
+&uart3 {
+	status = "okay";
+};
+
+&mac0 {
+	status = "okay";
+
+	use-ncsi;
+
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_rmii1_default>;
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+};
+
+&i2c3 {
+	status = "okay";
+};
+
+&i2c4 {
+	status = "okay";
+};
+
+&i2c5 {
+	status = "okay";
+};
+
+&i2c6 {
+	status = "okay";
+	tmp421@4e {
+		compatible = "ti,tmp421";
+		reg = <0x4e>;
+	};
+	tmp421@4f {
+		compatible = "ti,tmp421";
+		reg = <0x4f>;
+	};
+};
+
+&i2c7 {
+	status = "okay";
+	hsc@11 {
+		compatible = "adi,adm1278";
+		reg = <0x11>;
+	};
+};
+
+// TODO(bluecmd): Right now this is needed in order to enable iLPC2AHB
+// for some reason. My understanding is that the FWH and L2H settings
+// should not affect iLPC2AHB, but they seem to.
+// Removing this stanza right now causes the BMC to not be reachable
+// over iLPC2AHB.
+#if 0
+&lpc_ctrl {
+	status = "okay";
+	memory-region = <&flash_memory>;
+	flash = <&spi>;
+};
+#endif
+
+&mbox {
+	status = "okay";
+};
+
+&rtc {
+	status = "okay";
+};
+#endif /* !BOOTLOADER */
