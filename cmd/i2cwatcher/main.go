@@ -8,7 +8,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/aspeed"
 )
 
 var (
@@ -40,7 +40,7 @@ var (
 
 func main() {
 	flag.Parse()
-	a := ast2400.Open()
+	a := aspeed.Open()
 	defer a.Close()
 
 	base := uintptr(0x1E78A000)

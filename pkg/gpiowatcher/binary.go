@@ -10,20 +10,20 @@ import (
 	"os"
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/aspeed"
 )
 
 type binaryLog struct {
 	f *os.File
 }
 
-func newBinaryLog(p *ast2400.State) *binaryLog {
+func newBinaryLog(p *aspeed.State) *binaryLog {
 	l := binaryLog{os.Stdout}
 	l.Log(p)
 	return &l
 }
 
-func (l *binaryLog) Log(s *ast2400.State) {
+func (l *binaryLog) Log(s *aspeed.State) {
 	err := binary.Write(l.f, binary.LittleEndian, int64(time.Now().Unix()))
 	if err != nil {
 		log.Fatalf("binary.Write failed: %v", err)
