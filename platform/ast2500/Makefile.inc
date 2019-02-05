@@ -1,0 +1,7 @@
+# Copyright 2019 u-root Authors
+#
+# Use of this source code is governed by a BSD-style
+# license that can be found in the LICENSE file
+
+ARCH := arm
+RAM_START := 0x80000000
