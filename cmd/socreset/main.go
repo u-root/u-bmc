@@ -7,15 +7,15 @@ package main
 import (
 	"fmt"
 
-	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/aspeed"
 )
 
 func main() {
-	a := ast2400.Open()
+	a := aspeed.Open()
 	defer a.Close()
 
-	a.SetResetControl(ast2400.SCU_DEFAULT_RESET)
-	fmt.Printf("SCU04: %08x\n", a.Mem().MustRead32(ast2400.SCU_BASE+0x4))
+	a.SetResetControl(aspeed.SCU_DEFAULT_RESET)
+	fmt.Printf("SCU04: %08x\n", a.Mem().MustRead32(aspeed.SCU_BASE+0x4))
 
 	a.ResetCpu()
 	a.UnfreezeCpu()
