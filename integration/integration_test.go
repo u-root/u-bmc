@@ -11,6 +11,8 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +34,25 @@ func init() {
 	qemu.DefaultTimeout = 30 * time.Second
 }
 
+// MakefileVars holds variables specified in u-bmc Makefile.
+type MakefileVars map[string]string
+
+// ReadMakefile reads a map of variables from the Makefile.
+func ReadMakefile() (MakefileVars, error) {
+	cmd := exec.Command("make", "-C", "..", "vars")
+	cmd.Stderr = os.Stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	re := regexp.MustCompile(`([^=\n]+)=([^\n]+)`)
+	m := MakefileVars{}
+	for _, v := range re.FindAllStringSubmatch(string(out), -1) {
+		m[v[1]] = v[2]
+	}
+	return m, nil
+}
+
 // Returns temporary directory and QEMU instance.
 //
 // - `uinitName` is the name of a directory containing uinit found at
@@ -42,6 +63,11 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 	}
 	if _, err := os.Stat("../boot/boot.bin"); err != nil {
 		t.Fatalf("u-bmc not built, cannot test")
+	}
+
+	makeVars, err := ReadMakefile()
+	if err != nil {
+		t.Fatalf("unable to read Makefile: %v", err)
 	}
 
 	// TempDir
@@ -74,10 +100,10 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 				},
 			},
 		},
-		TempDir:      tmpDir,
-		BaseArchive:  uroot.DefaultRamfs.Reader(),
-		OutputFile:   w,
-		InitCmd:      "init",
+		TempDir:     tmpDir,
+		BaseArchive: uroot.DefaultRamfs.Reader(),
+		OutputFile:  w,
+		InitCmd:     "init",
 	}
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 	if err := uroot.CreateInitramfs(logger, opts); err != nil {
@@ -92,11 +118,9 @@ func testWithQEMU(t *testing.T, uinitName string, logName string, extraEnv []str
 	build(t, tmpDir, makefile, extraEnv)
 
 	flash := filepath.Join(tmpDir, "flash.sim.img")
-	extraArgs := []string{
-		"-drive", "file=" + flash + ",format=raw,if=mtd",
-		"-M", "palmetto-bmc",
-		"-m", "256",
-	}
+	flags := makeVars["QEMUFLAGS"]
+	flags = strings.Replace(flags, "flash.sim.img", flash, 1)
+	extraArgs := strings.Fields(flags)
 
 	// Create file for serial logs.
 	if err := os.MkdirAll(logDir, 0755); err != nil {
