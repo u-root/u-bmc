@@ -1,8 +1,12 @@
-// Copyright 2018 the u-root Authors. All rights reserved
+// Copyright 2018-2019 the u-root Authors. All rights reserved
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package ast2400
+package aspeed
+
+import (
+	"fmt"
+)
 
 var (
 	scuRegs = map[uint32]string{
@@ -89,38 +93,40 @@ func (a *Ast) GetSiliconRevision() uint32 {
 	return a.Mem().MustRead32(SCU_BASE + 0x7C)
 }
 
-func (a *Ast) ModelName() string {
-	switch a.GetSiliconRevision() {
-	case 0x00000102:
-		return "AST2200-A0/A1"
-	case 0x00000200:
-		return "AST1100-A0 or AST2050-A0"
-	case 0x00000201:
-		return "AST1100-A1 or AST2050-A1"
-	case 0x00000202:
-		return "AST1100-A2/3 or AST2050-A2/3 or AST2150-A0/1"
-	case 0x00000300:
-		return "AST2100-A0"
-	case 0x00000301:
-		return "AST2100-A1"
-	case 0x00000302:
-		return "AST2100-A2/3"
-	case 0x01000003:
-		return "AST2300-A0"
-	case 0x01010003:
-		return "AST1300-A1"
-	case 0x01010203:
-		return "AST1050-A1"
-	case 0x01010303:
-		return "AST2300-A1"
-	case 0x02000303:
-		return "AST2400-A0"
-	case 0x02010103:
-		return "AST1400-A1"
-	case 0x02010303:
-		return "AST1250-A1 or AST2400-A1"
+func (a *Ast) ModelName() (string, error) {
+	names := map[uint32]string{
+		0x00000102: "AST2200-A0/A1",
+		0x00000200: "AST1100-A0 or AST2050-A0",
+		0x00000201: "AST1100-A1 or AST2050-A1",
+		0x00000202: "AST1100-A2/3 or AST2050-A2/3 or AST2150-A0/1",
+		0x00000300: "AST2100-A0",
+		0x00000301: "AST2100-A1",
+		0x00000302: "AST2100-A2/3",
+		0x01000003: "AST2300-A0",
+		0x01010003: "AST1300-A1",
+		0x01010203: "AST1050-A1",
+		0x01010303: "AST2300-A1",
+		0x02000303: "AST2400-A0",
+		0x02010103: "AST1400-A1",
+		0x02010303: "AST1250-A1 or AST2400-A1",
+		0x04000303: "AST2500-A0",
+		0x04000103: "AST2510-A0",
+		0x04000203: "AST2520-A0",
+		0x04000403: "AST2530-A0",
+		0x04010303: "AST2500-A1",
+		0x04010103: "AST2510-A1",
+		0x04010203: "AST2520-A1",
+		0x04010403: "AST2530-A1",
+		0x04030303: "AST2500-A2",
+		0x04030103: "AST2510-A2",
+		0x04030203: "AST2520-A2",
+		0x04030403: "AST2530-A2",
 	}
-	return ""
+	rev := a.GetSiliconRevision()
+	if name, ok := names[rev]; ok {
+		return name, nil
+	}
+	return "", fmt.Errorf("unknown revision %#08x", rev)
 }
 
 func (a *Ast) IsSpiMaster() bool {

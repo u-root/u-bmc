@@ -10,7 +10,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/aspeed"
 )
 
 type playback struct {
@@ -21,7 +21,7 @@ func (p *playback) Close() {
 	p.f.Close()
 }
 
-func (p *playback) SnapshotGpio() *ast2400.State {
+func (p *playback) SnapshotGpio() *aspeed.State {
 	var gpios uint32
 	var scus uint32
 	var unix int64
@@ -42,7 +42,7 @@ func (p *playback) SnapshotGpio() *ast2400.State {
 		log.Fatalf("binary.Read failed: %v", err)
 	}
 
-	s := ast2400.State{Gpio: make(map[uint32]uint32), Scu: make(map[uint32]uint32)}
+	s := aspeed.State{Gpio: make(map[uint32]uint32), Scu: make(map[uint32]uint32)}
 	for i := uint32(0); i < gpios; i++ {
 		var k uint32
 		var v uint32

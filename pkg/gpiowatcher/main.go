@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/aspeed"
 )
 
 type GpioPlatform interface {
@@ -18,14 +18,15 @@ type GpioPlatform interface {
 
 type snapshoter interface {
 	Close()
-	SnapshotGpio() *ast2400.State
+	SnapshotGpio() *aspeed.State
 }
 
 type outputer interface {
 	Close()
-	Log(s *ast2400.State)
+	Log(s *aspeed.State)
 }
 
+// TODO: Does this also support other platforms like ast2500?
 type ast2400Platform struct {
 	g GpioPlatform
 }
@@ -37,12 +38,12 @@ func NewAst2400Platform(g GpioPlatform) *ast2400Platform {
 func (a *ast2400Platform) PortName(p uint32) string {
 	n, ok := a.g.GpioPortToName(p)
 	if !ok {
-		n = ast2400.GpioPortToFunction(p)
+		n = aspeed.GpioPortToFunction(p)
 	}
 	return n
 }
 
-// TODO(bluecmd): Things are still very ast2400 centric, but at least
+// TODO(bluecmd): Things are still very aspeed centric, but at least
 // the interface to the platform implementions should be pretty stable.
 type platform interface {
 	PortName(p uint32) string
@@ -55,7 +56,7 @@ func Gpiowatcher(doBinaryLog bool, doPlayback bool, ignoreLines string, plt plat
 	if doPlayback {
 		a = &playback{os.Stdin}
 	} else {
-		a = ast2400.Open()
+		a = aspeed.Open()
 	}
 	defer a.Close()
 
