@@ -8,7 +8,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/aspeed"
 	"github.com/u-root/u-bmc/pkg/bmc"
 	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/gpio"
 
@@ -16,7 +16,7 @@ import (
 )
 
 type platform struct {
-	a *ast2400.Ast
+	a *aspeed.Ast
 	g *bmc.GpioSystem
 	gpio.Gpio
 }
@@ -120,19 +120,19 @@ func (p *platform) InitializeSystem() error {
 	// This can be done by defining the uart2 as active in the dts, but
 	// if we do that then /dev/ttyS1 might be confusing as it will not work
 	// properly.
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0, ast2400.SCU_PASSWORD)
-	csr := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x0c)
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0c, csr & ^uint32(1<<16))
+	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x0, aspeed.SCU_PASSWORD)
+	csr := p.a.Mem().MustRead32(aspeed.SCU_BASE + 0x0c)
+	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x0c, csr & ^uint32(1<<16))
 	// Enable UART1 and UART2 pins
-	mfr := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x84)
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x84, mfr|0xffff0000)
+	mfr := p.a.Mem().MustRead32(aspeed.SCU_BASE + 0x84)
+	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x84, mfr|0xffff0000)
 	// Disable all pass-through GPIO ports. This enables u-bmc to control
 	// the power buttons, which are routed as pass-through before boot has
 	// completed.
-	hws := p.a.Mem().MustRead32(ast2400.SCU_BASE + 0x70)
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x70, hws & ^uint32(3<<21))
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x8c, 0)
-	p.a.Mem().MustWrite32(ast2400.SCU_BASE+0x0, 0x0)
+	hws := p.a.Mem().MustRead32(aspeed.SCU_BASE + 0x70)
+	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x70, hws & ^uint32(3<<21))
+	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x8c, 0)
+	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x0, 0x0)
 
 	log.Printf("Setting up Network Controller Sideband Interface (NC-SI) for eth0")
 	go bmc.StartNcsi("eth0")
@@ -170,7 +170,7 @@ func (p *platform) Close() {
 }
 
 func Platform() *platform {
-	a := ast2400.Open()
+	a := aspeed.Open()
 	p := platform{a, nil, gpio.Gpio{}}
 	return &p
 }
