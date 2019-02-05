@@ -41,7 +41,7 @@ all: flash.img
 include $(ROOT_DIR)platform/$(PLATFORM)/Makefile.inc
 include $(ROOT_DIR)platform/$(SOC)/Makefile.inc
 
-.PHONY: sim all linux-menuconfig-% test
+.PHONY: sim all linux-menuconfig-% test vars
 
 u-bmc:
 	go get
@@ -225,6 +225,9 @@ initramfs.cpio: u-bmc ssh_keys.pub $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)pkg $(
 test:
 	go test $(TESTFLAGS) \
 		$(shell find */ -name \*.go | grep -v vendor | cut -f -1 -d '/' | sort -u | xargs -n1 -I{} echo ./{}/... | xargs)
+
+vars:
+	$(foreach var,$(.VARIABLES),$(info $(var)=$($(var))))
 
 clean:
 	\rm -f initramfs.cpio u-root \

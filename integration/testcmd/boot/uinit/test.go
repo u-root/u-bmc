@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/ast2400"
+	"github.com/u-root/u-bmc/pkg/aspeed"
 	"github.com/u-root/u-bmc/pkg/bmc"
 	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/platform"
 	"golang.org/x/sys/unix"
@@ -18,7 +18,7 @@ func main() {
 	p := platform.Platform()
 	defer p.Close()
 
-	a := ast2400.Open()
+	a := aspeed.Open()
 	defer a.Close()
 
 	if err := bmc.Startup(p); err != nil {
