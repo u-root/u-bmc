@@ -13,7 +13,10 @@ workflows:
       - compile:
           requires:
             - clean-code
-      - image:
+      - image-quanta:
+          requires:
+            - clean-code
+      - image-s1706:
           requires:
             - clean-code
   nightly:
@@ -26,7 +29,8 @@ workflows:
                 - master
     jobs:
       - compile
-      - image
+      - image-quanta
+      - image-s1706
 jobs:
   clean-code:
     docker:
@@ -120,7 +124,7 @@ jobs:
             go install -a ./...
             cd ../
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
-  image:
+  image-quanta: &image
     docker:
       - image: circleci/golang:1.11
     working_directory: /go/src/github.com/u-root/u-bmc
@@ -185,3 +189,8 @@ jobs:
           when: on_fail
       - store_artifacts:
           path: /tmp/integration-data/
+  image-s1706:
+    <<: *image
+    environment:
+      - CGO_ENABLED: 0
+      - PLATFORM: tyan-s1706
