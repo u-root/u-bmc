@@ -17,7 +17,6 @@ import (
 	"net"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	descpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
@@ -55,37 +54,40 @@ func GetAllFiles(source DescriptorSource) ([]*desc.FileDescriptor, error) {
 	var files []*desc.FileDescriptor
 	srcFiles, ok := source.(sourceWithFiles)
 
+	// If an error occurs, we still try to load as many files as we can, so that
+	// caller can decide whether to ignore error or not.
+	var firstError error
 	if ok {
-		var err error
-		files, err = srcFiles.GetAllFiles()
-		if err != nil {
-			return nil, err
-		}
+		files, firstError = srcFiles.GetAllFiles()
 	} else {
 		// Source does not implement GetAllFiles method, so use ListServices
 		// and grab files from there.
-		allFiles := map[string]*desc.FileDescriptor{}
 		svcNames, err := source.ListServices()
 		if err != nil {
-			return nil, err
-		}
-		for _, name := range svcNames {
-			d, err := source.FindSymbol(name)
-			if err != nil {
-				return nil, err
+			firstError = err
+		} else {
+			allFiles := map[string]*desc.FileDescriptor{}
+			for _, name := range svcNames {
+				d, err := source.FindSymbol(name)
+				if err != nil {
+					if firstError == nil {
+						firstError = err
+					}
+				} else {
+					addAllFilesToSet(d.GetFile(), allFiles)
+				}
 			}
-			addAllFilesToSet(d.GetFile(), allFiles)
-		}
-		files = make([]*desc.FileDescriptor, len(allFiles))
-		i := 0
-		for _, fd := range allFiles {
-			files[i] = fd
-			i++
+			files = make([]*desc.FileDescriptor, len(allFiles))
+			i := 0
+			for _, fd := range allFiles {
+				files[i] = fd
+				i++
+			}
 		}
 	}
 
 	sort.Sort(filesByName(files))
-	return files, nil
+	return files, firstError
 }
 
 type filesByName []*desc.FileDescriptor
@@ -516,6 +518,9 @@ func ClientTransportCredentials(insecureSkipVerify bool, cacertFile, clientCertF
 // client certs. The serverCertFile and serverKeyFile must both not be blank.
 func ServerTransportCredentials(cacertFile, serverCertFile, serverKeyFile string, requireClientCerts bool) (credentials.TransportCredentials, error) {
 	var tlsConf tls.Config
+	// TODO(jh): Remove this line once https://github.com/golang/go/issues/28779 is fixed
+	// in Go tip. Until then, the recently merged TLS 1.3 support breaks the TLS tests.
+	tlsConf.MaxVersion = tls.VersionTLS12
 
 	// Load the server certificates from disk
 	certificate, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
@@ -568,11 +573,8 @@ func BlockingDial(ctx context.Context, network, address string, creds credential
 		}
 	}
 
-	dialer := func(address string, timeout time.Duration) (net.Conn, error) {
-		ctx, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-
-		conn, err := (&net.Dialer{Cancel: ctx.Done()}).Dial(network, address)
+	dialer := func(ctx context.Context, address string) (net.Conn, error) {
+		conn, err := (&net.Dialer{}).DialContext(ctx, network, address)
 		if err != nil {
 			writeResult(err)
 			return nil, err
@@ -595,7 +597,7 @@ func BlockingDial(ctx context.Context, network, address string, creds credential
 		opts = append(opts,
 			grpc.WithBlock(),
 			grpc.FailOnNonTempDialError(true),
-			grpc.WithDialer(dialer),
+			grpc.WithContextDialer(dialer),
 			grpc.WithInsecure(), // we are handling TLS, so tell grpc not to
 		)
 		conn, err := grpc.DialContext(ctx, address, opts...)

@@ -49,6 +49,11 @@ files (containing compiled descriptors, produced by `protoc`) to `grpcurl`.
 
 Download the binary from the [releases](https://github.com/fullstorydev/grpcurl/releases) page.
 
+On macOS, `grpcurl` is available via Homebrew:
+```shell
+brew install grpcurl
+```
+
 ### From Source
 You can use the `go` tool to install `grpcurl`:
 ```shell
@@ -102,7 +107,7 @@ If you want to include `grpcurl` in a command pipeline, such as when using `jq` 
 create a request body, you can use `-d @`, which tells `grpcurl` to read the actual
 request body from stdin:
 ```shell
-grpcurl -d @ grpc.server.com:443 my.custom.server.Service/Method <<<EOM
+grpcurl -d @ grpc.server.com:443 my.custom.server.Service/Method <<EOM
 {
   "id": 1234,
   "tags": [

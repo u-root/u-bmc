@@ -74,6 +74,15 @@ func CheckDuration(d time.Duration) Option {
 	}
 }
 
+// SendTimeout set timeout for Send commands
+func SendTimeout(timeout time.Duration) Option {
+	return func(e *GExpect) Option {
+		prev := e.sendTimeout
+		e.sendTimeout = timeout
+		return SendTimeout(prev)
+	}
+}
+
 // Verbose enables/disables verbose logging of matches and sends.
 func Verbose(v bool) Option {
 	return func(e *GExpect) Option {
@@ -156,6 +165,17 @@ func SetEnv(env []string) Option {
 		prev := e.cmd.Env
 		e.cmd.Env = env
 		return SetEnv(prev)
+	}
+}
+
+// SetSysProcAttr sets the SysProcAttr syscall values for the spawned process. 
+// Because this modifies cmd, it will only work with the process spawners 
+// and not effect the GExpect option method.
+func SetSysProcAttr(args *syscall.SysProcAttr) Option {
+	return func(e *GExpect) Option {
+		prev := e.cmd.SysProcAttr
+		e.cmd.SysProcAttr = args
+		return SetSysProcAttr(prev)
 	}
 }
 
@@ -529,6 +549,8 @@ type GExpect struct {
 	cls func(*GExpect) error
 	// timeout contains the default timeout for a spawned command.
 	timeout time.Duration
+	// sendTimeout contains the default timeout for a send command.
+	sendTimeout time.Duration
 	// chkDuration contains the duration between checks for new incoming data.
 	chkDuration time.Duration
 	// verbose enables verbose logging.
@@ -1079,21 +1101,28 @@ func (e *GExpect) Send(in string) error {
 	if !e.check() {
 		return errors.New("expect: Process not running")
 	}
-	e.snd <- in
+
+	if e.sendTimeout == 0 {
+		e.snd <- in
+	} else {
+		select {
+		case <-time.After(e.sendTimeout):
+			return fmt.Errorf("send to spawned process command reached the timeout %v", e.sendTimeout)
+		case e.snd <- in:
+		}
+	}
+
 	if e.verbose {
 		if e.verboseWriter != nil {
 			vStr := fmt.Sprintln(term.Blue("Sent:").String() + fmt.Sprintf(" %q", in))
-			for n, bytesRead, err := 0, 0, error(nil); bytesRead < len(vStr); bytesRead += n {
-				n, err = e.verboseWriter.Write([]byte(vStr)[n:])
-				if err != nil {
-					log.Printf("Write to Verbose Writer failed: %v", err)
-					break
-				}
-				return nil
+			_, err := e.verboseWriter.Write([]byte(vStr))
+			if err != nil {
+				log.Printf("Write to Verbose Writer failed: %v", err)
 			}
 		}
 		log.Printf("Sent: %q", in)
 	}
+
 	return nil
 }
 
@@ -1153,7 +1182,7 @@ func (e *GExpect) read(done chan struct{}, ptySync *sync.WaitGroup) {
 	buf := make([]byte, bufferSize)
 	for {
 		nr, err := e.pty.Master.Read(buf)
-		if err != nil || !e.check() {
+		if err != nil && !e.check() {
 			if e.teeWriter != nil {
 				e.teeWriter.Close()
 			}
