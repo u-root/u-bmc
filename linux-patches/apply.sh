@@ -6,8 +6,8 @@
 
 dir=$(dirname $0)
 
-for i in $(ls ${dir}/*.diff)
+for i in $(ls ${dir}/*.patch)
 do
   echo "=> Applying ${i}"
-  patch -p1 < $i
+  git apply $i
 done

@@ -1,7 +1,7 @@
-From fb3b26177169b3389275447823507a72a9e1624e Mon Sep 17 00:00:00 2001
+From 995ba8a011d8c0ff6e33fed0aae0bbe3188ee9ce Mon Sep 17 00:00:00 2001
 From: Christian Svensson <bluecmd@google.com>
 Date: Sat, 10 Nov 2018 18:35:08 +0100
-Subject: [PATCH] arch: define aspeed SOC IO mapping
+Subject: [PATCH 3/3] arch: define aspeed SOC IO mapping
 
 Without this IO mapping early printk will simply not work after the
 paging and MMU has been setup.
@@ -18,7 +18,7 @@ Signed-off-by: Christian Svensson <bluecmd@google.com>
  create mode 100644 arch/arm/mach-aspeed/iomap.h
 
 diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index d1516f85f25d..360734ef70f2 100644
+index 9db3c584b2cb..6a6df0f1344a 100644
 --- a/arch/arm/Makefile
 +++ b/arch/arm/Makefile
 @@ -156,6 +156,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
@@ -113,5 +113,5 @@ index 000000000000..7ea5276f3892
 +#define AST_IO_VIRT 0xfe600000
 +#define AST_IO_SIZE 0x00200000
 -- 
-2.19.1.930.g4563a0d9d0-goog
+2.21.0.392.gf8f6787159e-goog
 

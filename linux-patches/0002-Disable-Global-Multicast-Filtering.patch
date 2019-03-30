@@ -1,7 +1,7 @@
-From 8a1698754b722761f58a110830b1ac5aeb560cfa Mon Sep 17 00:00:00 2001
+From 73613aa6ec71cb789b94a2f68b4cbf8a39d375bc Mon Sep 17 00:00:00 2001
 From: Christian Svensson <bluecmd@google.com>
 Date: Sat, 3 Nov 2018 22:50:04 +0100
-Subject: [PATCH] Disable Global Multicast Filtering
+Subject: [PATCH 2/3] Disable Global Multicast Filtering
 
 See https://github.com/u-root/u-bmc/issues/92.
 TL;DR: IPv6 breaks on at least Mellanox CX3.
@@ -12,19 +12,19 @@ Signed-off-by: Christian Svensson <bluecmd@google.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index b5faf39812f5..3389b964af2b 100644
+index 96a3018ee363..b6afd7fb0b20 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -871,7 +871,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
- 			nca.type = NCSI_PKT_CMD_EBF;
- 			nca.dwords[0] = nc->caps[NCSI_CAP_BC].cap;
- 			nd->state = ncsi_dev_state_config_ecnt;
+@@ -1040,7 +1040,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
+ 				nd->state = ncsi_dev_state_config_ecnt;
+ 			else
+ 				nd->state = ncsi_dev_state_config_ec;
 -#if IS_ENABLED(CONFIG_IPV6)
 +#if 0
  			if (ndp->inet6_addr_num > 0 &&
  			    (nc->caps[NCSI_CAP_GENERIC].cap &
  			     NCSI_CAP_GENERIC_MC))
-@@ -1373,7 +1373,7 @@ static int ncsi_inet6addr_event(struct notifier_block *this,
+@@ -1507,7 +1507,7 @@ static int ncsi_inet6addr_event(struct notifier_block *this,
  	switch (event) {
  	case NETDEV_UP:
  		action = (++ndp->inet6_addr_num) == 1;
@@ -34,5 +34,5 @@ index b5faf39812f5..3389b964af2b 100644
  	case NETDEV_DOWN:
  		action = (--ndp->inet6_addr_num == 0);
 -- 
-2.19.1.930.g4563a0d9d0-goog
+2.21.0.392.gf8f6787159e-goog
 
