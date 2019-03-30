@@ -2,6 +2,7 @@ package genetlink
 
 import (
 	"syscall"
+	"time"
 
 	"github.com/mdlayher/netlink"
 	"golang.org/x/net/bpf"
@@ -43,8 +44,10 @@ func (c *Conn) Close() error {
 	return c.c.Close()
 }
 
-// GetFamily retrieves a generic netlink family with the specified name.  If the
-// family does not exist, the error value can be checked using os.IsNotExist.
+// GetFamily retrieves a generic netlink family with the specified name.
+//
+// If the family does not exist, the error value can be checked using
+// netlink.IsNotExist.
 func (c *Conn) GetFamily(name string) (Family, error) {
 	return c.getFamily(name)
 }
@@ -94,8 +97,10 @@ func (c *Conn) SetWriteBuffer(bytes int) error {
 // SyscallConn returns a raw network connection. This implements the
 // syscall.Conn interface.
 //
-// Only the Control method of the returned syscall.RawConn is currently
-// implemented.
+// On Go 1.12+, all methods of the returned syscall.RawConn are supported and
+// the Conn is integrated with the runtime network poller. On versions of Go
+// prior to Go 1.12, only the Control method of the returned syscall.RawConn
+// is implemented.
 //
 // SyscallConn is intended for advanced use cases, such as getting and setting
 // arbitrary socket options using the netlink socket's file descriptor.
@@ -105,6 +110,30 @@ func (c *Conn) SetWriteBuffer(bytes int) error {
 // each other.
 func (c *Conn) SyscallConn() (syscall.RawConn, error) {
 	return c.c.SyscallConn()
+}
+
+// SetDeadline sets the read and write deadlines associated with the connection.
+//
+// Deadline functionality is only supported on Go 1.12+. Calling this function
+// on older versions of Go will result in an error.
+func (c *Conn) SetDeadline(t time.Time) error {
+	return c.c.SetDeadline(t)
+}
+
+// SetReadDeadline sets the read deadline associated with the connection.
+//
+// Deadline functionality is only supported on Go 1.12+. Calling this function
+// on older versions of Go will result in an error.
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return c.c.SetReadDeadline(t)
+}
+
+// SetWriteDeadline sets the write deadline associated with the connection.
+//
+// Deadline functionality is only supported on Go 1.12+. Calling this function
+// on older versions of Go will result in an error.
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	return c.c.SetWriteDeadline(t)
 }
 
 // Send sends a single Message to netlink, wrapping it in a netlink.Message

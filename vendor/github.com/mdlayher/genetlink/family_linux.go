@@ -37,7 +37,7 @@ func (c *Conn) getFamily(name string) (Family, error) {
 		Data: b,
 	}
 
-	msgs, err := c.Execute(req, unix.GENL_ID_CTRL, netlink.HeaderFlagsRequest)
+	msgs, err := c.Execute(req, unix.GENL_ID_CTRL, netlink.Request)
 	if err != nil {
 		return Family{}, err
 	}
@@ -67,7 +67,7 @@ func (c *Conn) listFamilies() ([]Family, error) {
 		},
 	}
 
-	flags := netlink.HeaderFlagsRequest | netlink.HeaderFlagsDump
+	flags := netlink.Request | netlink.Dump
 	msgs, err := c.Execute(req, unix.GENL_ID_CTRL, flags)
 	if err != nil {
 		return nil, err

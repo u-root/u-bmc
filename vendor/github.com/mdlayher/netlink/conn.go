@@ -2,7 +2,6 @@ package netlink
 
 import (
 	"errors"
-	"io"
 	"math/rand"
 	"os"
 	"sync/atomic"
@@ -10,24 +9,6 @@ import (
 	"time"
 
 	"golang.org/x/net/bpf"
-)
-
-// Error messages which can be returned by Validate.
-var (
-	errMismatchedSequence = errors.New("mismatched sequence in netlink reply")
-	errMismatchedPID      = errors.New("mismatched PID in netlink reply")
-	errShortErrorMessage  = errors.New("not enough data for netlink error code")
-)
-
-// Errors which can be returned by a Socket that does not implement
-// all exposed methods of Conn.
-var (
-	errReadWriteCloserNotSupported = errors.New("raw read/write/closer not supported")
-	errMulticastGroupsNotSupported = errors.New("multicast groups not supported")
-	errBPFFiltersNotSupported      = errors.New("BPF filters not supported")
-	errOptionsNotSupported         = errors.New("options not supported")
-	errSetBufferNotSupported       = errors.New("setting buffer sizes not supported")
-	errSyscallConnNotSupported     = errors.New("syscall.RawConn operation not supported")
 )
 
 // A Conn is a connection to netlink.  A Conn can be used to send and
@@ -109,7 +90,7 @@ func (c *Conn) debug(fn func(d *debugger)) {
 
 // Close closes the connection.
 func (c *Conn) Close() error {
-	return c.sock.Close()
+	return newOpError("close", c.sock.Close())
 }
 
 // Execute sends a single Message to netlink using Conn.Send, receives one or more
@@ -176,7 +157,7 @@ func (c *Conn) SendMessages(messages []Message) ([]Message, error) {
 			d.debugf(1, "send msgs: err: %v", err)
 		})
 
-		return nil, err
+		return nil, newOpError("send-messages", err)
 	}
 
 	return messages, nil
@@ -214,7 +195,7 @@ func (c *Conn) Send(message Message) (Message, error) {
 			d.debugf(1, "send: err: %v", err)
 		})
 
-		return Message{}, err
+		return Message{}, newOpError("send", err)
 	}
 
 	return message, nil
@@ -248,7 +229,7 @@ func (c *Conn) Receive() ([]Message, error) {
 
 	// Trim the final message with multi-part done indicator if
 	// present.
-	if m := msgs[len(msgs)-1]; m.Header.Flags&HeaderFlagsMulti != 0 && m.Header.Type == HeaderTypeDone {
+	if m := msgs[len(msgs)-1]; m.Header.Flags&Multi != 0 && m.Header.Type == Done {
 		return msgs[:len(msgs)-1], nil
 	}
 
@@ -258,11 +239,18 @@ func (c *Conn) Receive() ([]Message, error) {
 // receive is the internal implementation of Conn.Receive, which can be called
 // recursively to handle multi-part messages.
 func (c *Conn) receive() ([]Message, error) {
+	// NB: All non-nil errors returned from this function *must* be of type
+	// OpError in order to maintain the appropriate contract with callers of
+	// this package.
+	//
+	// This contract also applies to functions called within this function,
+	// such as checkMessage.
+
 	var res []Message
 	for {
 		msgs, err := c.sock.Receive()
 		if err != nil {
-			return nil, err
+			return nil, newOpError("receive", err)
 		}
 
 		// If this message is multi-part, we will need to perform an recursive call
@@ -275,14 +263,14 @@ func (c *Conn) receive() ([]Message, error) {
 			}
 
 			// Does this message indicate a multi-part message?
-			if m.Header.Flags&HeaderFlagsMulti == 0 {
+			if m.Header.Flags&Multi == 0 {
 				// No, check the next messages.
 				continue
 			}
 
 			// Does this message indicate the last message in a series of
 			// multi-part messages from a single read?
-			multi = m.Header.Type != HeaderTypeDone
+			multi = m.Header.Type != Done
 		}
 
 		res = append(res, msgs...)
@@ -292,51 +280,6 @@ func (c *Conn) receive() ([]Message, error) {
 			return res, nil
 		}
 	}
-}
-
-// An fder is a Socket that supports retrieving its raw file descriptor.
-type fder interface {
-	Socket
-	FD() int
-}
-
-var _ io.ReadWriteCloser = &fileReadWriteCloser{}
-
-// A fileReadWriteCloser is a limited *os.File which only allows access to its
-// Read and Write methods.
-type fileReadWriteCloser struct {
-	f *os.File
-}
-
-// Read implements io.ReadWriteCloser.
-func (rwc *fileReadWriteCloser) Read(b []byte) (int, error) { return rwc.f.Read(b) }
-
-// Write implements io.ReadWriteCloser.
-func (rwc *fileReadWriteCloser) Write(b []byte) (int, error) { return rwc.f.Write(b) }
-
-// Close implements io.ReadWriteCloser.
-func (rwc *fileReadWriteCloser) Close() error { return rwc.f.Close() }
-
-// ReadWriteCloser returns a raw io.ReadWriteCloser backed by the connection
-// of the Conn.
-//
-// ReadWriteCloser is intended for advanced use cases, such as those that do
-// not involve standard netlink message passing.
-//
-// Once invoked, it is the caller's responsibility to ensure that operations
-// performed using Conn and the raw io.ReadWriteCloser do not conflict with
-// each other.  In almost all scenarios, only one of the two should be used.
-func (c *Conn) ReadWriteCloser() (io.ReadWriteCloser, error) {
-	fc, ok := c.sock.(fder)
-	if !ok {
-		return nil, errReadWriteCloserNotSupported
-	}
-
-	return &fileReadWriteCloser{
-		// Backing the io.ReadWriteCloser with an *os.File enables easy reading
-		// and writing without more system call boilerplate.
-		f: os.NewFile(uintptr(fc.FD()), "netlink"),
-	}, nil
 }
 
 // A groupJoinLeaver is a Socket that supports joining and leaving
@@ -349,22 +292,22 @@ type groupJoinLeaver interface {
 
 // JoinGroup joins a netlink multicast group by its ID.
 func (c *Conn) JoinGroup(group uint32) error {
-	gc, ok := c.sock.(groupJoinLeaver)
+	conn, ok := c.sock.(groupJoinLeaver)
 	if !ok {
-		return errMulticastGroupsNotSupported
+		return notSupported("join-group")
 	}
 
-	return gc.JoinGroup(group)
+	return newOpError("join-group", conn.JoinGroup(group))
 }
 
 // LeaveGroup leaves a netlink multicast group by its ID.
 func (c *Conn) LeaveGroup(group uint32) error {
-	gc, ok := c.sock.(groupJoinLeaver)
+	conn, ok := c.sock.(groupJoinLeaver)
 	if !ok {
-		return errMulticastGroupsNotSupported
+		return notSupported("leave-group")
 	}
 
-	return gc.LeaveGroup(group)
+	return newOpError("leave-group", conn.LeaveGroup(group))
 }
 
 // A bpfSetter is a Socket that supports setting and removing BPF filters.
@@ -376,22 +319,69 @@ type bpfSetter interface {
 
 // SetBPF attaches an assembled BPF program to a Conn.
 func (c *Conn) SetBPF(filter []bpf.RawInstruction) error {
-	bc, ok := c.sock.(bpfSetter)
+	conn, ok := c.sock.(bpfSetter)
 	if !ok {
-		return errBPFFiltersNotSupported
+		return notSupported("set-bpf")
 	}
 
-	return bc.SetBPF(filter)
+	return newOpError("set-bpf", conn.SetBPF(filter))
 }
 
 // RemoveBPF removes a BPF filter from a Conn.
 func (c *Conn) RemoveBPF() error {
-	s, ok := c.sock.(bpfSetter)
+	conn, ok := c.sock.(bpfSetter)
 	if !ok {
-		return errBPFFiltersNotSupported
+		return notSupported("remove-bpf")
 	}
 
-	return s.RemoveBPF()
+	return newOpError("remove-bpf", conn.RemoveBPF())
+}
+
+// A deadlineSetter is a Socket that supports setting deadlines.
+type deadlineSetter interface {
+	Socket
+	SetDeadline(time.Time) error
+	SetReadDeadline(time.Time) error
+	SetWriteDeadline(time.Time) error
+}
+
+// SetDeadline sets the read and write deadlines associated with the connection.
+//
+// Deadline functionality is only supported on Go 1.12+. Calling this function
+// on older versions of Go will result in an error.
+func (c *Conn) SetDeadline(t time.Time) error {
+	conn, ok := c.sock.(deadlineSetter)
+	if !ok {
+		return notSupported("set-deadline")
+	}
+
+	return newOpError("set-deadline", conn.SetDeadline(t))
+}
+
+// SetReadDeadline sets the read deadline associated with the connection.
+//
+// Deadline functionality is only supported on Go 1.12+. Calling this function
+// on older versions of Go will result in an error.
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	conn, ok := c.sock.(deadlineSetter)
+	if !ok {
+		return notSupported("set-read-deadline")
+	}
+
+	return newOpError("set-read-deadline", conn.SetReadDeadline(t))
+}
+
+// SetWriteDeadline sets the write deadline associated with the connection.
+//
+// Deadline functionality is only supported on Go 1.12+. Calling this function
+// on older versions of Go will result in an error.
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	conn, ok := c.sock.(deadlineSetter)
+	if !ok {
+		return notSupported("set-write-deadline")
+	}
+
+	return newOpError("set-write-deadline", conn.SetWriteDeadline(t))
 }
 
 // A ConnOption is a boolean option that may be set for a Conn.
@@ -415,12 +405,12 @@ type optionSetter interface {
 
 // SetOption enables or disables a netlink socket option for the Conn.
 func (c *Conn) SetOption(option ConnOption, enable bool) error {
-	fc, ok := c.sock.(optionSetter)
+	conn, ok := c.sock.(optionSetter)
 	if !ok {
-		return errOptionsNotSupported
+		return notSupported("set-option")
 	}
 
-	return fc.SetOption(option, enable)
+	return newOpError("set-option", conn.SetOption(option, enable))
 }
 
 // A bufferSetter is a Socket that supports setting connection buffer sizes.
@@ -435,10 +425,10 @@ type bufferSetter interface {
 func (c *Conn) SetReadBuffer(bytes int) error {
 	conn, ok := c.sock.(bufferSetter)
 	if !ok {
-		return errSetBufferNotSupported
+		return notSupported("set-read-buffer")
 	}
 
-	return conn.SetReadBuffer(bytes)
+	return newOpError("set-read-buffer", conn.SetReadBuffer(bytes))
 }
 
 // SetWriteBuffer sets the size of the operating system's transmit buffer
@@ -446,10 +436,16 @@ func (c *Conn) SetReadBuffer(bytes int) error {
 func (c *Conn) SetWriteBuffer(bytes int) error {
 	conn, ok := c.sock.(bufferSetter)
 	if !ok {
-		return errSetBufferNotSupported
+		return notSupported("set-write-buffer")
 	}
 
-	return conn.SetWriteBuffer(bytes)
+	return newOpError("set-write-buffer", conn.SetWriteBuffer(bytes))
+}
+
+// A filer is a Socket that supports retrieving its associated *os.File.
+type filer interface {
+	Socket
+	File() *os.File
 }
 
 var _ syscall.Conn = &Conn{}
@@ -460,8 +456,10 @@ var _ syscall.Conn = &Conn{}
 // SyscallConn returns a raw network connection. This implements the
 // syscall.Conn interface.
 //
-// Only the Control method of the returned syscall.RawConn is currently
-// implemented.
+// On Go 1.12+, all methods of the returned syscall.RawConn are supported and
+// the Conn is integrated with the runtime network poller. On versions of Go
+// prior to Go 1.12, only the Control method of the returned syscall.RawConn
+// is implemented.
 //
 // SyscallConn is intended for advanced use cases, such as getting and setting
 // arbitrary socket options using the netlink socket's file descriptor.
@@ -470,32 +468,13 @@ var _ syscall.Conn = &Conn{}
 // performed using Conn and the syscall.RawConn do not conflict with
 // each other.
 func (c *Conn) SyscallConn() (syscall.RawConn, error) {
-	conn, ok := c.sock.(fder)
+	fc, ok := c.sock.(filer)
 	if !ok {
-		return nil, errSyscallConnNotSupported
+		return nil, notSupported("syscall-conn")
 	}
 
-	return &rawConn{
-		fd: uintptr(conn.FD()),
-	}, nil
+	return newRawConn(fc.File())
 }
-
-var _ syscall.RawConn = &rawConn{}
-
-// A rawConn is a syscall.RawConn.
-type rawConn struct {
-	fd uintptr
-}
-
-func (rc *rawConn) Control(f func(fd uintptr)) error {
-	f(rc.fd)
-	return nil
-}
-
-// TODO(mdlayher): implement Read and Write?
-
-func (rc *rawConn) Read(_ func(fd uintptr) (done bool)) error  { return errSyscallConnNotSupported }
-func (rc *rawConn) Write(_ func(fd uintptr) (done bool)) error { return errSyscallConnNotSupported }
 
 // nextSequence atomically increments Conn's sequence number and returns
 // the incremented value.
@@ -511,7 +490,7 @@ func Validate(request Message, replies []Message) error {
 		//   - request had no sequence, meaning we are probably validating
 		//     a multicast reply
 		if m.Header.Sequence != request.Header.Sequence && request.Header.Sequence != 0 {
-			return errMismatchedSequence
+			return newOpError("validate", errMismatchedSequence)
 		}
 
 		// Check for mismatched PID, unless:
@@ -520,7 +499,7 @@ func Validate(request Message, replies []Message) error {
 		//     - netlink has not yet assigned us a PID
 		//   - response had no PID, meaning it's from the kernel as a multicast reply
 		if m.Header.PID != request.Header.PID && request.Header.PID != 0 && m.Header.PID != 0 {
-			return errMismatchedPID
+			return newOpError("validate", errMismatchedPID)
 		}
 	}
 

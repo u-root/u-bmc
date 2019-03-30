@@ -49,7 +49,7 @@ func (a *Attribute) unmarshal(b []byte) error {
 	a.Length = nlenc.Uint16(b[0:2])
 	a.Type = nlenc.Uint16(b[2:4])
 
-	if nlaAlign(int(a.Length)) > len(b) {
+	if int(a.Length) > len(b) {
 		return errInvalidAttribute
 	}
 
@@ -107,7 +107,7 @@ func UnmarshalAttributes(b []byte) ([]Attribute, error) {
 	var attrs []Attribute
 	var i int
 	for {
-		if len(b[i:]) == 0 {
+		if i > len(b) || len(b[i:]) == 0 {
 			break
 		}
 
@@ -180,12 +180,8 @@ func (ad *AttributeDecoder) Next() bool {
 
 	ad.i++
 
-	if len(ad.attrs) < ad.i {
-		// No more attributes, stop iteration.
-		return false
-	}
-
-	return true
+	// More attributes?
+	return len(ad.attrs) >= ad.i
 }
 
 // Type returns the Attribute.Type field of the current netlink attribute

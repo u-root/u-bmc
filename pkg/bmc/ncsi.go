@@ -135,7 +135,7 @@ func StartNcsi(iface string) {
 			Data: ed,
 		}
 
-		msgs, err := c.Execute(req, family.ID, netlink.HeaderFlagsRequest|netlink.HeaderFlagsDump)
+		msgs, err := c.Execute(req, family.ID, netlink.Request|netlink.Dump)
 		if err != nil {
 			log.Printf("execute NCSI dump: %v", err)
 			return

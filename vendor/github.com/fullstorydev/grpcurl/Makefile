@@ -6,7 +6,7 @@ dev_build_version=$(shell git describe --tags --always --dirty)
 # they are just too noisy to be a requirement for a CI -- we don't even *want*
 # to fix some of the things they consider to be violations.
 .PHONY: ci
-ci: deps checkgofmt vet staticcheck unused ineffassign predeclared test
+ci: deps checkgofmt vet staticcheck ineffassign predeclared test
 
 .PHONY: deps
 deps:
@@ -36,15 +36,18 @@ checkgofmt:
 vet:
 	go vet ./...
 
+# TODO: remove the ignored check; need it for now because it
+# is complaining about a deprecated comment added to grpc,
+# but it's not yet released. Once the new (non-deprecated)
+# API is included in a release, we can move to that new
+# version and fix the call site to no longer use deprecated
+# method.
+# This all works fine with Go modules, but without modules,
+# CI is just getting latest master for dependencies like grpc.
 .PHONY: staticcheck
 staticcheck:
 	@go get honnef.co/go/tools/cmd/staticcheck
 	staticcheck ./...
-
-.PHONY: unused
-unused:
-	@go get honnef.co/go/tools/cmd/unused
-	unused ./...
 
 .PHONY: ineffassign
 ineffassign:
@@ -63,7 +66,7 @@ golint:
 	golint -min_confidence 0.9 -set_exit_status ./...
 
 # Intentionally omitted from CI, but target here for ad-hoc reports.
-.PHONY: errchack
+.PHONY: errcheck
 errcheck:
 	@go get github.com/kisielk/errcheck
 	errcheck ./...
