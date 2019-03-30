@@ -30,14 +30,14 @@ workflows:
 jobs:
   clean-code:
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     working_directory: /go/src/github.com/u-root/u-bmc
     steps:
       - checkout
       - run:
           name: Install dep
           command: |
-            wget https://github.com/golang/dep/releases/download/v0.5.0/dep-linux-amd64
+            wget https://github.com/golang/dep/releases/download/v0.5.1/dep-linux-amd64
             mv dep-linux-amd64 dep
             chmod +x dep
       - run:
@@ -57,8 +57,13 @@ jobs:
               exit 1
             fi
       - run:
+          name: Create test key
+          command: |
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+            go generate ./config/
+      - run:
           name: vet
-          command: go tool vet cmd pkg
+          command: go vet $(go list ./... | grep -v /vendor/)
       - run:
           name: gofmt
           command: test -z $(gofmt -s -l $(go list ./... | grep -v /vendor/))
@@ -67,7 +72,7 @@ jobs:
           command: ineffassign .
   test:
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -86,7 +91,7 @@ jobs:
           command: make test TESTFLAGS=-cover
   race:
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 1
@@ -102,7 +107,7 @@ jobs:
           command: make test TESTFLAGS=-race
   compile:
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -122,7 +127,7 @@ jobs:
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
