@@ -31,7 +31,7 @@ const (
 
 func init() {
 	// Allow 30 seconds * TimeoutMultiplier (2.0 right now) timeout for tests
-	qemu.DefaultTimeout = 30 * time.Second
+	qemu.DefaultTimeout = 60 * time.Second
 }
 
 type Options urootint.Options
@@ -105,8 +105,9 @@ func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 	if _, ok := os.LookupEnv("UBMC_NATIVE_QEMU"); !ok {
 		t.Skip("test is skipped unless UBMC_NATIVE_QEMU is set")
 	}
-	if _, ok := os.LookupEnv("UBMC_NATIVE_BZIMAGE"); !ok {
-		t.Skip("test is skipped unless UBMC_NATIVE_BZIMAGE is set")
+	kernel, err := filepath.Abs("bzImage")
+	if err != nil {
+		t.Skip("test is skipped unless bzImage is built")
 	}
 
 	// TempDir
@@ -125,7 +126,7 @@ func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 	i := buildInitramfs(t, tmpDir, o)
 	q := &qemu.Options{
 		Initramfs: i,
-		Kernel:    os.Getenv("UBMC_NATIVE_BZIMAGE"),
+		Kernel:    kernel,
 		QEMUPath:  os.Getenv("UBMC_NATIVE_QEMU"),
 	}
 	vm, vmCleanup := qemuTest(t, q, o)

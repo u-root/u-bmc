@@ -180,7 +180,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:09abea8b3a58e5a374839129d313dbbf58f54158d71a531a0f3662a6d4bece39"
+  digest = "1:982cccc55f96dde419f6ab275639093613cf3857abc331c860548578d0495eaa"
   name = "github.com/u-root/u-root"
   packages = [
     "integration",
@@ -201,7 +201,7 @@
     "pkg/uroot/logger",
   ]
   pruneopts = "UT"
-  revision = "87d39765cda02b84f301d4436660d5e547523a54"
+  revision = "f721362de6ddde70d26d7e7bd7eb2696a91aca8a"
 
 [[projects]]
   branch = "master"

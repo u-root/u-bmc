@@ -59,7 +59,7 @@ To give you some sense of what we want to create:
 
 Prerequisites:
 ```
-sudo apt-get install gcc-arm-none-eabi mtd-utils golang-1.12 fakeroot flex bison device-tree-compiler bc libssl-dev
+sudo apt install gcc-arm-none-eabi mtd-utils golang-1.12 fakeroot flex bison device-tree-compiler bc libssl-dev libelf-dev qemu-kvm
 ```
 
 Clone:
@@ -97,7 +97,9 @@ make sim
 
 To run the integration tests:
 ```
+make integration/bzImage
 export UBMC_QEMU=qemu-system-arm
+export UBMC_NATIVE_QEMU=kvm
 cd integration
 go test
 ```
