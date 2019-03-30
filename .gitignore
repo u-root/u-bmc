@@ -12,6 +12,7 @@ boot/kexec
 *.img
 .*.sw*
 root/
+integration/bzImage
 integration/serial/
 initramfs.cpio
 initramfs.cpio.tmp

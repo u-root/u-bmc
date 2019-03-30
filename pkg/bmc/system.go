@@ -52,7 +52,7 @@ var (
 	systemVersion = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "ubmc",
 		Subsystem: "system",
-		Name:      "vesion",
+		Name:      "version",
 		Help:      "u-bmc version metric",
 	}, []string{"version"})
 	systemHasTime = prometheus.NewGauge(prometheus.GaugeOpts{
