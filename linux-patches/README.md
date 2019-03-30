@@ -2,3 +2,12 @@
 
 These are patches that are in the process of being upstreamed but needs to
 be patched now to support some critical functionallity.
+
+## Updating patches
+
+Use `git am` to apply patches, then use the following command to update
+the patch files:
+
+```
+git format-patch origin -o ../linux-patches
+```
