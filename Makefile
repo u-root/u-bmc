@@ -13,8 +13,9 @@ QEMU ?= qemu-system-arm
 # - unimp, show things that the VM tries to do but isn't implemented in QEMU
 # Run "make QEMUDEBUGFLAGS='-d help' sim" for more flags
 QEMUDEBUGFLAGS ?= -d guest_errors
-QEMUFLAGS ?= -nographic \
+QEMUFLAGS ?= -display none \
 	-drive file=flash.sim.img,format=raw,if=mtd \
+	-chardev socket,id=host,path=host.uart,server,nowait \
 	${QEMUDEBUGFLAGS}
 MAKE_JOBS ?= -j8
 ABS_ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))/
