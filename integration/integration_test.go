@@ -5,7 +5,6 @@
 package integration
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -36,31 +35,7 @@ func init() {
 
 type Options urootint.Options
 
-type FlashDevice struct {
-	Image string
-}
-
-func (d FlashDevice) Cmdline() []string {
-	return []string{"-drive", "file=" + d.Image + ",format=raw,if=mtd"}
-}
-
-type MemoryDevice struct {
-	MB int
-}
-
-func (d MemoryDevice) Cmdline() []string {
-	return []string{"-m", fmt.Sprintf("%d", d.MB)}
-}
-
-type MachineDevice struct {
-	Board string
-}
-
-func (d MachineDevice) Cmdline() []string {
-	return []string{"-M", d.Board}
-}
-
-func BMCTest(t *testing.T, o *Options) (*qemu.VM, func()) {
+func BMCTest(t *testing.T, o *Options) (*TestVM, func()) {
 	if _, ok := os.LookupEnv("UBMC_QEMU"); !ok {
 		t.Skip("test is skipped unless UBMC_QEMU is set")
 	}
@@ -84,6 +59,7 @@ func BMCTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 
 	_ = buildInitramfs(t, tmpDir, o)
 	flash := buildFlash(t, tmpDir, o)
+	monsock := filepath.Join(tmpDir, "qmp.sock")
 	q := &qemu.Options{
 		QEMUPath: os.Getenv("UBMC_QEMU"),
 		// TODO(bluecmd): Right now only one platform is supported for tests
@@ -91,14 +67,31 @@ func BMCTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 			MachineDevice{"palmetto-bmc"},
 			MemoryDevice{128},
 			FlashDevice{flash},
+			QemuMonitorDevice{monsock},
 		},
 	}
 	vm, vmCleanup := qemuTest(t, q, o)
-
-	return vm, func() {
+	cleanup := func() {
 		vmCleanup()
 		dirCleanup(t, tmpDir)
 	}
+	// Wait for monitor socket to show up
+	for i := range []int{100, 500, 1000, 5000, -1} {
+		if _, err := os.Stat(monsock); !os.IsNotExist(err) {
+			break
+		}
+		if i == -1 {
+			t.Fatalf("Timed out waiting for monitor socket to appear")
+		}
+		time.Sleep(time.Duration(i) * time.Millisecond)
+	}
+	tvm, err := NewTestVM(vm, monsock, cleanup)
+	if err != nil {
+		cleanup()
+		t.Fatalf("Failed to create test VM: %v", err)
+	}
+
+	return tvm, tvm.Close
 }
 
 func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {

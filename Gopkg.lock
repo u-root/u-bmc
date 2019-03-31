@@ -18,6 +18,26 @@
   revision = "3a771d992973f24aa725d07868b467d1ddfceafb"
 
 [[projects]]
+  branch = "master"
+  digest = "1:0b35e980096f6d52132b05b71352d9720edb55277c70619a1b20827d9da052dc"
+  name = "github.com/digitalocean/go-libvirt"
+  packages = [
+    ".",
+    "internal/constants",
+    "internal/go-xdr/xdr2",
+  ]
+  pruneopts = "UT"
+  revision = "07f4be593e4b39f221afb121fa7c9c22c6bb36dd"
+
+[[projects]]
+  branch = "master"
+  digest = "1:7f191e9bebdb9c00b50e677864e0f3248af04633935e34d0d85d45ca24144a9b"
+  name = "github.com/digitalocean/go-qemu"
+  packages = ["qmp"]
+  pruneopts = "UT"
+  revision = "dd7bb9c771b832426e2d51ef0aef82b359579854"
+
+[[projects]]
   digest = "1:6f9339c912bbdda81302633ad7e99a28dfa5a639c864061f1929510a9a64aa74"
   name = "github.com/dustin/go-humanize"
   packages = ["."]
@@ -389,6 +409,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/beevik/ntp",
+    "github.com/digitalocean/go-qemu/qmp",
     "github.com/fullstorydev/grpcurl",
     "github.com/golang/protobuf/proto",
     "github.com/golang/protobuf/protoc-gen-go/descriptor",
