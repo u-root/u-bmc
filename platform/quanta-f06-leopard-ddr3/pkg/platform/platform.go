@@ -141,15 +141,23 @@ func (p *platform) InitializeSystem() error {
 
 func (p *platform) PwmMap() map[int]string {
 	return map[int]string{
-		0: "hwmon0/pwm1",
-		1: "hwmon0/pwm2",
+		0: "/sys/class/hwmon/hwmon0/pwm1",
+		1: "/sys/class/hwmon/hwmon0/pwm2",
 	}
 }
 
 func (p *platform) FanMap() map[int]string {
 	return map[int]string{
-		0: "hwmon0/fan1_input",
-		1: "hwmon0/fan3_input",
+		0: "/sys/class/hwmon/hwmon0/fan1_input",
+		1: "/sys/class/hwmon/hwmon0/fan3_input",
+	}
+}
+
+func (p *platform) ThermometerMap() map[int]string {
+	// TODO(bluecmd): These are unverified, most likely there are more
+	return map[int]string{
+		0: "/sys/class/hwmon/hwmon1/temp1_input",
+		1: "/sys/class/hwmon/hwmon2/temp1_input",
 	}
 }
 
