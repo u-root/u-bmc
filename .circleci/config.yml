@@ -141,6 +141,10 @@ jobs:
           name: Compile qemu
           command: |
             git clone https://github.com/openbmc/qemu.git --depth 1
+            # TOOD(bluecmd): Temporary until these can be upstreamed correctly
+            cd qemu
+            patch -p1 < /go/src/github.com/u-root/u-bmc/qemu-leopard.patch
+            cd ..
             mkdir qemu/build
             cd qemu/build
             ../configure --target-list=arm-softmmu

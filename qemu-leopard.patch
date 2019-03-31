@@ -1,0 +1,88 @@
+diff --git a/hw/arm/aspeed.c b/hw/arm/aspeed.c
+index 465e65f323..82cb981f3d 100644
+--- a/hw/arm/aspeed.c
++++ b/hw/arm/aspeed.c
+@@ -247,22 +247,18 @@ static void palmetto_bmc_i2c_init(AspeedBoardState *bmc)
+ {
+     AspeedSoCState *soc = &bmc->soc;
+     DeviceState *dev;
+-    uint8_t *eeprom_buf = g_malloc0(32 * 1024);
+ 
+-    /* The palmetto platform expects a ds3231 RTC but a ds1338 is
+-     * enough to provide basic RTC features. Alarms will be missing */
+-    i2c_create_slave(aspeed_i2c_get_bus(DEVICE(&soc->i2c), 0), "ds1338", 0x68);
+-
+-    smbus_eeprom_init_one(aspeed_i2c_get_bus(DEVICE(&soc->i2c), 0), 0x50,
+-                          eeprom_buf);
+-
+-    /* add a TMP423 temperature sensor */
+-    dev = i2c_create_slave(aspeed_i2c_get_bus(DEVICE(&soc->i2c), 2),
+-                           "tmp423", 0x4c);
++    /* add two TMP421 emperature sensors */
++    dev = i2c_create_slave(aspeed_i2c_get_bus(DEVICE(&soc->i2c), 6),
++                           "tmp421", 0x4e);
+     object_property_set_int(OBJECT(dev), 31000, "temperature0", &error_abort);
+     object_property_set_int(OBJECT(dev), 28000, "temperature1", &error_abort);
+-    object_property_set_int(OBJECT(dev), 20000, "temperature2", &error_abort);
+-    object_property_set_int(OBJECT(dev), 110000, "temperature3", &error_abort);
++
++    dev = i2c_create_slave(aspeed_i2c_get_bus(DEVICE(&soc->i2c), 6),
++                           "tmp421", 0x4f);
++    object_property_set_int(OBJECT(dev), 51000, "temperature0", &error_abort);
++    object_property_set_int(OBJECT(dev), 48000, "temperature1", &error_abort);
++
+ }
+ 
+ static void ast2500_evb_i2c_init(AspeedBoardState *bmc)
+diff --git a/hw/arm/aspeed_soc.c b/hw/arm/aspeed_soc.c
+index 0f6e5be666..1348313037 100644
+--- a/hw/arm/aspeed_soc.c
++++ b/hw/arm/aspeed_soc.c
+@@ -23,6 +23,9 @@
+ #include "net/net.h"
+ 
+ #define ASPEED_SOC_UART_1_BASE      0x00183000
++#define ASPEED_SOC_UART_2_BASE      0x0018D000
++#define ASPEED_SOC_UART_3_BASE      0x0018E000
++#define ASPEED_SOC_UART_4_BASE      0x0018F000
+ #define ASPEED_SOC_UART_5_BASE      0x00184000
+ #define ASPEED_SOC_VUART_BASE       0x00187000
+ #define ASPEED_SOC_IOMEM_SIZE       0x00200000
+@@ -311,12 +314,36 @@ static void aspeed_soc_realize(DeviceState *dev, Error **errp)
+ 
+     /* UART1 */
+     if (serial_hd(2)) {
+-        qemu_irq uart1 = qdev_get_gpio_in(DEVICE(&s->vic), 9);
++        qemu_irq uart1 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[0]);
+         serial_mm_init(get_system_memory(),
+                        ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_1_BASE, 2,
+                        uart1, 38400, serial_hd(2), DEVICE_LITTLE_ENDIAN);
+     }
+ 
++    /* UART2 */
++    if (serial_hd(3)) {
++        qemu_irq uart2 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[1]);
++        serial_mm_init(get_system_memory(),
++                       ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_2_BASE, 2,
++                       uart2, 38400, serial_hd(3), DEVICE_LITTLE_ENDIAN);
++    }
++
++    /* UART3 */
++    if (serial_hd(4)) {
++        qemu_irq uart3 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[2]);
++        serial_mm_init(get_system_memory(),
++                       ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_3_BASE, 2,
++                       uart3, 57600, serial_hd(4), DEVICE_LITTLE_ENDIAN);
++    }
++
++    /* UART4 */
++    if (serial_hd(5)) {
++        qemu_irq uart4 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[3]);
++        serial_mm_init(get_system_memory(),
++                       ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_4_BASE, 2,
++                       uart4, 38400, serial_hd(5), DEVICE_LITTLE_ENDIAN);
++    }
++
+     /* I2C */
+     object_property_set_bool(OBJECT(&s->i2c),
+                              ASPEED_IS_AST2500(sc->info->silicon_rev),
