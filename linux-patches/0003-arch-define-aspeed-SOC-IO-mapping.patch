@@ -1,7 +1,7 @@
-From 995ba8a011d8c0ff6e33fed0aae0bbe3188ee9ce Mon Sep 17 00:00:00 2001
+From 3f3b0bd5ade387c36c4a010abe06c1c3372c136b Mon Sep 17 00:00:00 2001
 From: Christian Svensson <bluecmd@google.com>
 Date: Sat, 10 Nov 2018 18:35:08 +0100
-Subject: [PATCH 3/3] arch: define aspeed SOC IO mapping
+Subject: [PATCH 3/4] arch: define aspeed SOC IO mapping
 
 Without this IO mapping early printk will simply not work after the
 paging and MMU has been setup.

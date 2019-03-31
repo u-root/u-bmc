@@ -4,6 +4,7 @@
 #include "aspeed-g4.dtsi"
 #include "config.h"
 #include <dt-bindings/gpio/aspeed-gpio.h>
+#include <dt-bindings/thermal/thermal.h>
 
 / {
 	model = "Quanta F06 Leopard DDR3 BMC";
@@ -35,6 +36,38 @@
 			reg = <0x98000000 0x01000000>; /* 16MB */
 		};
 	};
+
+#ifndef BOOTLOADER
+	thermal-zones {
+		chassis_thermal: chassis-thermal {
+			polling-delay-passive = <250>; /* milliseconds */
+			polling-delay = <1000>; /* milliseconds */
+
+			thermal-sensors = <&temp0 0>;
+
+			trips {
+				chassis_alert0: chassis-alert {
+					temperature = <40000>; /* millicelsius */
+					hysteresis = <2000>; /* millicelsius */
+					type = "active";
+				};
+				chassis_crit: chassis-crit {
+					temperature = <105000>; /* millicelsius */
+					hysteresis = <2000>; /* millicelsius */
+					type = "critical";
+				};
+			};
+
+			cooling-maps {
+				map0 {
+					trip = <&chassis_alert0>;
+					cooling-device = <&fan0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+						<&fan1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+				};
+			};
+		};
+	};
+#endif
 };
 
 &fmc {
@@ -79,13 +112,20 @@
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_pwm1_default>;
-	fan@0 {
+	fan0: fan@0 {
 		reg = <0x00>;
 		aspeed,fan-tach-ch = /bits/ 8 <0x00>;
+		#cooling-cells = <2>;
+		// For some reason aspeed-pwm-tacho insists on using 8 bit values.
+		// Yes, it's true that it really is only 0-255, but all other cooling
+		// devices uses u32, so you don't have to '/bits/ 8'. Oh well.
+		cooling-levels = /bits/ 8 <20 130 170 230>;
 	};
-	fan@1 {
+	fan1: fan@1 {
 		reg = <0x01>;
 		aspeed,fan-tach-ch = /bits/ 8 <0x02>;
+		#cooling-cells = <2>;
+		cooling-levels = /bits/ 8 <20 130 170 230>;
 	};
 };
 
@@ -129,13 +169,15 @@
 
 &i2c6 {
 	status = "okay";
-	tmp421@4e {
+	temp0: tmp421@4e {
 		compatible = "ti,tmp421";
 		reg = <0x4e>;
+		#thermal-sensor-cells = <1>;
 	};
-	tmp421@4f {
+	temp1: tmp421@4f {
 		compatible = "ti,tmp421";
 		reg = <0x4f>;
+		#thermal-sensor-cells = <1>;
 	};
 };
 

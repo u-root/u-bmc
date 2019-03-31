@@ -1,7 +1,7 @@
-From 73613aa6ec71cb789b94a2f68b4cbf8a39d375bc Mon Sep 17 00:00:00 2001
+From 8e1e26bea9161c4c394665d89318cf3b5854a6ac Mon Sep 17 00:00:00 2001
 From: Christian Svensson <bluecmd@google.com>
 Date: Sat, 3 Nov 2018 22:50:04 +0100
-Subject: [PATCH 2/3] Disable Global Multicast Filtering
+Subject: [PATCH 2/4] Disable Global Multicast Filtering
 
 See https://github.com/u-root/u-bmc/issues/92.
 TL;DR: IPv6 breaks on at least Mellanox CX3.
