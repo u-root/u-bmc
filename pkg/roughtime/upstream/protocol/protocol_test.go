@@ -167,8 +167,8 @@ func TestChaining(t *testing.T) {
 	}
 
 	claim := []claimStep{
-		claimStep{rootPublicKeyA, nonce1, replies1[0]},
-		claimStep{rootPublicKeyB, blind2, replies2[0]},
+		{rootPublicKeyA, nonce1, replies1[0]},
+		{rootPublicKeyB, blind2, replies2[0]},
 	}
 
 	// In order to verify a claim, one would check each of the replies

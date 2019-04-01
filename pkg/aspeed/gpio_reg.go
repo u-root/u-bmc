@@ -434,10 +434,10 @@ func (a *Ast) SnapshotGpio() *State {
 	s := State{}
 	s.Gpio = make(map[uint32]uint32)
 	s.Scu = make(map[uint32]uint32)
-	for r, _ := range gpioDirRegs {
+	for r := range gpioDirRegs {
 		s.Gpio[r] = a.Mem().MustRead32(base + uintptr(r))
 	}
-	for r, _ := range gpioDataRegs {
+	for r := range gpioDataRegs {
 		s.Gpio[r] = a.Mem().MustRead32(base + uintptr(r))
 	}
 	for _, r := range scuGpioRegs {

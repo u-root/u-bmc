@@ -45,7 +45,7 @@ func main() {
 	dtbStart := (ramEnd - dtb.Size()) & ^0x3
 	// Align to 64 KiB to make the kernel happy
 	initrdEnd := (dtbStart - 64*1024)
-	initrdStart := (initrdEnd - initrd.Size()) & ^(64*1024-1)
+	initrdStart := (initrdEnd - initrd.Size()) & ^(64*1024 - 1)
 	initrdEnd = initrdStart + initrd.Size()
 
 	fmt.Printf(`

@@ -15,12 +15,12 @@ import (
 	"testing"
 	"time"
 
+	urootint "github.com/u-root/u-root/integration"
 	"github.com/u-root/u-root/pkg/golang"
 	"github.com/u-root/u-root/pkg/qemu"
 	"github.com/u-root/u-root/pkg/uroot"
 	"github.com/u-root/u-root/pkg/uroot/builder"
 	"github.com/u-root/u-root/pkg/uroot/initramfs"
-	urootint "github.com/u-root/u-root/integration"
 )
 
 const (
@@ -60,7 +60,6 @@ func (d MachineDevice) Cmdline() []string {
 	return []string{"-M", d.Board}
 }
 
-
 func BMCTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 	if _, ok := os.LookupEnv("UBMC_QEMU"); !ok {
 		t.Skip("test is skipped unless UBMC_QEMU is set")
@@ -86,7 +85,7 @@ func BMCTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 	_ = buildInitramfs(t, tmpDir, o)
 	flash := buildFlash(t, tmpDir, o)
 	q := &qemu.Options{
-		QEMUPath:  os.Getenv("UBMC_QEMU"),
+		QEMUPath: os.Getenv("UBMC_QEMU"),
 		// TODO(bluecmd): Right now only one platform is supported for tests
 		Devices: []qemu.Device{
 			MachineDevice{"palmetto-bmc"},
@@ -128,7 +127,6 @@ func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 		Initramfs: i,
 		Kernel:    os.Getenv("UBMC_NATIVE_BZIMAGE"),
 		QEMUPath:  os.Getenv("UBMC_NATIVE_QEMU"),
-
 	}
 	vm, vmCleanup := qemuTest(t, q, o)
 
@@ -152,14 +150,14 @@ func buildInitramfs(t *testing.T, tmpDir string, o *Options) string {
 		Env: *o.Env,
 		Commands: []uroot.Commands{
 			{
-				Builder: builder.BusyBox,
+				Builder:  builder.BusyBox,
 				Packages: o.Cmds,
 			},
 		},
-		TempDir:      tmpDir,
-		BaseArchive:  uroot.DefaultRamfs.Reader(),
-		OutputFile:   w,
-		InitCmd:      "init",
+		TempDir:     tmpDir,
+		BaseArchive: uroot.DefaultRamfs.Reader(),
+		OutputFile:  w,
+		InitCmd:     "init",
 	}
 	if err := uroot.CreateInitramfs(logger, opts); err != nil {
 		t.Fatal(err)

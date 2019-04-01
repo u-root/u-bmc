@@ -46,7 +46,7 @@ func getOneRoughtime(rs []RoughtimeServer) *roughtime.Roughtime {
 			PublicKeyType: r.PublicKeyType,
 			PublicKey:     pk,
 			Addresses: []config.ServerAddress{
-				config.ServerAddress{Protocol: r.Protocol, Address: r.Address},
+				{Protocol: r.Protocol, Address: r.Address},
 			}}
 		g.Go(func() error {
 			res, err := roughtime.Get(srv, roughtimeAttempts, roughtimeTimeout, nil)
