@@ -30,8 +30,8 @@ const (
 	pubKeyPath = "/u-bmc.pub"
 	// TODO(bluecmd): We cannot chroot into /mnt since we have to run /kexec
 	// for now.
-	kernelPath  = "/mnt/boot/zImage"
-	dtbPath     = "/mnt/boot/platform.dtb"
+	kernelPath = "/mnt/boot/zImage"
+	dtbPath    = "/mnt/boot/platform.dtb"
 )
 
 var (

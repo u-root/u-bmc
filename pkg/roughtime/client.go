@@ -263,7 +263,7 @@ func (r *Result) Error() error {
 func Do(servers []config.Server, attempts int, timeout time.Duration, prev *Roughtime) []Result {
 	results := make([]Result, len(servers))
 	var delay time.Duration
-	for i, _ := range servers {
+	for i := range servers {
 		start := time.Now()
 		srv := &servers[i]
 		rt, err := Get(srv, attempts, timeout, prev)

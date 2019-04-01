@@ -66,7 +66,7 @@ jobs:
           command: go vet $(go list ./... | grep -v /vendor/)
       - run:
           name: gofmt
-          command: test -z $(gofmt -s -l $(go list ./... | grep -v /vendor/))
+          command: test -z "$(gofmt -s -l $(go list ./... | grep -v /vendor/ | cut -f 4- -d '/'))"
       - run:
           name: ineffassign
           command: ineffassign .
