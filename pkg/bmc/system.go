@@ -25,6 +25,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/u-root/u-bmc/apparmor"
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
 	pb "github.com/u-root/u-bmc/proto"
@@ -279,6 +280,12 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	fan, err := startFan(p)
 	if err != nil {
 		log.Printf("startFan failed: %v", err)
+		return err
+	}
+
+	log.Printf("Loading AppArmor profiles")
+	if err := apparmor.Load(); err != nil {
+		log.Printf("apparmor load failed: %v", err)
 		return err
 	}
 

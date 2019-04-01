@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -54,6 +55,10 @@ Note: This is TODO, password is 'rosebud'
 		return
 	}
 	fmt.Println("")
+
+	if err := ioutil.WriteFile("/proc/self/attr/exec", []byte("exec shell\000"), 0600); err != nil {
+		log.Fatalf("Failed to set profile: %v", err)
+	}
 
 	envv := []string{"TZ=UTC", "HOME=/root", "USER=root", "PATH=/bbin:/bin"}
 	err = unix.Exec(*shell, []string{*shell}, envv)
