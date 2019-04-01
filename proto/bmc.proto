@@ -8,7 +8,6 @@ package bmc;
 
 service ManagementService {
   rpc PressButton (ButtonPressRequest) returns (ButtonPressResponse) {}
-  rpc SetFan (SetFanRequest) returns (SetFanResponse) {}
   rpc GetFans (GetFansRequest) returns (GetFansResponse) {}
   rpc StreamConsole (stream ConsoleData) returns (stream ConsoleData) {}
   rpc GetVersion (GetVersionRequest) returns (GetVersionResponse) {}
@@ -32,26 +31,6 @@ message ButtonPressResponse {
 
 }
 
-enum FanMode {
-  FAN_MODE_UNSPEC      = 0;
-  FAN_MODE_PERCENTAGE  = 1;
-}
-
-message SetFanRequest {
-  // Required: which fan to modify
-  uint32 fan = 1;
-
-  // Required: which mode to put the fan in
-  FanMode mode = 2;
-
-  // Required if mode is PERCENTAGE
-  uint32 percentage = 3;
-}
-
-message SetFanResponse {
-
-}
-
 message GetFansRequest {
 
 }
@@ -59,11 +38,9 @@ message GetFansRequest {
 message Fan {
   uint32 fan        = 1;
 
-  FanMode mode      = 2;
+  uint32 percentage = 2;
 
-  uint32 percentage = 3;
-
-  uint32 rpm        = 4;
+  uint32 rpm        = 3;
 }
 
 message GetFansResponse {

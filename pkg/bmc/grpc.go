@@ -24,7 +24,6 @@ type rpcGpioSystem interface {
 type rpcFanSystem interface {
 	ReadFanPercentage(int) (int, error)
 	ReadFanRpm(int) (int, error)
-	SetFanPercentage(int, int) error
 	FanCount() int
 }
 
@@ -62,22 +61,10 @@ func (m *mgmtServer) GetFans(ctx context.Context, _ *pb.GetFansRequest) (*pb.Get
 			return nil, err
 		}
 		r.Fan = append(r.Fan, &pb.Fan{
-			Fan: uint32(i), Mode: pb.FanMode_FAN_MODE_PERCENTAGE,
-			Percentage: uint32(prct), Rpm: uint32(rpm),
+			Fan: uint32(i), Percentage: uint32(prct), Rpm: uint32(rpm),
 		})
 	}
 	return &r, nil
-}
-
-func (m *mgmtServer) SetFan(ctx context.Context, r *pb.SetFanRequest) (*pb.SetFanResponse, error) {
-	if r.Mode != pb.FanMode_FAN_MODE_PERCENTAGE {
-		return nil, fmt.Errorf("Specified fan mode not supported")
-	}
-	err := m.fan.SetFanPercentage(int(r.Fan), int(r.Percentage))
-	if err != nil {
-		return nil, err
-	}
-	return &pb.SetFanResponse{}, nil
 }
 
 func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer, done <-chan struct{}) error {
