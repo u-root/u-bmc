@@ -157,14 +157,6 @@ func (p *platform) HostUart() (string, int) {
 	return "/dev/ttyS2", 57600
 }
 
-func (p *platform) InitializeFans(fan *bmc.FanSystem) error {
-	for i := 0; i < fan.FanCount(); i++ {
-		log.Printf("Configuring fan %d for 20%%", i)
-		go fan.SetFanPercentage(i, 20)
-	}
-	return nil
-}
-
 func (p *platform) Close() {
 	p.a.Close()
 }

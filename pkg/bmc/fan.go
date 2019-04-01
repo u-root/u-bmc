@@ -14,7 +14,6 @@ import (
 type FanPlatform interface {
 	PwmMap() map[int]string
 	FanMap() map[int]string
-	InitializeFans(*FanSystem) error
 }
 
 type FanSystem struct {
@@ -27,7 +26,7 @@ func readHwmon(m map[int]string, fan int) (int, error) {
 	if !ok {
 		return 0, fmt.Errorf("No such fan %d", fan)
 	}
-	f, err := os.OpenFile("/sys/class/hwmon/"+fname, os.O_RDONLY, 0600)
+	f, err := os.OpenFile(fname, os.O_RDONLY, 0600)
 	if err != nil {
 		return 0, err
 	}
@@ -49,7 +48,7 @@ func writeHwmon(m map[int]string, fan int, v int) error {
 	if !ok {
 		return fmt.Errorf("No such fan %d", fan)
 	}
-	f, err := os.OpenFile("/sys/class/hwmon/"+fname, os.O_WRONLY, 0600)
+	f, err := os.OpenFile(fname, os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
@@ -74,16 +73,7 @@ func (f *FanSystem) ReadFanPercentage(fan int) (int, error) {
 	return int(float32(v) * 100.0 / 255.0), nil
 }
 
-func (f *FanSystem) SetFanPercentage(fan int, prct int) error {
-	v := int(float32(prct) * 255.0 / 100.0)
-	return writeHwmon(f.pwmMap, fan, v)
-}
-
 func startFan(p FanPlatform) (*FanSystem, error) {
 	f := FanSystem{fanMap: p.FanMap(), pwmMap: p.PwmMap()}
-	err := p.InitializeFans(&f)
-	if err != nil {
-		return nil, fmt.Errorf("platform.InitializeFans: %v", err)
-	}
 	return &f, nil
 }
