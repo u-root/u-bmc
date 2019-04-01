@@ -5,11 +5,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/fullstorydev/grpcurl"
@@ -69,7 +71,7 @@ func main() {
 	if *host == "localhost" {
 		// Connect to localhost:80 unauthenticated and unecrypted
 		// This is used to troubleshoot on the BMC. If you have shell access
-		// on the BMC you're already authorized to do anything.
+		// on the BMC you're already authorized to execute RPCs.
 		target = fmt.Sprintf("[::1]:80")
 	} else {
 		// Connect to host:443 using client credentials and server verification
@@ -99,6 +101,14 @@ func call(ctx context.Context, ds grpcurl.DescriptorSource, c *grpc.ClientConn, 
 	method = fmt.Sprintf("%s.%s", service, method)
 	sent := false
 	rd := func(m proto.Message) error {
+		if text == "-" {
+			reader := bufio.NewReader(os.Stdin)
+			text, err := reader.ReadString('\n')
+			if err != nil {
+				return err
+			}
+			return proto.UnmarshalText(text, m)
+		}
 		if sent || text == "" {
 			return io.EOF
 		}
