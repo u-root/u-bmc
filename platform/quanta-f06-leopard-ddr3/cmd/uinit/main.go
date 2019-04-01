@@ -16,7 +16,7 @@ func main() {
 	defer p.Close()
 	bmc.Startup(p)
 	fmt.Printf("Starting local shell\n")
-	bmc.Shell()
-	fmt.Printf("Shell exited, rebooting\n")
-	bmc.Reboot()
+	for {
+		bmc.Shell()
+	}
 }

@@ -24,6 +24,7 @@ var (
 	packages = []string{
 		"github.com/u-root/u-bmc/cmd/fan",
 		"github.com/u-root/u-bmc/cmd/i2cwatcher",
+		"github.com/u-root/u-bmc/cmd/login",
 		"github.com/u-root/u-bmc/cmd/socreset",
 		"github.com/u-root/u-bmc/cmd/ubmcctl",
 		// Based on core in u-root

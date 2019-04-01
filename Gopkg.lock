@@ -224,7 +224,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:2c617505d9b5f9c1126765258348117bd6b2165118ff575ea86090e716b3c041"
+  digest = "1:470b7eaba56d52f782ec129bcc5cde976e8c3f28a30af7373d5750c229cdd404"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
@@ -241,6 +241,7 @@
     "openpgp/s2k",
     "poly1305",
     "ssh",
+    "ssh/terminal",
   ]
   pruneopts = "UT"
   revision = "a5d413f7728c81fb97d96a2b722368945f651e78"
@@ -415,6 +416,7 @@
     "golang.org/x/crypto/openpgp/errors",
     "golang.org/x/crypto/openpgp/packet",
     "golang.org/x/crypto/openpgp/s2k",
+    "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/net/context",
     "golang.org/x/sync/errgroup",
     "golang.org/x/sys/unix",
