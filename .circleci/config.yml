@@ -136,7 +136,7 @@ jobs:
       - run:
           name: Install dependencies
           command:
-            sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch
+            sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch libelf-dev qemu-kvm
       - run:
           name: Compile qemu
           command: |
@@ -177,7 +177,9 @@ jobs:
       - run:
           name: Run integration tests
           command: |
+            make integration/bzImage
             export UBMC_QEMU=qemu-system-arm
+            export UBMC_NATIVE_QEMU=qemu-system-x86_64
             cd integration/
             go test
       - store_artifacts:

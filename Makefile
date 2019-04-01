@@ -122,6 +122,20 @@ linux-menuconfig-%: platform/$(SOC)/linux.config.%
 		menuconfig
 	rm -f $<.old
 
+integration/bzImage: integration/linux.config
+	$(MAKE) $(MAKE_JOBS) \
+		-C linux/ O=build/$@/ \
+		KCONFIG_CONFIG="$(ABS_ROOT_DIR)$<"
+	rm -f $<.old
+	cp linux/build/$@/arch/x86/boot/bzImage $@
+
+linux-integration-menuconfig: integration/linux.config
+	$(MAKE) $(MAKE_JOBS) \
+		-C linux/ O=build/$@/ \
+		KCONFIG_CONFIG="$(ABS_ROOT_DIR)$<" \
+		menuconfig
+	rm -f $<.old
+
 boot/%.dtb.boot.dummy: platform/$(PLATFORM)/%.dts platform/ubmc-flash-layout.dtsi platform/$(PLATFORM)/boot/config.h boot/loader.cpio.gz
 	# Construct the DTB first with dummy addresses, and then again with the real
 	# ones. This assumes the DTB does not grow, but since it's only addresses
