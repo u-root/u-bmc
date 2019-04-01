@@ -321,8 +321,8 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 }
 
 func Shell() {
-	cmd := exec.Command("/bbin/elvish")
-	cmd.Dir = "/root"
+	cmd := exec.Command("/bbin/login")
+	cmd.Dir = "/"
 	cmd.Env = environ
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
