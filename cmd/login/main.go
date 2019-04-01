@@ -55,7 +55,7 @@ Note: This is TODO, password is 'rosebud'
 	}
 	fmt.Println("")
 
-	envv := []string{"TZ=UTC", "HOME=/root", "USER=root"}
+	envv := []string{"TZ=UTC", "HOME=/root", "USER=root", "PATH=/bbin:/bin"}
 	err = unix.Exec(*shell, []string{*shell}, envv)
 	log.Fatalf("Failed to exec: %v", err)
 }
