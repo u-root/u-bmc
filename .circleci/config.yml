@@ -60,6 +60,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+            touch config/i_agree_to_the_acme_terms
             go generate ./config/
       - run:
           name: vet
@@ -82,6 +83,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+            touch config/i_agree_to_the_acme_terms
             go generate ./config/
       - run:
           name: Test all
@@ -101,6 +103,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+            touch config/i_agree_to_the_acme_terms
             go generate ./config/
       - run:
           name: Race detector
@@ -117,6 +120,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+            touch config/i_agree_to_the_acme_terms
             go generate ./config/
       - run:
           name: build all commands
@@ -154,6 +158,7 @@ jobs:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
+            touch config/i_agree_to_the_acme_terms
       # TODO(bluecmd): This step should probably be cached somehow
       - run:
           name: Update submodules

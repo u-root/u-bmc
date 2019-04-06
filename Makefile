@@ -16,6 +16,7 @@ QEMUDEBUGFLAGS ?= -d guest_errors
 QEMUFLAGS ?= -display none \
 	-drive file=flash.sim.img,format=raw,if=mtd \
 	-chardev socket,id=host,path=host.uart,server,nowait \
+	-nic user,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,hostfwd=tcp::9370-:9370 \
 	${QEMUDEBUGFLAGS}
 MAKE_JOBS ?= -j8
 ABS_ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))/
@@ -42,7 +43,7 @@ all: flash.img
 include $(ROOT_DIR)platform/$(PLATFORM)/Makefile.inc
 include $(ROOT_DIR)platform/$(SOC)/Makefile.inc
 
-.PHONY: sim all linux-menuconfig-% test vars
+.PHONY: sim all linux-menuconfig-% test vars pebble
 
 u-bmc:
 	go get
@@ -205,6 +206,7 @@ root.ubifs.img: initramfs.cpio $(ROOT_DIR)boot/zImage.full $(ROOT_DIR)boot/signe
 	echo "nameserver 2001:4860:4860::8888" > root/etc/resolv.conf
 	echo "nameserver 2606:4700:4700::1111" >> root/etc/resolv.conf
 	echo "nameserver 8.8.8.8" >> root/etc/resolv.conf
+	echo "::1 localhost" >> root/etc/hosts
 	cp -v $(ROOT_DIR)boot/zImage.full root/boot/zImage-$(GIT_VERSION)
 	cat $(ROOT_DIR)boot/zImage.full | $(ROOT_DIR)boot/signer/signer > root/boot/zImage-$(GIT_VERSION).gpg
 	cp -v $(ROOT_DIR)boot/platform.dtb.full root/boot/platform-$(GIT_VERSION).dtb
@@ -232,7 +234,7 @@ flash.sim.img: flash.img
 	( cat $^ ; perl -e 'print chr(0xFF)x1024 while 1' ) \
 		| dd bs=1M count=32 iflag=fullblock > $@
 
-initramfs.cpio: u-bmc ssh_keys.pub $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)platform/$(PLATFORM) $(ROOT_DIR)pkg $(ROOT_DIR)proto -name \*.go -type f)
+initramfs.cpio: u-bmc ssh_keys.pub config/config.go $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)platform/$(PLATFORM) $(ROOT_DIR)pkg $(ROOT_DIR)proto -name \*.go -type f)
 	go generate ./config/
 	GOARM=5 GOARCH=$(ARCH) ./u-bmc -o "$@.tmp" -p "$(PLATFORM)"
 	mv "$@.tmp" "$@"
@@ -252,3 +254,8 @@ clean:
 	 module/*.o module/*.mod.c module/*.ko module/.*.cmd module/modules.order \
 	 module/Module.symvers config/ssh_keys.go config/version.go
 	\rm -fr root/ boot/modules/ module/.tmp_versions/ boot/out
+
+pebble:
+	PEBBLE_VA_ALWAYS_VALID=1 go run github.com/letsencrypt/pebble/cmd/pebble \
+		-dnsserver locahost:6053 \
+		-config config/sim-pebble.json

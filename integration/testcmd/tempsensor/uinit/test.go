@@ -41,7 +41,7 @@ func uinit() error {
 	p := platform.Platform()
 	defer p.Close()
 
-	if err := bmc.Startup(p); err != nil {
+	if err, _ := bmc.Startup(p); err != nil {
 		return err
 	}
 

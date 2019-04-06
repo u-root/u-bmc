@@ -39,7 +39,7 @@ func testMetrics(u string) error {
 }
 
 func uinit() error {
-	if err := utils.AddIP("10.0.10.1/24", "eth0"); err != nil {
+	if err := utils.AddIP("10.0.2.1/24", "eth0"); err != nil {
 		return fmt.Errorf("Error adding IPv4 interface: %v", err)
 	}
 	if err := utils.SetLinkUp("eth0"); err != nil {
@@ -53,7 +53,7 @@ func uinit() error {
 
 		time.Sleep(time.Duration(i) * time.Millisecond)
 
-		if err := testMetrics("http://10.0.10.20:9370/metrics"); err != nil {
+		if err := testMetrics("http://10.0.2.15:9370/metrics"); err != nil {
 			log.Printf("Error verifying metrics over IPv4: %v, retrying", err)
 			continue
 		}
