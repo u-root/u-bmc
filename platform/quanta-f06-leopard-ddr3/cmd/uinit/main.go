@@ -5,8 +5,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/u-root/u-bmc/pkg/bmc"
 	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/platform"
 )
@@ -15,7 +13,6 @@ func main() {
 	p := platform.Platform()
 	defer p.Close()
 	bmc.Startup(p)
-	fmt.Printf("Starting local shell\n")
 	for {
 		bmc.Shell()
 	}
