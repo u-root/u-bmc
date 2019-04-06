@@ -76,8 +76,8 @@ func BMCTest(t *testing.T, o *Options) (*TestVM, func()) {
 		dirCleanup(t, tmpDir)
 	}
 	// Wait for monitor socket to show up
-	for i := range []int{100, 500, 1000, 5000, -1} {
-		if _, err := os.Stat(monsock); !os.IsNotExist(err) {
+	for _, i := range []int{100, 500, 1000, 5000, -1} {
+		if _, err := os.Stat(monsock); err == nil {
 			break
 		}
 		if i == -1 {
