@@ -1,3 +1,8 @@
 uinit
 ssh_keys.go
 version.go
+acme.go
+sim_pebble.go
+i_agree_to_the_acme_terms
+*.crt
+*.key

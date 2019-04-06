@@ -74,9 +74,19 @@ func main() {
 		// on the BMC you're already authorized to execute RPCs.
 		target = fmt.Sprintf("[::1]:80")
 	} else {
+		if strings.Contains(*host, ":") {
+			target = *host
+		} else {
+			target = fmt.Sprintf("%s:443", *host)
+		}
+
+		var err error
 		// Connect to host:443 using client credentials and server verification
-		// TODO(bluecmd): Add grpcurl.ClientTransportCredentials to opts
-		target = fmt.Sprintf("%s:443", *host)
+		// TODO(bluecmd): Add client credentials here
+		creds, err = grpcurl.ClientTransportCredentials(false, "", "", "")
+		if err != nil {
+			log.Fatalf("Unable to load TLS credentials: %v", err)
+		}
 	}
 
 	ctx := context.Background()

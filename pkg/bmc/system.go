@@ -9,6 +9,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	crand "crypto/rand"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/pem"
@@ -24,18 +25,13 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/jpillora/backoff"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/u-root/u-bmc/config"
+	"github.com/u-root/u-bmc/pkg/bmc/cert"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
 	pb "github.com/u-root/u-bmc/proto"
 	"golang.org/x/sys/unix"
-)
-
-const (
-	timeRetryDelay                = 10 * time.Second
-	timeRetryDelaySecondsJitter   = 10
-	timeRefreshDelay              = 7 * time.Hour
-	timeRefreshDelaySecondsJitter = 3600
 )
 
 const banner = `
@@ -61,6 +57,11 @@ var (
 		Name:      "has_trusted_time",
 		Help:      "u-bmc has acquired trusted time",
 	})
+
+	timeRetry   = &backoff.Backoff{Min: 1 * time.Second, Max: 1 * time.Hour, Factor: 5, Jitter: true}
+	timeRefresh = &backoff.Backoff{Min: 3 * time.Hour, Max: 6 * time.Hour, Factor: 2, Jitter: true}
+	certRetry   = &backoff.Backoff{Min: 1 * time.Second, Max: 1 * time.Hour, Factor: 5, Jitter: true}
+	certRefresh = &backoff.Backoff{Min: 240 * time.Hour, Max: 480 * time.Hour, Factor: 2, Jitter: true}
 )
 
 func init() {
@@ -77,6 +78,10 @@ type Platform interface {
 	HostUart() (string, int)
 	GpioPlatform
 	FanPlatform
+}
+
+type RpcServer interface {
+	EnableRemote(*tls.Certificate) error
 }
 
 func newSshKey() []byte {
@@ -149,8 +154,7 @@ func acquireTime(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
 		t, err := ttime.AcquireTime(rs, ntps)
 		if err != nil {
 			log.Printf("Failed to acquire trusted time: %v", err)
-			j := time.Duration(rand.Intn(timeRetryDelaySecondsJitter)) * time.Second
-			delay := timeRetryDelay + j
+			delay := timeRetry.Duration()
 			log.Printf("Waiting %v before retrying time acquisition", delay)
 			time.Sleep(delay)
 			continue
@@ -159,6 +163,7 @@ func acquireTime(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
 			break
 		}
 	}
+	timeRetry.Reset()
 
 	log.Printf("Got trusted time: %v", tt)
 	tv := unix.NsecToTimeval(tt.UnixNano())
@@ -184,10 +189,9 @@ func seedRandomGenerator() {
 
 func backgroundTimeSync(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
 	for {
-		j := time.Duration(rand.Intn(timeRefreshDelaySecondsJitter)) * time.Second
-		delay := timeRefreshDelay + j
+		delay := timeRefresh.Duration()
 		log.Printf("Scheduling time re-sync in %s", delay.String())
-		tmr := time.NewTimer(timeRefreshDelay)
+		tmr := time.NewTimer(delay)
 		<-tmr.C
 		log.Printf("Re-syncing trusted time")
 		acquireTime(rs, ntps)
@@ -213,11 +217,11 @@ func importSystemConfiguration(path string) {
 	}
 }
 
-func Startup(p Platform) error {
+func Startup(p Platform) (error, chan error) {
 	return StartupWithConfig(p, config.DefaultConfig)
 }
 
-func StartupWithConfig(p Platform, c *config.Config) error {
+func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	fmt.Printf("\n")
 	fmt.Printf(banner)
 	fmt.Printf("Welcome to u-bmc version %s\n\n", c.Version.Version)
@@ -265,21 +269,21 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	log.Printf("Initialize system hardware")
 	if err := p.InitializeSystem(); err != nil {
 		log.Printf("platform.InitializeSystem: %v", err)
-		return err
+		return err, nil
 	}
 
 	log.Printf("Starting GPIO drivers")
 	gpio, err := startGpio(p)
 	if err != nil {
 		log.Printf("startGpio failed: %v", err)
-		return err
+		return err, nil
 	}
 
 	log.Printf("Starting fan system")
 	fan, err := startFan(p)
 	if err != nil {
 		log.Printf("startFan failed: %v", err)
-		return err
+		return err, nil
 	}
 
 	tty, baud := p.HostUart()
@@ -287,35 +291,69 @@ func StartupWithConfig(p Platform, c *config.Config) error {
 	uart, err := startUart(tty, baud)
 	if err != nil {
 		log.Printf("startUart failed: %v", err)
-		return err
+		return err, nil
 	}
 
 	log.Printf("Starting OpenMetrics interface")
 	if err := startMetrics(); err != nil {
 		log.Printf("startMetrics failed: %v", err)
-		return err
+		return err, nil
 	}
 
 	log.Printf("Starting gRPC interface")
 	rpc, err := startGrpc(gpio, fan, uart, &c.Version)
 	if err != nil {
 		log.Printf("startGrpc failed: %v", err)
-		return err
+		return err, nil
 	}
 
+	// The rest of the startup depends on the system having the correct time,
+	// so initialize the rest in the background
+	startupResult := make(chan error)
 	go func() {
-		// Before we enable remote calls, make sure we have acquired accurate time
-		<-timeAcquired
-		systemHasTime.Set(1)
-
-		log.Printf("Time has been verified, enabling remote RPCs")
-		if err := rpc.EnableRemote(); err != nil {
-			log.Printf("rpc.EnableRemote failed: %v", err)
+		if err := asyncStartup(p, c, rpc, timeAcquired); err != nil {
+			startupResult <- err
+			return
 		}
-
-		// Start background time sync
-		go backgroundTimeSync(c.RoughtimeServers, c.NtpServers)
+		startupResult <- nil
 	}()
+
+	return nil, startupResult
+}
+
+func asyncStartup(p Platform, c *config.Config, rpc RpcServer, t chan bool) error {
+	// Before we enable remote calls, make sure we have acquired accurate time
+	<-t
+	systemHasTime.Set(1)
+
+	// Start background time sync
+	go backgroundTimeSync(c.RoughtimeServers, c.NtpServers)
+
+	log.Printf("Time has been verified, loading system certificate")
+	domain := FQDN()
+	cf := fmt.Sprintf("/config/%s.crt", domain)
+	kf := fmt.Sprintf("/config/%s.key", domain)
+	akeyf := "/config/acme.key"
+
+	var crt *tls.Certificate
+	for {
+		var err error
+		crt, err = cert.Load(&c.Acme, akeyf, domain, cf, kf)
+		if err == nil {
+			break
+		}
+		log.Printf("cert.Load failed: %v", err)
+		delay := certRetry.Duration()
+		log.Printf("Waiting %v before retrying certificate acquisition", delay)
+		time.Sleep(delay)
+	}
+	certRetry.Reset()
+
+	log.Printf("Certificate available, enabling remote RPCs")
+	if err := rpc.EnableRemote(crt); err != nil {
+		log.Printf("rpc.EnableRemote failed: %v", err)
+		return err
+	}
 
 	return nil
 }

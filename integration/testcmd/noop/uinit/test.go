@@ -5,27 +5,37 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/aspeed"
+	"github.com/u-root/u-bmc/integration/utils"
 	"github.com/u-root/u-bmc/pkg/bmc"
 	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/platform"
 )
 
-func main() {
+func uinit() error {
 	p := platform.Platform()
 	defer p.Close()
 
-	a := aspeed.Open()
-	defer a.Close()
+	err, sr := bmc.Startup(p)
 
-	if err := bmc.Startup(p); err != nil {
-		fmt.Printf("BOOT_TEST_FAILED: %v\n", err)
+	if err != nil {
+		return err
 	}
 
-	// Do nothing
+	if err := <-sr; err != nil {
+		return err
+	}
+
+	// Hang around forever
 	for {
 		time.Sleep(10 * time.Second)
+	}
+}
+
+func main() {
+	if err := uinit(); err != nil {
+		utils.FailTest(err)
+	} else {
+		utils.PassTest()
 	}
 }

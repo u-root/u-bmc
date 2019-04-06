@@ -115,6 +115,45 @@
   version = "v1.2.0"
 
 [[projects]]
+  digest = "1:abb6572474aa961d2aa78aabf5aaa96cf623db17eb690e4dd1714611de999618"
+  name = "github.com/jmhodges/clock"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "880ee4c335489bc78d01e4d0a254ae880734bc15"
+  version = "v1.1"
+
+[[projects]]
+  digest = "1:b6bbd2f9e0724bd81890c8644259f920c6d61c08453978faff0bebd25f3e7d3e"
+  name = "github.com/jpillora/backoff"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "8eab2debe79d12b7bd3d10653910df25fa9552ba"
+  version = "1.0.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:a614f90efda8bb0e3d6118da83a11eaa9a3dfbb12f0f0ae6ba919dd86f71fa43"
+  name = "github.com/letsencrypt/challtestsrv"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "285efd6fac122954c72d2f32bf1f6e3f7c50ffb5"
+
+[[projects]]
+  branch = "master"
+  digest = "1:b380421d5e6384644af120efbc677f9850566db580fcf2080864903eae6bc198"
+  name = "github.com/letsencrypt/pebble"
+  packages = [
+    "acme",
+    "ca",
+    "core",
+    "db",
+    "va",
+    "wfe",
+  ]
+  pruneopts = "UT"
+  revision = "194da59119430fff75e3249f07e109bb2ba69c24"
+
+[[projects]]
   digest = "1:bafd3a9adf27bf1d851160b0e7a0187c3855223b3920771fdbfe44edf066934e"
   name = "github.com/machinebox/progress"
   packages = ["."]
@@ -148,6 +187,14 @@
   ]
   pruneopts = "UT"
   revision = "258ea9dff42c0ec7540aa4b1599d09e7bfc7973b"
+
+[[projects]]
+  digest = "1:2b4b4b2e5544c2a11a486c1b631357aa2ddf766e50c1b2483cf809da2c511234"
+  name = "github.com/miekg/dns"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "73601d4aed9d844322611759d7f3619110b7c88e"
+  version = "v1.1.8"
 
 [[projects]]
   branch = "master"
@@ -244,7 +291,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:2c617505d9b5f9c1126765258348117bd6b2165118ff575ea86090e716b3c041"
+  digest = "1:69f805e6494b37fe59183ce2a823c850aeb54c1276aab88bad63e38ef649100c"
   name = "golang.org/x/crypto"
   packages = [
     "cast5",
@@ -259,6 +306,7 @@
     "openpgp/errors",
     "openpgp/packet",
     "openpgp/s2k",
+    "pbkdf2",
     "poly1305",
     "ssh",
   ]
@@ -267,7 +315,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:a337d6b08f0591dfb62e6652db8c19084dad970f99d45b80f3e03a5da28c1aeb"
+  digest = "1:8f318996c743000bc523ab666e65cc34b888acf2a582610308ad27f7a407b574"
   name = "golang.org/x/net"
   packages = [
     "bpf",
@@ -280,6 +328,7 @@
     "internal/socket",
     "internal/timeseries",
     "ipv4",
+    "ipv6",
     "trace",
   ]
   pruneopts = "UT"
@@ -403,6 +452,18 @@
   revision = "3507fb8e1a5ad030303c106fef3a47c9fdad16ad"
   version = "v1.19.1"
 
+[[projects]]
+  digest = "1:c0c30f47f9c16f227ba82f0bdfd14fa968453c30b7677a07903b3b4f34b98d49"
+  name = "gopkg.in/square/go-jose.v2"
+  packages = [
+    ".",
+    "cipher",
+    "json",
+  ]
+  pruneopts = "UT"
+  revision = "628223f44a71f715d2881ea69afc795a1e9c01be"
+  version = "v2.3.0"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
@@ -415,6 +476,12 @@
     "github.com/grpc-ecosystem/go-grpc-prometheus",
     "github.com/jhump/protoreflect/desc",
     "github.com/jhump/protoreflect/grpcreflect",
+    "github.com/jmhodges/clock",
+    "github.com/jpillora/backoff",
+    "github.com/letsencrypt/pebble/ca",
+    "github.com/letsencrypt/pebble/db",
+    "github.com/letsencrypt/pebble/va",
+    "github.com/letsencrypt/pebble/wfe",
     "github.com/machinebox/progress",
     "github.com/mdlayher/genetlink",
     "github.com/mdlayher/netlink",

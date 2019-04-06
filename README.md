@@ -76,6 +76,11 @@ Setup:
 ```
 # SSH ECDSA public keys does not work for now
 cp ~/.ssh/id_rsa.pub ssh_keys.pub
+# Agree to the terms of the configured ACME server
+# By default it's just a toy ACME server so this is fine, but if you're
+# using another ACME server like Let's Encrypt (LE) ensure you agree to their terms.
+# For LE, you can find them at https://letsencrypt.org/repository/.
+touch config/i_agree_to_the_acme_terms
 make
 ```
 
@@ -85,15 +90,47 @@ signed with these keys.
 
 # Hacking
 
-To run the unit tests, run `make test`.
-
 To run the simulator and the integration test you need a special
 Qemu from https://github.com/openbmc/qemu. Using the upstream Qemu will
 not work predictably.
 
+## Simulator
+
+Trying out u-bmc is easiest using the simulator. To launch it, run:
+
 ```
+# Launch a local ACME server
+make pebble &
+# Launch u-bmc simulator
 make sim
 ```
+
+When simulating the following TCP/IP ports are set up:
+
+ * 6053/udp: u-bmc DNS
+ * 6443/tcp: u-bmc gRPC
+ * 9370/tcp: u-bmc OpenMetrics
+
+When the u-bmc guest tries to access 10.0.2.100 a local service called
+ubmc-pebble is started which uses Let's Encrypt's pebble service to generate
+an HTTPS certificate. The CA used is located in config/sim-ca.crt.
+
+You can interact with u-bmc running in the simulator by using ubmcctl:
+
+```
+go install github.com/u-root/u-bmc/cmd/ubmcctl
+# The root CA is regenerated every time pebble is started to prevent
+# testing to accidentally become production
+curl https://localhost:14000/root --cacert config/sim-pebble.crt > root.crt
+echo '127.0.1.2	ubmc.example.com' | sudo tee -a /etc/hosts
+SSL_CERT_FILE=root.crt ubmcctl -host ubmc.example.com:6443
+```
+
+If you restart pebble you need to update root.crt.
+
+## Testing
+
+The easiest way to run all unit tests is to run `make test`.
 
 To run the integration tests:
 ```
@@ -110,6 +147,8 @@ can use socflash\_x64 provided by ASPEED like this:
 echo This is extremely likely to break things as u-bmc is still experimental
 sudo ./socflash_x64 of=bmc-backup.img if=flash.img lpcport=0x2e option=glc
 ```
+
+## Uploading a new version
 
 If you want to quickly upload a new build of u-bmc without updating the kernel,
 you can use SCP like this:
@@ -132,7 +171,7 @@ sync
 shutdown -r
 ```
 
-# Updating Dependencies
+## Updating Dependencies
 
 Latest released version of dep is required. One easy way, but not that secure,
 is to install it using their installation script.

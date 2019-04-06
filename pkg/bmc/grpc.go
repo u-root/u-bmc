@@ -6,6 +6,7 @@ package bmc
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"github.com/u-root/u-bmc/config"
 	pb "github.com/u-root/u-bmc/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -100,21 +102,26 @@ func (m *mgmtServer) GetVersion(ctx context.Context, r *pb.GetVersionRequest) (*
 	return &pb.GetVersionResponse{Version: m.v.Version, GitHash: m.v.GitHash}, nil
 }
 
-func (m *mgmtServer) EnableRemote() error {
-	// TODO(bluecmd): Add HTTPS when that is implemented
-	l, err := net.Listen("tcp", "[::]:443")
+func (m *mgmtServer) EnableRemote(c *tls.Certificate) error {
+	l, err := net.Listen("tcp", ":443")
 	if err != nil {
 		return fmt.Errorf("could not listen: %v", err)
 	}
-	m.newServer(l)
+	m.newServer(l, c)
 	return nil
 }
 
-func (m *mgmtServer) newServer(l net.Listener) {
-	g := grpc.NewServer(
+func (m *mgmtServer) newServer(l net.Listener, c *tls.Certificate) {
+	opts := []grpc.ServerOption{
 		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
 		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
-	)
+	}
+	if c != nil {
+		creds := credentials.NewServerTLSFromCert(c)
+		opts = []grpc.ServerOption{grpc.Creds(creds)}
+	}
+
+	g := grpc.NewServer(opts...)
 	pb.RegisterManagementServiceServer(g, m)
 	grpc_prometheus.Register(g)
 	reflection.Register(g)
@@ -128,7 +135,7 @@ func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem, v *conf
 	}
 
 	s := mgmtServer{gpio, fan, uart, v}
-	s.newServer(l)
+	s.newServer(l, nil)
 
 	return &s, nil
 }

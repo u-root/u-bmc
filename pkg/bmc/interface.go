@@ -20,6 +20,10 @@ const (
 	interfaceUpTimeout = 30 * time.Second
 )
 
+var (
+	fqdn string
+)
+
 func addIp(cidr string, iface string) error {
 	l, err := netlink.LinkByName(iface)
 	if err != nil {
@@ -128,17 +132,21 @@ func ipv6LinkFixer(iface string) {
 	}
 }
 
+func FQDN() string {
+	return fqdn
+}
+
 func ConfigureNetwork(config *pb.Network) error {
 	if config == nil {
 		log.Printf("No network configuration detected, using defaults")
 		config = &pb.Network{}
 	}
 
+	fqdn = "ubmc.local"
 	if config.Hostname != "" {
-		unix.Sethostname([]byte(config.Hostname))
-	} else {
-		unix.Sethostname([]byte("ubmc"))
+		fqdn = config.Hostname
 	}
+	unix.Sethostname([]byte(fqdn))
 
 	// Fun story: if you don't have both IPv4 and IPv6 loopback configured
 	// golang binaries will not bind to :: but to 0.0.0.0 instead.

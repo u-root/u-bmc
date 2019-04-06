@@ -21,7 +21,7 @@ func main() {
 	a := aspeed.Open()
 	defer a.Close()
 
-	if err := bmc.Startup(p); err != nil {
+	if err, _ := bmc.Startup(p); err != nil {
 		fmt.Printf("TEST_FAILED: %v\n", err)
 	} else {
 		// Verify that the power button is set to an output for sanity

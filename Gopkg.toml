@@ -38,6 +38,10 @@
   name = "github.com/fullstorydev/grpcurl"
   branch = "master"
 
+[[constraint]]
+  name = "github.com/letsencrypt/pebble"
+  branch = "master"
+
 [prune]
   go-tests = true
   unused-packages = true
