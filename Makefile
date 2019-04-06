@@ -232,7 +232,7 @@ flash.sim.img: flash.img
 	( cat $^ ; perl -e 'print chr(0xFF)x1024 while 1' ) \
 		| dd bs=1M count=32 iflag=fullblock > $@
 
-initramfs.cpio: u-bmc ssh_keys.pub $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)pkg $(ROOT_DIR)proto -name \*.go -type f)
+initramfs.cpio: u-bmc ssh_keys.pub $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)platform/$(PLATFORM) $(ROOT_DIR)pkg $(ROOT_DIR)proto -name \*.go -type f)
 	go generate ./config/
 	GOARM=5 GOARCH=$(ARCH) ./u-bmc -o "$@.tmp" -p "$(PLATFORM)"
 	mv "$@.tmp" "$@"

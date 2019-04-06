@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 
-	"golang.org/x/crypto/ssh/terminal"
 	"golang.org/x/sys/unix"
 )
 
@@ -31,11 +30,6 @@ func main() {
 		log.Fatalf("Unable to read from terminal: %v", err)
 	}
 
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = "<unknown>"
-	}
-
 	fmt.Printf(`
 ██╗   ██╗      ██████╗ ███╗   ███╗ ██████╗
 ██║   ██║      ██╔══██╗████╗ ████║██╔════╝
@@ -44,16 +38,7 @@ func main() {
 ╚██████╔╝      ██████╔╝██║ ╚═╝ ██║╚██████╗
  ╚═════╝       ╚═════╝ ╚═╝     ╚═╝ ╚═════╝
 
-Note: This is TODO, password is 'rosebud'
-%s login: `, hostname)
-
-	pw, _ := terminal.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Println("")
-	if string(pw) != "rosebud" {
-		fmt.Println("Password incorrect")
-		return
-	}
-	fmt.Println("")
+`)
 
 	envv := []string{"TZ=UTC", "HOME=/root", "USER=root", "PATH=/bbin:/bin"}
 	err = unix.Exec(*shell, []string{*shell}, envv)

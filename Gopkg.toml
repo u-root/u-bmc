@@ -1,5 +1,3 @@
-ignored = ["golang.org/x/sys/windows"]
-
 [[constraint]]
   name = "github.com/golang/protobuf"
   version = "1.3.1"
