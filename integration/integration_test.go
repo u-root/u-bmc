@@ -121,6 +121,9 @@ func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 		Initramfs: i,
 		Kernel:    kernel,
 		QEMUPath:  os.Getenv("UBMC_NATIVE_QEMU"),
+		Devices:   []qemu.Device{
+			VirtioRngDevice{},
+		},
 	}
 	vm, vmCleanup := qemuTest(t, q, o)
 
