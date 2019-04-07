@@ -45,6 +45,13 @@ func (d QemuMonitorDevice) Cmdline() []string {
 	return []string{"-qmp", "unix:" + d.Socket + ",server,nowait"}
 }
 
+type VirtioRngDevice struct {
+}
+
+func (d VirtioRngDevice) Cmdline() []string {
+	return []string{"-device", "virtio-rng-pci"}
+}
+
 type QOMInteger struct {
 	Path     string `json:"path"`
 	Property string `json:"property"`
