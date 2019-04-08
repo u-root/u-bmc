@@ -17,14 +17,19 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/pkg/acme"
 )
 
+const (
+	lifetimePadding = -4 * time.Hour
+)
+
 func Load(c *config.Acme, akey, fqdn, crt, key string) (*tls.Certificate, error) {
-	return load(afero.NewOsFs(), c, akey, fqdn, crt, key)
+	return load(afero.NewOsFs(), time.Now(), c, akey, fqdn, crt, key)
 }
 
 func loadX509KeyPair(fs afero.Fs, certFile, keyFile string) (*tls.Certificate, error) {
@@ -40,9 +45,27 @@ func loadX509KeyPair(fs afero.Fs, certFile, keyFile string) (*tls.Certificate, e
 	return &c, err
 }
 
-func load(fs afero.Fs, c *config.Acme, akey, fqdn, crt, key string) (*tls.Certificate, error) {
+func validateCert(ct *tls.Certificate, now time.Time) bool {
+	c, err := x509.ParseCertificate(ct.Certificate[0])
+	if err != nil {
+		return false
+	}
+	// Check that the validity of the certificate is sane
+	validFrom := c.NotBefore
+	if validFrom.After(now) {
+		return false
+	}
+
+	expires := c.NotAfter.Add(lifetimePadding)
+	if expires.Before(now) {
+		return false
+	}
+	return true
+}
+
+func load(fs afero.Fs, n time.Time, c *config.Acme, akey, fqdn, crt, key string) (*tls.Certificate, error) {
 	kp, err := loadX509KeyPair(fs, crt, key)
-	if err == nil {
+	if err == nil && validateCert(kp, n) {
 		return kp, nil
 	}
 	kp, err = renewCert(fs, c, akey, fqdn)
