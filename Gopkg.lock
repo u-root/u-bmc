@@ -238,6 +238,17 @@
   revision = "af7bedc223fba51343f25a6fa7aba84355d0357a"
 
 [[projects]]
+  digest = "1:bb495ec276ab82d3dd08504bbc0594a65de8c3b22c6f2aaa92d05b73fbf3a82e"
+  name = "github.com/spf13/afero"
+  packages = [
+    ".",
+    "mem",
+  ]
+  pruneopts = "UT"
+  revision = "588a75ec4f32903aa5e39a2619ba6a4631e28424"
+  version = "v1.2.2"
+
+[[projects]]
   branch = "master"
   digest = "1:52b21e6be25049834aea5ecdde35d723c00fbdad3ea0357f2072dfb105836e02"
   name = "github.com/tarm/serial"
@@ -488,6 +499,7 @@
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/client_golang/prometheus/testutil",
+    "github.com/spf13/afero",
     "github.com/tarm/serial",
     "github.com/u-root/u-root/integration",
     "github.com/u-root/u-root/pkg/golang",
