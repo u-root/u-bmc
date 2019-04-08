@@ -5,34 +5,123 @@
 package cert
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 
+	"github.com/spf13/afero"
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/pkg/acme"
 )
 
 func Load(c *config.Acme, akey, fqdn, crt, key string) (*tls.Certificate, error) {
-	return renewCert(c, akey, fqdn)
+	return load(afero.NewOsFs(), c, akey, fqdn, crt, key)
 }
 
-func loadOrGenerateKey(key string) (*ecdsa.PrivateKey, error) {
-	b, err := ioutil.ReadFile(key)
+func loadX509KeyPair(fs afero.Fs, certFile, keyFile string) (*tls.Certificate, error) {
+	certPEMBlock, err := afero.ReadFile(fs, certFile)
+	if err != nil {
+		return nil, err
+	}
+	keyPEMBlock, err := afero.ReadFile(fs, keyFile)
+	if err != nil {
+		return nil, err
+	}
+	c, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
+	return &c, err
+}
+
+func load(fs afero.Fs, c *config.Acme, akey, fqdn, crt, key string) (*tls.Certificate, error) {
+	kp, err := loadX509KeyPair(fs, crt, key)
+	if err == nil {
+		return kp, nil
+	}
+	kp, err = renewCert(fs, c, akey, fqdn)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fail soft on failing to write these files. We can still serve from memory
+	// and next reboot we will have to renew instead.
+	if err := saveKeyPair(fs, kp, crt, key); err != nil {
+		log.Printf("WARNING: System will use certificate from memory, but will have to renew it on reboot. Error was: %v", err)
+	}
+
+	return kp, nil
+}
+
+func saveKeyPair(fs afero.Fs, kp *tls.Certificate, crt, key string) error {
+	b, err := encodeCert(kp.Certificate)
+	if err != nil {
+		return fmt.Errorf("Failed to encode certificate, please file a bug about this: %v", err)
+	} else {
+		if err := afero.WriteFile(fs, crt, b, 0644); err != nil {
+			return fmt.Errorf("Failed to save system certificate %s: %v", crt, err)
+		}
+	}
+
+	b, err = encodeKey(kp.PrivateKey.(*ecdsa.PrivateKey))
+	if err != nil {
+		return fmt.Errorf("Failed to encode certificate, please file a bug about this")
+	} else {
+		if err := afero.WriteFile(fs, key, b, 0600); err != nil {
+			return fmt.Errorf("Failed to save system certificate key %s: %v", key, err)
+		}
+	}
+	return nil
+}
+
+func encodeCert(der [][]byte) ([]byte, error) {
+	var res bytes.Buffer
+
+	for _, c := range der {
+		block := &pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: c,
+		}
+		if err := pem.Encode(&res, block); err != nil {
+			return []byte{}, err
+		}
+	}
+	return res.Bytes(), nil
+}
+
+func encodeKey(pk *ecdsa.PrivateKey) ([]byte, error) {
+	var res bytes.Buffer
+
+	der, err := x509.MarshalECPrivateKey(pk)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	block := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: der,
+	}
+	if err := pem.Encode(&res, block); err != nil {
+		return []byte{}, err
+	}
+	return res.Bytes(), nil
+}
+
+func loadOrGenerateKey(fs afero.Fs, key string) (*ecdsa.PrivateKey, error) {
+	b, err := afero.ReadFile(fs, key)
 	if os.IsNotExist(err) {
-		return generateAndSaveKey(key)
+		return generateAndSaveKey(fs, key)
 	}
 	return x509.ParseECPrivateKey(b)
 }
 
-func generateAndSaveKey(key string) (*ecdsa.PrivateKey, error) {
+func generateAndSaveKey(fs afero.Fs, key string) (*ecdsa.PrivateKey, error) {
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -41,11 +130,14 @@ func generateAndSaveKey(key string) (*ecdsa.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return k, ioutil.WriteFile(key, b, 0400)
+	return k, afero.WriteFile(fs, key, b, 0400)
 }
 
-func renewCert(conf *config.Acme, akey, fqdn string) (*tls.Certificate, error) {
-	key, err := loadOrGenerateKey(akey)
+func renewCert(fs afero.Fs, conf *config.Acme, akey string, fqdn string) (*tls.Certificate, error) {
+	key, err := loadOrGenerateKey(fs, akey)
+	if err != nil {
+		return nil, err
+	}
 
 	roots := x509.NewCertPool()
 	ok := roots.AppendCertsFromPEM([]byte(conf.APICA))
