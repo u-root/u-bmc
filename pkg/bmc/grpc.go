@@ -7,11 +7,13 @@ package bmc
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
 
 	"github.com/grpc-ecosystem/go-grpc-prometheus"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/u-root/u-bmc/config"
 	pb "github.com/u-root/u-bmc/proto"
 	"google.golang.org/grpc"
@@ -39,6 +41,26 @@ type mgmtServer struct {
 	fan  rpcFanSystem
 	uart rpcUartSystem
 	v    *config.Version
+}
+
+var (
+	tlsCertificateExpiry = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "ubmc",
+		Subsystem: "grpc",
+		Name:      "certificate_expiry",
+		Help:      "UNIX timestamp when the currently loaded TLS certificate expires for the gRPC server",
+	})
+	tlsCertificateLoaded = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "ubmc",
+		Subsystem: "grpc",
+		Name:      "certificate_loaded",
+		Help:      "Whether the gRPC server has loaded a certificate",
+	})
+)
+
+func init() {
+	prometheus.MustRegister(tlsCertificateExpiry)
+	prometheus.MustRegister(tlsCertificateLoaded)
 }
 
 func (m *mgmtServer) PressButton(ctx context.Context, r *pb.ButtonPressRequest) (*pb.ButtonPressResponse, error) {
@@ -119,6 +141,11 @@ func (m *mgmtServer) newServer(l net.Listener, c *tls.Certificate) {
 	if c != nil {
 		creds := credentials.NewServerTLSFromCert(c)
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
+		c, err := x509.ParseCertificate(c.Certificate[0])
+		if err == nil {
+			tlsCertificateLoaded.Set(float64(1))
+			tlsCertificateExpiry.Set(float64(c.NotAfter.Unix()))
+		}
 	}
 
 	g := grpc.NewServer(opts...)
