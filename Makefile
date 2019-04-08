@@ -259,3 +259,10 @@ pebble:
 	PEBBLE_VA_ALWAYS_VALID=1 go run github.com/letsencrypt/pebble/cmd/pebble \
 		-dnsserver locahost:6053 \
 		-config config/sim-pebble.json
+
+run-ovmf:
+	qemu-system-x86_64 -bios $(ROOT_DIR)integration/ovmf.rom \
+		-display none \
+		-chardev socket,id=host,path=host.uart \
+		-serial chardev:host \
+		-net none
