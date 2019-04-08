@@ -13,6 +13,7 @@ import (
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/integration/utils"
 	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/pkg/bmc/ttime"
 	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/platform"
 )
 
@@ -24,8 +25,11 @@ func uinit() error {
 	os.Setenv("PEBBLE_VA_ALWAYS_VALID", "1")
 
 	ca := utils.NewTestCA()
+	rt := utils.NewTestRoughtimeServer()
 
 	c := config.DefaultConfig
+	c.RoughtimeServers = []ttime.RoughtimeServer{rt.Config}
+	log.Printf("Roughtime server: %v", rt.Config)
 	c.Acme.APICA = ca.APICA
 	log.Printf("API CA: %v", ca.APICA)
 	c.Acme.Directory = ca.Directory
@@ -36,8 +40,9 @@ func uinit() error {
 		return err
 	}
 
-	// Network has been configured, start CA server
+	// Network has been configured, start helper servers
 	go ca.Run()
+	go rt.Run()
 
 	if err := <-sr; err != nil {
 		return err
