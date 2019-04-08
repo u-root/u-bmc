@@ -101,10 +101,11 @@ Trying out u-bmc is easiest using the simulator. To launch it, run:
 ```
 # Launch a local ACME server
 make pebble &
-# (Optional) Launch a local emulated BIOS to produce some data on the UART
-make run-ovmf &
 # Launch u-bmc simulator
 make sim
+# (Optional, run in another terminal) Launch a local emulated BIOS to produce some data on the UART
+# Needs to have u-bmc simulator above running for it to attach correctly.
+make run-ovmf
 ```
 
 When simulating the following TCP/IP ports are set up:
