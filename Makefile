@@ -225,7 +225,7 @@ root.ubifs.img: initramfs.cpio $(ROOT_DIR)boot/zImage.full $(ROOT_DIR)boot/signe
 	fakeroot sh -c "(cd root/; cpio -idv < ../$(<)) && \
 		cat root/bbin/bb $(TEST_EXTRA_SIGN) | \
 			$(ROOT_DIR)boot/signer/signer > root/bbin/bb.gpg && \
-		mkfs.ubifs -r root -R0 -m 1 -e ${LEB} -c 2047 -o $(@)"
+		mkfs.ubifs -x zlib -r root -R0 -m 1 -e ${LEB} -c 2047 -o $(@)"
 
 ubi.img: root.ubifs.img $(ROOT_DIR)ubi.cfg
 	ubinize -vv -o ubi.img -m 1 -p64KiB $(ROOT_DIR)ubi.cfg
