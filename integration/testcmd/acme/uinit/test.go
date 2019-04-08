@@ -29,6 +29,7 @@ func uinit() error {
 
 	c := config.DefaultConfig
 	c.RoughtimeServers = []ttime.RoughtimeServer{rt.Config}
+	c.NtpServers = []ttime.NtpServer{}
 	log.Printf("Roughtime server: %v", rt.Config)
 	c.Acme.APICA = ca.APICA
 	log.Printf("API CA: %v", ca.APICA)
