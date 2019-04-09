@@ -66,10 +66,9 @@ Clone:
 ```
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
-git submodule init && git submodule update
+(cd linux/; ../linux-patches/apply.sh)
 # Until https://github.com/u-root/u-root/issues/1024 is fixed
 go get github.com/u-root/u-root
-(cd linux/; ../linux-patches/apply.sh)
 ```
 
 Setup:
