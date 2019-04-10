@@ -198,7 +198,7 @@ func backgroundTimeSync(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
 	}
 }
 
-func importSystemConfiguration(path string) {
+func loadSysconf(path string) *pb.SystemConfig {
 	f, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Printf("Failed to read system configuration %s: %v", path, err)
@@ -212,9 +212,7 @@ func importSystemConfiguration(path string) {
 		log.Printf("Using default system configuration")
 	}
 
-	if err := ConfigureNetwork(sysconf.Network); err != nil {
-		log.Printf("Failed to configure network: %v", err)
-	}
+	return sysconf
 }
 
 func Startup(p Platform) (error, chan error) {
@@ -270,7 +268,13 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	}
 
 	log.Printf("Loading system configuration")
-	importSystemConfiguration("/config/system.textpb")
+	sysconf := loadSysconf("/config/system.textpb")
+
+	network, err := startNetwork(sysconf.Network)
+	if err != nil {
+		log.Printf("startNetwork failed: %v", err)
+		return err, nil
+	}
 
 	// At this time we can assume having a hostname and network connectivity
 
@@ -310,7 +314,7 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	}
 
 	log.Printf("Starting DNS interface")
-	dns, err := startDNS(FQDN())
+	dns, err := startDNS(network.FQDN(), network)
 	if err != nil {
 		log.Printf("startDNS failed: %v", err)
 		return err, nil
@@ -323,7 +327,7 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	}
 
 	cm := &cert.Manager{
-		FQDN:         FQDN(),
+		FQDN:         network.FQDN(),
 		AccountKey:   akey,
 		ACMEConfig:   &c.ACME,
 		ACMEHandlers: []cert.ACMEHandler{dns},
@@ -352,7 +356,7 @@ func asyncStartup(p Platform, c *config.Config, rpc RPCServer, cm *cert.Manager,
 	go backgroundTimeSync(c.RoughtimeServers, c.NtpServers)
 
 	log.Printf("Time has been verified, loading system certificate")
-	domain := FQDN()
+	domain := cm.FQDN
 	cf := fmt.Sprintf("/config/%s.crt", domain)
 	kf := fmt.Sprintf("/config/%s.key", domain)
 

@@ -20,9 +20,11 @@ const (
 	interfaceUpTimeout = 30 * time.Second
 )
 
-var (
+type network struct {
 	fqdn string
-)
+	ipv4 net.IP
+	ipv6 net.IP
+}
 
 func addIp(cidr string, iface string) error {
 	l, err := netlink.LinkByName(iface)
@@ -132,11 +134,24 @@ func ipv6LinkFixer(iface string) {
 	}
 }
 
-func FQDN() string {
-	return fqdn
+func (n *network) FQDN() string {
+	return n.fqdn
 }
 
-func ConfigureNetwork(config *pb.Network) error {
+func (n *network) IPv4() net.IP {
+	return n.ipv4
+}
+
+func (n *network) IPv6() net.IP {
+	return n.ipv4
+}
+
+func (n *network) AddressLifetime() time.Duration {
+	// TODO(bluecmd): This should be decided based on DHCP lease and such
+	return time.Hour
+}
+
+func startNetwork(config *pb.Network) (*network, error) {
 	if config == nil {
 		log.Printf("No network configuration detected, using defaults")
 		config = &pb.Network{}
@@ -146,22 +161,23 @@ func ConfigureNetwork(config *pb.Network) error {
 	// golang binaries will not bind to :: but to 0.0.0.0 instead.
 	// Isn't that surprising?
 	if err := addIp("127.0.0.1/8", "lo"); err != nil {
-		return err
+		return nil, err
 	}
 	if err := addIp("::1/32", "lo"); err != nil {
-		return err
+		return nil, err
 	}
 	if err := setLinkUp("lo"); err != nil {
-		return err
+		return nil, err
 	}
 
+	// TODO(bluecmd): Set ipv4/ipv6 objects to remember the host addresses
 	for iface, ic := range config.Interface {
 		if ic.Vlan != 0 {
 			log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
 			continue
 		}
 		if err := setLinkUp(iface); err != nil {
-			return err
+			return nil, err
 		}
 
 		for _, ipv4 := range ic.Ipv4Address {
@@ -198,11 +214,11 @@ func ConfigureNetwork(config *pb.Network) error {
 	// had one configured. The rest of the startup flow depends on it.
 
 	// TODO(bluecmd): Read hostname from config file or DHCP, don't have any default
-	fqdn = "ubmc.local"
+	fqdn := "ubmc.local"
 	if config.Hostname != "" {
 		fqdn = config.Hostname
 	}
 	unix.Sethostname([]byte(fqdn))
 
-	return nil
+	return &network{fqdn: fqdn}, nil
 }

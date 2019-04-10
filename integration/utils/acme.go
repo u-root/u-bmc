@@ -5,6 +5,7 @@
 package utils
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -36,6 +37,14 @@ type CAServer struct {
 
 func NewTestCA() *CAServer {
 	cert := genCert()
+
+	net.DefaultResolver = &net.Resolver{
+		PreferGo: true,
+		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			d := net.Dialer{}
+			return d.DialContext(ctx, "udp", "[::1]:53")
+		},
+	}
 
 	logger := log.New(os.Stdout, "Pebble ", log.LstdFlags)
 	clk := clock.New()

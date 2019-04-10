@@ -7,7 +7,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/u-root/u-bmc/config"
@@ -20,9 +19,6 @@ import (
 func uinit() error {
 	p := platform.Platform()
 	defer p.Close()
-
-	// TODO(bluecmd): Test with validation
-	os.Setenv("PEBBLE_VA_ALWAYS_VALID", "1")
 
 	ca := utils.NewTestCA()
 	rt := utils.NewTestRoughtimeServer()
