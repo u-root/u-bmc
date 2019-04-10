@@ -256,8 +256,8 @@ clean:
 	\rm -fr root/ boot/modules/ module/.tmp_versions/ boot/out
 
 pebble:
-	PEBBLE_VA_ALWAYS_VALID=1 go run github.com/letsencrypt/pebble/cmd/pebble \
-		-dnsserver locahost:6053 \
+	go run github.com/letsencrypt/pebble/cmd/pebble \
+		-dnsserver 127.0.0.1:6053 \
 		-config config/sim-pebble.json
 
 run-ovmf:

@@ -496,6 +496,7 @@
     "github.com/machinebox/progress",
     "github.com/mdlayher/genetlink",
     "github.com/mdlayher/netlink",
+    "github.com/miekg/dns",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/prometheus/client_golang/prometheus/testutil",
