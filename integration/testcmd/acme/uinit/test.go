@@ -31,10 +31,10 @@ func uinit() error {
 	c.RoughtimeServers = []ttime.RoughtimeServer{rt.Config}
 	c.NtpServers = []ttime.NtpServer{}
 	log.Printf("Roughtime server: %v", rt.Config)
-	c.Acme.APICA = ca.APICA
+	c.ACME.APICA = ca.APICA
 	log.Printf("API CA: %v", ca.APICA)
-	c.Acme.Directory = ca.Directory
-	c.Acme.TermsAgreed = true
+	c.ACME.Directory = ca.Directory
+	c.ACME.TermsAgreed = true
 
 	err, sr := bmc.StartupWithConfig(p, c)
 	if err != nil {

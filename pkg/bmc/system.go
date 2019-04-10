@@ -80,7 +80,7 @@ type Platform interface {
 	FanPlatform
 }
 
-type RpcServer interface {
+type RPCServer interface {
 	EnableRemote(*tls.Certificate) error
 }
 
@@ -241,31 +241,6 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 		log.SetOutput(io.MultiWriter(loggers...))
 	}
 
-	log.Printf("Loading system configuration")
-	importSystemConfiguration("/config/system.textpb")
-
-	timeAcquired := make(chan bool)
-	go func() {
-		log.Printf("Acquiring trusted time")
-		acquireTime(c.RoughtimeServers, c.NtpServers)
-		// TODO(bluecmd): If the RTC is already set, we should send this straight away
-		timeAcquired <- true
-	}()
-
-	createFile("/etc/passwd", 0644, []byte("root:x:0:0:root:/root:/bbin/elvish"))
-	createFile("/etc/group", 0644, []byte("root:x:0:"))
-
-	// The platform libraries need access to physical memory
-	unix.Mknod("/dev/mem", unix.S_IFCHR|0600, 0x0101)
-
-	if c.StartDebugSshServer {
-		log.Printf("Starting debug SSH server")
-		// Make sure sshd starts up completely before we continue, to allow for debugging
-		if err := startSsh(c.DebugSshServerKeys); err != nil {
-			log.Printf("ssh server failed: %v", err)
-		}
-	}
-
 	log.Printf("Initialize system hardware")
 	if err := p.InitializeSystem(); err != nil {
 		log.Printf("platform.InitializeSystem: %v", err)
@@ -294,6 +269,33 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 		return err, nil
 	}
 
+	log.Printf("Loading system configuration")
+	importSystemConfiguration("/config/system.textpb")
+
+	// At this time we can assume having a hostname and network connectivity
+
+	timeAcquired := make(chan bool)
+	go func() {
+		log.Printf("Acquiring trusted time")
+		acquireTime(c.RoughtimeServers, c.NtpServers)
+		// TODO(bluecmd): If the RTC is already set, we should send this straight away
+		timeAcquired <- true
+	}()
+
+	createFile("/etc/passwd", 0644, []byte("root:x:0:0:root:/root:/bbin/elvish"))
+	createFile("/etc/group", 0644, []byte("root:x:0:"))
+
+	// The platform libraries need access to physical memory
+	unix.Mknod("/dev/mem", unix.S_IFCHR|0600, 0x0101)
+
+	if c.StartDebugSshServer {
+		log.Printf("Starting debug SSH server")
+		// Make sure sshd starts up completely before we continue, to allow for debugging
+		if err := startSsh(c.DebugSshServerKeys); err != nil {
+			log.Printf("ssh server failed: %v", err)
+		}
+	}
+
 	log.Printf("Starting OpenMetrics interface")
 	if err := startMetrics(); err != nil {
 		log.Printf("startMetrics failed: %v", err)
@@ -301,17 +303,37 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	}
 
 	log.Printf("Starting gRPC interface")
-	rpc, err := startGrpc(gpio, fan, uart, &c.Version)
+	rpc, err := startGRPC(gpio, fan, uart, &c.Version)
 	if err != nil {
-		log.Printf("startGrpc failed: %v", err)
+		log.Printf("startGRPC failed: %v", err)
 		return err, nil
+	}
+
+	log.Printf("Starting DNS interface")
+	dns, err := startDNS(FQDN())
+	if err != nil {
+		log.Printf("startDNS failed: %v", err)
+		return err, nil
+	}
+
+	akey, err := cert.LoadOrGenerateKey("/config/acme.key")
+	if err != nil {
+		log.Printf("Failed to load ACME key: %v", err)
+		return err, nil
+	}
+
+	cm := &cert.Manager{
+		FQDN:         FQDN(),
+		AccountKey:   akey,
+		ACMEConfig:   &c.ACME,
+		ACMEHandlers: []cert.ACMEHandler{dns},
 	}
 
 	// The rest of the startup depends on the system having the correct time,
 	// so initialize the rest in the background
 	startupResult := make(chan error)
 	go func() {
-		if err := asyncStartup(p, c, rpc, timeAcquired); err != nil {
+		if err := asyncStartup(p, c, rpc, cm, timeAcquired); err != nil {
 			startupResult <- err
 			return
 		}
@@ -321,7 +343,7 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	return nil, startupResult
 }
 
-func asyncStartup(p Platform, c *config.Config, rpc RpcServer, t chan bool) error {
+func asyncStartup(p Platform, c *config.Config, rpc RPCServer, cm *cert.Manager, t chan bool) error {
 	// Before we enable remote calls, make sure we have acquired accurate time
 	<-t
 	systemHasTime.Set(1)
@@ -333,12 +355,17 @@ func asyncStartup(p Platform, c *config.Config, rpc RpcServer, t chan bool) erro
 	domain := FQDN()
 	cf := fmt.Sprintf("/config/%s.crt", domain)
 	kf := fmt.Sprintf("/config/%s.key", domain)
-	akeyf := "/config/acme.key"
 
-	var crt *tls.Certificate
+	var kp *tls.Certificate
 	for {
-		var err error
-		crt, err = cert.Load(&c.Acme, akeyf, domain, cf, kf)
+		skp, err := tls.LoadX509KeyPair(cf, kf)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				log.Printf("tls.LoadX509KeyPair failed: %v", err)
+			}
+		}
+
+		kp, err = cm.MaybeRenew(&skp)
 		if err == nil {
 			break
 		}
@@ -349,8 +376,14 @@ func asyncStartup(p Platform, c *config.Config, rpc RpcServer, t chan bool) erro
 	}
 	certRetry.Reset()
 
+	// Fail soft on failing to write these files. We can still serve from memory
+	// and next reboot we will have to renew instead.
+	if err := cert.SaveKeyPair(kp, cf, kf); err != nil {
+		log.Printf("WARNING: System will use certificate from memory, but will have to renew it on reboot. Error was: %v", err)
+	}
+
 	log.Printf("Certificate available, enabling remote RPCs")
-	if err := rpc.EnableRemote(crt); err != nil {
+	if err := rpc.EnableRemote(kp); err != nil {
 		log.Printf("rpc.EnableRemote failed: %v", err)
 		return err
 	}

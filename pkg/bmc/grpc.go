@@ -155,7 +155,7 @@ func (m *mgmtServer) newServer(l net.Listener, c *tls.Certificate) {
 	go g.Serve(l)
 }
 
-func startGrpc(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem, v *config.Version) (*mgmtServer, error) {
+func startGRPC(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem, v *config.Version) (*mgmtServer, error) {
 	l, err := net.Listen("tcp", "[::1]:80")
 	if err != nil {
 		return nil, fmt.Errorf("could not listen: %v", err)
