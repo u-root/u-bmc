@@ -15,7 +15,7 @@ type Version struct {
 	GitHash string
 }
 
-type Acme struct {
+type ACME struct {
 	Directory   string
 	Contact     string
 	TermsAgreed bool
@@ -28,7 +28,7 @@ type Config struct {
 	StartDebugSshServer bool
 	DebugSshServerKeys  []string
 	Version             Version
-	Acme                Acme
+	ACME                ACME
 }
 
 var (
@@ -71,7 +71,7 @@ var (
 			GitHash: gitHash,
 		},
 
-		Acme: Acme{
+		ACME: ACME{
 			// Production LE is https://acme-v02.api.letsencrypt.org/directory
 			// 10.0.2.2 is QEMUs address for the host and where pebble is running.
 			Directory:   "https://10.0.2.2:14000/dir",

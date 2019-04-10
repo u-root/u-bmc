@@ -142,12 +142,6 @@ func ConfigureNetwork(config *pb.Network) error {
 		config = &pb.Network{}
 	}
 
-	fqdn = "ubmc.local"
-	if config.Hostname != "" {
-		fqdn = config.Hostname
-	}
-	unix.Sethostname([]byte(fqdn))
-
 	// Fun story: if you don't have both IPv4 and IPv6 loopback configured
 	// golang binaries will not bind to :: but to 0.0.0.0 instead.
 	// Isn't that surprising?
@@ -199,6 +193,16 @@ func ConfigureNetwork(config *pb.Network) error {
 			log.Printf("TODO: got RDNSS %v", r)
 		}
 	}()
+
+	// When we exit this function we must have received a hostname or otherwise
+	// had one configured. The rest of the startup flow depends on it.
+
+	// TODO(bluecmd): Read hostname from config file or DHCP, don't have any default
+	fqdn = "ubmc.local"
+	if config.Hostname != "" {
+		fqdn = config.Hostname
+	}
+	unix.Sethostname([]byte(fqdn))
 
 	return nil
 }

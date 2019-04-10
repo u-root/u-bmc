@@ -5,7 +5,6 @@
 package cert
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -31,14 +30,14 @@ import (
 	"github.com/u-root/u-bmc/config"
 )
 
-const (
-	acmeKey  = "/config/acme.key"
-	fqdn     = "ubmc.test"
-	certFile = "/config/ubmc.test.crt"
-	keyFile  = "/config/ubmc.test.key"
-)
+type fakeACMEHandler struct {
+}
 
-func TestAcme(t *testing.T) {
+func (h *fakeACMEHandler) HandleDNS01Challenge(string, string) error {
+	return nil
+}
+
+func TestACME(t *testing.T) {
 	cert := genCert()
 	logger := Logger(t, "Pebble")
 	clk := clock.New()
@@ -76,57 +75,47 @@ func TestAcme(t *testing.T) {
 		Bytes: cert.Certificate[0],
 	}
 
-	c := config.Acme{
-		Directory:   fmt.Sprintf("https://%s/dir", l.Addr().String()),
-		Contact:     "mailto:nobody@localhost",
-		TermsAgreed: true,
-		APICA:       string(pem.EncodeToMemory(block)),
-	}
-
 	fs := afero.NewMemMapFs()
-	t.Run("TestInitialCert", func(t *testing.T) { testInitialCert(t, &c, fs) })
-	t.Run("TestLoadCert", func(t *testing.T) { testLoadCert(t, &c, fs) })
-	t.Run("TestSoonToExpireCert", func(t *testing.T) { testSoonToExpireCert(t, &c, fs) })
-}
+	pk, _ := loadOrGenerateKey(fs, "account.key")
 
-func testInitialCert(t *testing.T, c *config.Acme, fs afero.Fs) {
+	m := &Manager{
+		FQDN:         "ubmc.test",
+		AccountKey:   pk,
+		ACMEHandlers: []ACMEHandler{&fakeACMEHandler{}},
+		ACMEConfig: &config.ACME{
+			Directory:   fmt.Sprintf("https://%s/dir", l.Addr().String()),
+			Contact:     "mailto:nobody@localhost",
+			TermsAgreed: true,
+			APICA:       string(pem.EncodeToMemory(block)),
+		},
+	}
+
 	now := time.Now()
-	if _, err := load(fs, now, c, acmeKey, fqdn, certFile, keyFile); err != nil {
-		t.Fatalf("Failed to load cert: %v", err)
-	}
-}
-
-func testLoadCert(t *testing.T, c *config.Acme, fs afero.Fs) {
-	now := time.Now()
-	if _, err := load(fs, now, c, "/acme-canary.key", fqdn, certFile, keyFile); err != nil {
-		t.Fatalf("Failed to load cert: %v", err)
-	}
-	// If acme-canary.key was created the cert was not loaded from the file system
-	ok, _ := afero.Exists(fs, "/acme-canary.key")
-	if ok {
-		t.Fatalf("ACME key was created which indicates that the certificate was not loaded from disk")
-	}
-}
-
-func testSoonToExpireCert(t *testing.T, c *config.Acme, fs afero.Fs) {
-	origb, err := afero.ReadFile(fs, certFile)
+	kp, err := m.maybeRenew(now, nil)
 	if err != nil {
-		t.Fatalf("Failed to read original cert: %v", err)
+		t.Fatalf("Failed to load cert: %v", err)
+	}
+
+	// Try to renew just a bit after
+	now = now.AddDate(0, 0, 1)
+	kp2, err := m.maybeRenew(now, kp)
+	if err != nil {
+		t.Fatalf("Failed to load cert: %v", err)
+	}
+
+	if kp != kp2 {
+		t.Fatalf("Certificate changed when it should not have, %v != %v", kp, kp2)
 	}
 
 	// Pebble mints 5 year certificates by default
-	now := time.Now().AddDate(5, 0, 0)
-	if _, err := load(fs, now, c, acmeKey, fqdn, certFile, keyFile); err != nil {
+	now = now.AddDate(5, 0, 0)
+	kp2, err = m.maybeRenew(now, kp)
+	if err != nil {
 		t.Fatalf("Failed to load cert: %v", err)
 	}
 
-	newb, err := afero.ReadFile(fs, certFile)
-	if err != nil {
-		t.Fatalf("Failed to read new cert: %v", err)
-	}
-
-	if bytes.Equal(origb, newb) {
-		t.Fatalf("Certificate that will soon expire was not updated")
+	if kp == kp2 {
+		t.Fatalf("Certificate remained the same when it should have been renewed")
 	}
 }
 
