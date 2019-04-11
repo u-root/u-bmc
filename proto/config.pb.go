@@ -33,7 +33,7 @@ func (m *Route) Reset()         { *m = Route{} }
 func (m *Route) String() string { return proto.CompactTextString(m) }
 func (*Route) ProtoMessage()    {}
 func (*Route) Descriptor() ([]byte, []int) {
-	return fileDescriptor_config_d548019174eaf845, []int{0}
+	return fileDescriptor_3eaf2c85e69e9ea4, []int{0}
 }
 func (m *Route) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Route.Unmarshal(m, b)
@@ -41,8 +41,8 @@ func (m *Route) XXX_Unmarshal(b []byte) error {
 func (m *Route) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Route.Marshal(b, m, deterministic)
 }
-func (dst *Route) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Route.Merge(dst, src)
+func (m *Route) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Route.Merge(m, src)
 }
 func (m *Route) XXX_Size() int {
 	return xxx_messageInfo_Route.Size(m)
@@ -74,82 +74,28 @@ func (m *Route) GetInterface() string {
 	return ""
 }
 
-type Interface struct {
-	// VLAN ID to tag traffic with
-	// Default: all traffic is untagged
-	Vlan uint32 `protobuf:"varint,1,opt,name=vlan,proto3" json:"vlan,omitempty"`
-	// Additional static IPv4 address(es) to set
-	// Example: 192.168.0.100/24
-	// Default: No additional IPv4 addresses
-	Ipv4Address []string `protobuf:"bytes,2,rep,name=ipv4_address,json=ipv4Address,proto3" json:"ipv4_address,omitempty"`
-	// Additional static IPv6 address(es) to set
-	// Example: fec0::100/64
-	// Default: No additional IPv6 addresses
-	Ipv6Address          []string `protobuf:"bytes,3,rep,name=ipv6_address,json=ipv6Address,proto3" json:"ipv6_address,omitempty"`
-	XXX_NoUnkeyedLiteral struct{} `json:"-"`
-	XXX_unrecognized     []byte   `json:"-"`
-	XXX_sizecache        int32    `json:"-"`
-}
-
-func (m *Interface) Reset()         { *m = Interface{} }
-func (m *Interface) String() string { return proto.CompactTextString(m) }
-func (*Interface) ProtoMessage()    {}
-func (*Interface) Descriptor() ([]byte, []int) {
-	return fileDescriptor_config_d548019174eaf845, []int{1}
-}
-func (m *Interface) XXX_Unmarshal(b []byte) error {
-	return xxx_messageInfo_Interface.Unmarshal(m, b)
-}
-func (m *Interface) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
-	return xxx_messageInfo_Interface.Marshal(b, m, deterministic)
-}
-func (dst *Interface) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Interface.Merge(dst, src)
-}
-func (m *Interface) XXX_Size() int {
-	return xxx_messageInfo_Interface.Size(m)
-}
-func (m *Interface) XXX_DiscardUnknown() {
-	xxx_messageInfo_Interface.DiscardUnknown(m)
-}
-
-var xxx_messageInfo_Interface proto.InternalMessageInfo
-
-func (m *Interface) GetVlan() uint32 {
-	if m != nil {
-		return m.Vlan
-	}
-	return 0
-}
-
-func (m *Interface) GetIpv4Address() []string {
-	if m != nil {
-		return m.Ipv4Address
-	}
-	return nil
-}
-
-func (m *Interface) GetIpv6Address() []string {
-	if m != nil {
-		return m.Ipv6Address
-	}
-	return nil
-}
-
 type Network struct {
 	// System's fully qualified hostname
 	// Example: rack01server02.mycompany.org
 	// Default: Get hostname from DHCPv4 or reverse DNS lookup
 	Hostname string `protobuf:"bytes,1,opt,name=hostname,proto3" json:"hostname,omitempty"`
-	// Network interface configuration mapped by interface name
-	// Default: Auto-configure eth0
-	Interface map[string]*Interface `protobuf:"bytes,2,rep,name=interface,proto3" json:"interface,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// VLAN ID to tag traffic with
+	// Default: all traffic is untagged
+	Vlan uint32 `protobuf:"varint,2,opt,name=vlan,proto3" json:"vlan,omitempty"`
+	// Static IPv4 address to set
+	// Example: 192.168.0.100/24
+	// Default: Use DHCPv4 addresses
+	Ipv4Address string `protobuf:"bytes,3,opt,name=ipv4_address,json=ipv4Address,proto3" json:"ipv4_address,omitempty"`
+	// Static IPv6 address to set
+	// Example: fec0::100/64
+	// Default: Use DHCPv6 address
+	Ipv6Address string `protobuf:"bytes,4,opt,name=ipv6_address,json=ipv6Address,proto3" json:"ipv6_address,omitempty"`
 	// Static IPv4 routes
 	// Default: No static IPv4 routes
-	Ipv4Route []*Route `protobuf:"bytes,3,rep,name=ipv4_route,json=ipv4Route,proto3" json:"ipv4_route,omitempty"`
+	Ipv4Route []*Route `protobuf:"bytes,5,rep,name=ipv4_route,json=ipv4Route,proto3" json:"ipv4_route,omitempty"`
 	// Static IPv6 routes
 	// Default: No static IPv6 routes
-	Ipv6Route            []*Route `protobuf:"bytes,4,rep,name=ipv6_route,json=ipv6Route,proto3" json:"ipv6_route,omitempty"`
+	Ipv6Route            []*Route `protobuf:"bytes,6,rep,name=ipv6_route,json=ipv6Route,proto3" json:"ipv6_route,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -159,7 +105,7 @@ func (m *Network) Reset()         { *m = Network{} }
 func (m *Network) String() string { return proto.CompactTextString(m) }
 func (*Network) ProtoMessage()    {}
 func (*Network) Descriptor() ([]byte, []int) {
-	return fileDescriptor_config_d548019174eaf845, []int{2}
+	return fileDescriptor_3eaf2c85e69e9ea4, []int{1}
 }
 func (m *Network) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Network.Unmarshal(m, b)
@@ -167,8 +113,8 @@ func (m *Network) XXX_Unmarshal(b []byte) error {
 func (m *Network) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Network.Marshal(b, m, deterministic)
 }
-func (dst *Network) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_Network.Merge(dst, src)
+func (m *Network) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Network.Merge(m, src)
 }
 func (m *Network) XXX_Size() int {
 	return xxx_messageInfo_Network.Size(m)
@@ -186,11 +132,25 @@ func (m *Network) GetHostname() string {
 	return ""
 }
 
-func (m *Network) GetInterface() map[string]*Interface {
+func (m *Network) GetVlan() uint32 {
 	if m != nil {
-		return m.Interface
+		return m.Vlan
 	}
-	return nil
+	return 0
+}
+
+func (m *Network) GetIpv4Address() string {
+	if m != nil {
+		return m.Ipv4Address
+	}
+	return ""
+}
+
+func (m *Network) GetIpv6Address() string {
+	if m != nil {
+		return m.Ipv6Address
+	}
+	return ""
 }
 
 func (m *Network) GetIpv4Route() []*Route {
@@ -218,7 +178,7 @@ func (m *SystemConfig) Reset()         { *m = SystemConfig{} }
 func (m *SystemConfig) String() string { return proto.CompactTextString(m) }
 func (*SystemConfig) ProtoMessage()    {}
 func (*SystemConfig) Descriptor() ([]byte, []int) {
-	return fileDescriptor_config_d548019174eaf845, []int{3}
+	return fileDescriptor_3eaf2c85e69e9ea4, []int{2}
 }
 func (m *SystemConfig) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SystemConfig.Unmarshal(m, b)
@@ -226,8 +186,8 @@ func (m *SystemConfig) XXX_Unmarshal(b []byte) error {
 func (m *SystemConfig) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SystemConfig.Marshal(b, m, deterministic)
 }
-func (dst *SystemConfig) XXX_Merge(src proto.Message) {
-	xxx_messageInfo_SystemConfig.Merge(dst, src)
+func (m *SystemConfig) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_SystemConfig.Merge(m, src)
 }
 func (m *SystemConfig) XXX_Size() int {
 	return xxx_messageInfo_SystemConfig.Size(m)
@@ -247,34 +207,28 @@ func (m *SystemConfig) GetNetwork() *Network {
 
 func init() {
 	proto.RegisterType((*Route)(nil), "bmc.Route")
-	proto.RegisterType((*Interface)(nil), "bmc.Interface")
 	proto.RegisterType((*Network)(nil), "bmc.Network")
-	proto.RegisterMapType((map[string]*Interface)(nil), "bmc.Network.InterfaceEntry")
 	proto.RegisterType((*SystemConfig)(nil), "bmc.SystemConfig")
 }
 
-func init() { proto.RegisterFile("config.proto", fileDescriptor_config_d548019174eaf845) }
+func init() { proto.RegisterFile("config.proto", fileDescriptor_3eaf2c85e69e9ea4) }
 
-var fileDescriptor_config_d548019174eaf845 = []byte{
-	// 319 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x52, 0x41, 0x4b, 0xf3, 0x40,
-	0x10, 0xa5, 0x49, 0xfb, 0xf5, 0xcb, 0x24, 0x16, 0x99, 0x53, 0xa8, 0x1e, 0x6a, 0x10, 0xd1, 0x4b,
-	0x0e, 0x51, 0x82, 0x7a, 0x13, 0xf1, 0x20, 0x88, 0x87, 0x78, 0xf2, 0x24, 0xdb, 0x74, 0xab, 0xa1,
-	0xcd, 0x6e, 0xd9, 0x6c, 0x23, 0xbd, 0xfb, 0xc3, 0x65, 0x67, 0xb7, 0x31, 0x82, 0xb7, 0xd9, 0x37,
-	0x6f, 0x66, 0xde, 0x7b, 0x09, 0x44, 0xa5, 0x14, 0xcb, 0xea, 0x3d, 0xdd, 0x28, 0xa9, 0x25, 0xfa,
-	0xf3, 0xba, 0x4c, 0x5e, 0x61, 0x54, 0xc8, 0xad, 0xe6, 0x38, 0x83, 0x70, 0xc1, 0x1b, 0x5d, 0x09,
-	0xa6, 0x2b, 0x29, 0xe2, 0xc1, 0x6c, 0x70, 0x1e, 0x14, 0x7d, 0x08, 0x0f, 0xc1, 0x6f, 0x2b, 0x16,
-	0x7b, 0xd4, 0x31, 0x25, 0x1e, 0x43, 0x50, 0x09, 0xcd, 0xd5, 0x92, 0x95, 0x3c, 0xf6, 0x09, 0xff,
-	0x01, 0x12, 0x0e, 0xc1, 0xe3, 0xfe, 0x81, 0x08, 0xc3, 0x76, 0xcd, 0xec, 0xde, 0x83, 0x82, 0x6a,
-	0x3c, 0x81, 0xa8, 0xda, 0xb4, 0x57, 0x6f, 0x6c, 0xb1, 0x50, 0xbc, 0x69, 0x62, 0x6f, 0xe6, 0x9b,
-	0x9b, 0x06, 0xbb, 0xb3, 0x90, 0xa3, 0xe4, 0x1d, 0xc5, 0xef, 0x28, 0xb9, 0xa3, 0x24, 0x5f, 0x1e,
-	0x8c, 0x9f, 0xb9, 0xfe, 0x94, 0x6a, 0x85, 0x53, 0xf8, 0xff, 0x21, 0x1b, 0x2d, 0x58, 0xcd, 0x9d,
-	0x83, 0xee, 0x8d, 0x37, 0x7d, 0xb1, 0xe6, 0x54, 0x98, 0x1d, 0xa5, 0xf3, 0xba, 0x4c, 0xdd, 0x70,
-	0xda, 0x89, 0x7d, 0x10, 0x5a, 0xed, 0x7a, 0x4e, 0xf0, 0x02, 0x80, 0x84, 0x2a, 0x93, 0x14, 0x69,
-	0x08, 0x33, 0xa0, 0x59, 0xca, 0xae, 0x08, 0x4c, 0xd7, 0xc6, 0x68, 0xa9, 0xb9, 0xa3, 0x0e, 0xff,
-	0xa4, 0xe6, 0x54, 0x4e, 0x9f, 0x60, 0xf2, 0xfb, 0xa4, 0x49, 0x78, 0xc5, 0x77, 0x4e, 0xb9, 0x29,
-	0xf1, 0x14, 0x46, 0x2d, 0x5b, 0x6f, 0x39, 0xa5, 0x1e, 0x66, 0x13, 0xda, 0xd4, 0x4d, 0x15, 0xb6,
-	0x79, 0xeb, 0x5d, 0x0f, 0x92, 0x1c, 0xa2, 0x97, 0x5d, 0xa3, 0x79, 0x7d, 0x4f, 0xdf, 0x18, 0xcf,
-	0x60, 0x2c, 0xac, 0x31, 0xda, 0x17, 0x66, 0x51, 0xdf, 0x6c, 0xb1, 0x6f, 0xce, 0xff, 0xd1, 0xcf,
-	0x70, 0xf9, 0x1d, 0x00, 0x00, 0xff, 0xff, 0x9e, 0xdb, 0xfd, 0x76, 0x1c, 0x02, 0x00, 0x00,
+var fileDescriptor_3eaf2c85e69e9ea4 = []byte{
+	// 253 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x6c, 0x90, 0x3d, 0x4f, 0xc3, 0x30,
+	0x10, 0x86, 0x15, 0xd2, 0x0f, 0x72, 0x09, 0x12, 0xba, 0x29, 0x42, 0x0c, 0x21, 0x03, 0x2a, 0x4b,
+	0x86, 0x82, 0xbc, 0x23, 0x76, 0x06, 0x33, 0x31, 0x21, 0x27, 0x71, 0xc1, 0x82, 0xd8, 0x95, 0x6d,
+	0x82, 0xf8, 0xa1, 0xfc, 0x1f, 0x94, 0xb3, 0x1b, 0x18, 0xba, 0x9d, 0xdf, 0x7b, 0xfc, 0x4a, 0xcf,
+	0x41, 0xd1, 0x19, 0xbd, 0x53, 0xaf, 0xcd, 0xde, 0x1a, 0x6f, 0x30, 0x6d, 0x87, 0xae, 0x7e, 0x86,
+	0x25, 0x37, 0x9f, 0x5e, 0x62, 0x05, 0x79, 0x2f, 0x9d, 0x57, 0x5a, 0x78, 0x65, 0x74, 0x99, 0x54,
+	0xc9, 0x26, 0xe3, 0xff, 0x23, 0x3c, 0x87, 0x74, 0x54, 0xa2, 0x3c, 0xa1, 0xcd, 0x34, 0xe2, 0x25,
+	0x64, 0x4a, 0x7b, 0x69, 0x77, 0xa2, 0x93, 0x65, 0x4a, 0xf9, 0x5f, 0x50, 0xff, 0x24, 0xb0, 0x7e,
+	0x94, 0xfe, 0xcb, 0xd8, 0x77, 0xbc, 0x80, 0xd3, 0x37, 0xe3, 0xbc, 0x16, 0x83, 0x8c, 0xd5, 0xf3,
+	0x1b, 0x11, 0x16, 0xe3, 0x87, 0xd0, 0x54, 0x7c, 0xc6, 0x69, 0xc6, 0x2b, 0x28, 0xd4, 0x7e, 0xbc,
+	0x7b, 0x11, 0x7d, 0x6f, 0xa5, 0x73, 0xb1, 0x3c, 0x9f, 0xb2, 0xfb, 0x10, 0x45, 0x84, 0xcd, 0xc8,
+	0x62, 0x46, 0xd8, 0x01, 0xb9, 0x01, 0xa0, 0x16, 0x3b, 0x19, 0x96, 0xcb, 0x2a, 0xdd, 0xe4, 0x5b,
+	0x68, 0xda, 0xa1, 0x6b, 0xc8, 0x99, 0x67, 0xd3, 0x36, 0xe8, 0x07, 0x94, 0x45, 0x74, 0x75, 0x14,
+	0x65, 0x34, 0xd6, 0x0c, 0x8a, 0xa7, 0x6f, 0xe7, 0xe5, 0xf0, 0x40, 0xd7, 0xc4, 0x6b, 0x58, 0xeb,
+	0xa0, 0x49, 0x6a, 0xf9, 0xb6, 0xa0, 0x7f, 0x51, 0x9d, 0x1f, 0x96, 0xed, 0x8a, 0xce, 0x7e, 0xfb,
+	0x1b, 0x00, 0x00, 0xff, 0xff, 0x94, 0x56, 0x97, 0x7d, 0x86, 0x01, 0x00, 0x00,
 }

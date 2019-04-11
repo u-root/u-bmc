@@ -98,6 +98,21 @@
   version = "v1.2.0"
 
 [[projects]]
+  branch = "master"
+  digest = "1:f55ffe028761947faf43bcb08ce942f8f7730b251a5c282b96b6f40c47daed7b"
+  name = "github.com/insomniacslk/dhcp"
+  packages = [
+    "dhcpv4",
+    "dhcpv4/nclient4",
+    "dhcpv6",
+    "dhcpv6/nclient6",
+    "iana",
+    "rfc1035label",
+  ]
+  pruneopts = "UT"
+  revision = "eea1149bcb0a49e5203db64137de7d48ce78c18b"
+
+[[projects]]
   digest = "1:a37a3ea97e06f611bde0e4f465175c512fb587062d864c8c62b4e209f5d6cbb5"
   name = "github.com/jhump/protoreflect"
   packages = [
@@ -171,6 +186,14 @@
 
 [[projects]]
   branch = "master"
+  digest = "1:399231b1d0c4fc8204517cfe50e3f959b2404a9a8640983634dd258d7bf2821f"
+  name = "github.com/mdlayher/ethernet"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "5b5fc417d966b71d3781b0d5860413e9fae947c1"
+
+[[projects]]
+  branch = "master"
   digest = "1:8bc6c6b7a56ce25f3c6754c5b5ae6cc3d07c212a9d13e7bdbab1021319cbce08"
   name = "github.com/mdlayher/genetlink"
   packages = ["."]
@@ -187,6 +210,14 @@
   ]
   pruneopts = "UT"
   revision = "258ea9dff42c0ec7540aa4b1599d09e7bfc7973b"
+
+[[projects]]
+  branch = "master"
+  digest = "1:34bd596081cc218eb9f14ddcc712015bed5b9b84917c6279640397f534565e72"
+  name = "github.com/mdlayher/raw"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "b0647ab7d8b35d5b8b734462042628e5af82f7f4"
 
 [[projects]]
   digest = "1:2b4b4b2e5544c2a11a486c1b631357aa2ddf766e50c1b2483cf809da2c511234"
@@ -258,18 +289,20 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ae8a86169cd28b9df25538faf5d339c11769eb4b45b5dd58fa305677698b9185"
+  digest = "1:ba126df88fb4a061f54927de52a90712a187d600878eca6c7204f34996ed7c66"
   name = "github.com/u-root/u-root"
   packages = [
     "integration",
     "pkg/cp",
     "pkg/cpio",
+    "pkg/dhclient",
     "pkg/golang",
     "pkg/kmodule",
     "pkg/ldd",
     "pkg/lockfile",
     "pkg/ls",
     "pkg/qemu",
+    "pkg/rand",
     "pkg/ubinary",
     "pkg/uio",
     "pkg/uroot",
@@ -279,7 +312,7 @@
     "pkg/uroot/logger",
   ]
   pruneopts = "UT"
-  revision = "0e08ce71e71ace5fb5d85724d60b727286f1f68d"
+  revision = "d6d5e43c7bdb9105bbee6d95e8e9f79360fb94c9"
 
 [[projects]]
   branch = "master"
@@ -503,6 +536,7 @@
     "github.com/spf13/afero",
     "github.com/tarm/serial",
     "github.com/u-root/u-root/integration",
+    "github.com/u-root/u-root/pkg/dhclient",
     "github.com/u-root/u-root/pkg/golang",
     "github.com/u-root/u-root/pkg/kmodule",
     "github.com/u-root/u-root/pkg/qemu",

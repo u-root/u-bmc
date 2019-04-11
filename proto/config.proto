@@ -14,40 +14,33 @@ message Route {
   string interface = 3;
 }
 
-message Interface {
-  // VLAN ID to tag traffic with
-  // Default: all traffic is untagged
-  uint32 vlan = 1;
-
-  // Additional static IPv4 address(es) to set
-  // Example: 192.168.0.100/24
-  // Default: No additional IPv4 addresses
-  repeated string ipv4_address = 2;
-
-  // Additional static IPv6 address(es) to set
-  // Example: fec0::100/64
-  // Default: No additional IPv6 addresses
-  repeated string ipv6_address = 3;
-
-}
-
 message Network {
   // System's fully qualified hostname
   // Example: rack01server02.mycompany.org
   // Default: Get hostname from DHCPv4 or reverse DNS lookup
   string hostname = 1;
 
-  // Network interface configuration mapped by interface name
-  // Default: Auto-configure eth0
-  map<string, Interface> interface = 2;
+  // VLAN ID to tag traffic with
+  // Default: all traffic is untagged
+  uint32 vlan = 2;
+
+  // Static IPv4 address to set
+  // Example: 192.168.0.100/24
+  // Default: Use DHCPv4 addresses
+  string ipv4_address = 3;
+
+  // Static IPv6 address to set
+  // Example: fec0::100/64
+  // Default: Use DHCPv6 address
+  string ipv6_address = 4;
 
   // Static IPv4 routes
   // Default: No static IPv4 routes
-  repeated Route ipv4_route = 3;
+  repeated Route ipv4_route = 5;
 
   // Static IPv6 routes
   // Default: No static IPv6 routes
-  repeated Route ipv6_route = 4;
+  repeated Route ipv6_route = 6;
 }
 
 message SystemConfig {
