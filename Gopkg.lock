@@ -289,7 +289,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ba126df88fb4a061f54927de52a90712a187d600878eca6c7204f34996ed7c66"
+  digest = "1:2c95961e8766178db2658ab6d2741febceb17b9fb52e9ebf150fa3d47e6f34e9"
   name = "github.com/u-root/u-root"
   packages = [
     "integration",
@@ -303,6 +303,7 @@
     "pkg/ls",
     "pkg/qemu",
     "pkg/rand",
+    "pkg/rtc",
     "pkg/ubinary",
     "pkg/uio",
     "pkg/uroot",
@@ -540,6 +541,7 @@
     "github.com/u-root/u-root/pkg/golang",
     "github.com/u-root/u-root/pkg/kmodule",
     "github.com/u-root/u-root/pkg/qemu",
+    "github.com/u-root/u-root/pkg/rtc",
     "github.com/u-root/u-root/pkg/uroot",
     "github.com/u-root/u-root/pkg/uroot/builder",
     "github.com/u-root/u-root/pkg/uroot/initramfs",

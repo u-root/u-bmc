@@ -31,6 +31,7 @@ import (
 	"github.com/u-root/u-bmc/pkg/bmc/cert"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
 	pb "github.com/u-root/u-bmc/proto"
+	"github.com/u-root/u-root/pkg/rtc"
 	"golang.org/x/sys/unix"
 )
 
@@ -281,9 +282,25 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	timeAcquired := make(chan bool)
 	go func() {
 		log.Printf("Acquiring trusted time")
-		acquireTime(c.RoughtimeServers, c.NtpServers)
-		// TODO(bluecmd): If the RTC is already set, we should send this straight away
-		timeAcquired <- true
+		if time.Now().Year() > 2018 {
+			// Consider the RTC trusted.
+			// This means that if the RTC is set, don't block waiting getting trusted
+			// time. If we do get a new trusted time however, make sure to update RTC.
+			timeAcquired <- true
+			acquireTime(c.RoughtimeServers, c.NtpServers)
+		} else {
+			acquireTime(c.RoughtimeServers, c.NtpServers)
+			timeAcquired <- true
+		}
+		r, err := rtc.OpenRTC()
+		if err != nil {
+			log.Printf("Failed to open RTC: %v", err)
+			return
+		}
+		tu := time.Now().UTC()
+		if err := r.Set(tu); err != nil {
+			log.Printf("Failed to update RTC: %v", err)
+		}
 	}()
 
 	createFile("/etc/passwd", 0644, []byte("root:x:0:0:root:/root:/bbin/elvish"))
