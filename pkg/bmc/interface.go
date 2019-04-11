@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pb "github.com/u-root/u-bmc/proto"
+	"github.com/u-root/u-root/pkg/dhclient"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -170,32 +171,33 @@ func startNetwork(config *pb.Network) (*network, error) {
 		return nil, err
 	}
 
+	iface := "eth0"
+
 	// TODO(bluecmd): Set ipv4/ipv6 objects to remember the host addresses
-	for iface, ic := range config.Interface {
-		if ic.Vlan != 0 {
-			log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
-			continue
-		}
-		if err := setLinkUp(iface); err != nil {
-			return nil, err
-		}
+	if config.Vlan != 0 {
+		log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
+	}
 
-		for _, ipv4 := range ic.Ipv4Address {
-			if err := addIp(ipv4, iface); err != nil {
-				log.Printf("Error adding IPv4 %s to interface %s: %v", ipv4, iface, err)
-			}
-		}
-		for _, ipv6 := range ic.Ipv6Address {
-			if err := addIp(ipv6, iface); err != nil {
-				log.Printf("Error adding IPv6 %s to interface %s: %v", ipv6, iface, err)
-			}
-		}
+	_, err := dhclient.IfUp(iface)
+	if err != nil {
+		return nil, err
+	}
 
-		// If the MAC address changes on the interface the interface needs to be
-		// taken down and up again in order for all IPv6 addresses and things to be
-		// refreshed. MAC address changes happens when NC-SI reads the correct
-		// MAC address from the adapter, or a controller hotswap potentially.
-		go ipv6LinkFixer(iface)
+	// If the MAC address changes on the interface the interface needs to be
+	// taken down and up again in order for all IPv6 addresses and things to be
+	// refreshed. MAC address changes happens when NC-SI reads the correct
+	// MAC address from the adapter, or a controller hotswap potentially.
+	go ipv6LinkFixer(iface)
+
+	if config.Ipv4Address != "" {
+		if err := addIp(config.Ipv4Address, iface); err != nil {
+			log.Printf("Error adding IPv4 %s to interface %s: %v", config.Ipv4Address, iface, err)
+		}
+	}
+	if config.Ipv6Address != "" {
+		if err := addIp(config.Ipv6Address, iface); err != nil {
+			log.Printf("Error adding IPv6 %s to interface %s: %v", config.Ipv6Address, iface, err)
+		}
 	}
 
 	if len(config.Ipv4Route)+len(config.Ipv6Route) > 0 {
