@@ -110,6 +110,10 @@
 
 #include <config.h>
 
+// u-bmc modified
+// Setting lifted from ast-g5-phy.h from OpenBMC u-boot
+#define CONFIG_DRAM_ECC_SIZE 0x10000000
+
 /******************************************************************************
   r4 : return program counter
   r5 : DDR speed timing table base address
@@ -819,6 +823,10 @@ wait_ddr_reset:
 #ifdef CONFIG_DRAM_UART_38400
     moveq r1, #0x27                              @ Baudrate 38400
     movne r1, #0x03                              @ Baudrate 38400 , div13
+#endif
+#ifdef CONFIG_DRAM_UART_57600
+    moveq r1, #0x1A                              @ Baudrate 57600
+    movne r1, #0x02                              @ Baudrate 57600 , div13
 #endif
     str   r1, [r0]
 

@@ -9,10 +9,10 @@ import (
 	"testing"
 )
 
-func TestAcmeCAConfig(t *testing.T) {
+func TestACMECAConfig(t *testing.T) {
 	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM([]byte(DefaultConfig.Acme.APICA))
+	ok := roots.AppendCertsFromPEM([]byte(DefaultConfig.ACME.APICA))
 	if !ok {
-		t.Fatal("No parsable ACME API CA (Acme.APICA) certificates found")
+		t.Fatal("No parsable ACME API CA (ACME.APICA) certificates found")
 	}
 }

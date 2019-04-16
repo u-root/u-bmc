@@ -7,7 +7,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/u-root/u-bmc/config"
@@ -21,9 +20,6 @@ func uinit() error {
 	p := platform.Platform()
 	defer p.Close()
 
-	// TODO(bluecmd): Test with validation
-	os.Setenv("PEBBLE_VA_ALWAYS_VALID", "1")
-
 	ca := utils.NewTestCA()
 	rt := utils.NewTestRoughtimeServer()
 
@@ -31,10 +27,10 @@ func uinit() error {
 	c.RoughtimeServers = []ttime.RoughtimeServer{rt.Config}
 	c.NtpServers = []ttime.NtpServer{}
 	log.Printf("Roughtime server: %v", rt.Config)
-	c.Acme.APICA = ca.APICA
+	c.ACME.APICA = ca.APICA
 	log.Printf("API CA: %v", ca.APICA)
-	c.Acme.Directory = ca.Directory
-	c.Acme.TermsAgreed = true
+	c.ACME.Directory = ca.Directory
+	c.ACME.TermsAgreed = true
 
 	err, sr := bmc.StartupWithConfig(p, c)
 	if err != nil {

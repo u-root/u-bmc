@@ -12,6 +12,7 @@ import (
 	"time"
 
 	pb "github.com/u-root/u-bmc/proto"
+	"github.com/u-root/u-root/pkg/dhclient"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -20,9 +21,11 @@ const (
 	interfaceUpTimeout = 30 * time.Second
 )
 
-var (
+type network struct {
 	fqdn string
-)
+	ipv4 net.IP
+	ipv6 net.IP
+}
 
 func addIp(cidr string, iface string) error {
 	l, err := netlink.LinkByName(iface)
@@ -132,60 +135,69 @@ func ipv6LinkFixer(iface string) {
 	}
 }
 
-func FQDN() string {
-	return fqdn
+func (n *network) FQDN() string {
+	return n.fqdn
 }
 
-func ConfigureNetwork(config *pb.Network) error {
+func (n *network) IPv4() net.IP {
+	return n.ipv4
+}
+
+func (n *network) IPv6() net.IP {
+	return n.ipv4
+}
+
+func (n *network) AddressLifetime() time.Duration {
+	// TODO(bluecmd): This should be decided based on DHCP lease and such
+	return time.Hour
+}
+
+func startNetwork(config *pb.Network) (*network, error) {
 	if config == nil {
 		log.Printf("No network configuration detected, using defaults")
 		config = &pb.Network{}
 	}
 
-	fqdn = "ubmc.local"
-	if config.Hostname != "" {
-		fqdn = config.Hostname
-	}
-	unix.Sethostname([]byte(fqdn))
-
 	// Fun story: if you don't have both IPv4 and IPv6 loopback configured
 	// golang binaries will not bind to :: but to 0.0.0.0 instead.
 	// Isn't that surprising?
 	if err := addIp("127.0.0.1/8", "lo"); err != nil {
-		return err
+		return nil, err
 	}
 	if err := addIp("::1/32", "lo"); err != nil {
-		return err
+		return nil, err
 	}
 	if err := setLinkUp("lo"); err != nil {
-		return err
+		return nil, err
 	}
 
-	for iface, ic := range config.Interface {
-		if ic.Vlan != 0 {
-			log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
-			continue
-		}
-		if err := setLinkUp(iface); err != nil {
-			return err
-		}
+	iface := "eth0"
 
-		for _, ipv4 := range ic.Ipv4Address {
-			if err := addIp(ipv4, iface); err != nil {
-				log.Printf("Error adding IPv4 %s to interface %s: %v", ipv4, iface, err)
-			}
-		}
-		for _, ipv6 := range ic.Ipv6Address {
-			if err := addIp(ipv6, iface); err != nil {
-				log.Printf("Error adding IPv6 %s to interface %s: %v", ipv6, iface, err)
-			}
-		}
+	// TODO(bluecmd): Set ipv4/ipv6 objects to remember the host addresses
+	if config.Vlan != 0 {
+		log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
+	}
 
-		// If the MAC address changes on the interface the interface needs to be
-		// taken down and up again in order for all IPv6 addresses and things to be
-		// refreshed. MAC address changes happens when NC-SI reads the correct
-		// MAC address from the adapter, or a controller hotswap potentially.
-		go ipv6LinkFixer(iface)
+	_, err := dhclient.IfUp(iface)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the MAC address changes on the interface the interface needs to be
+	// taken down and up again in order for all IPv6 addresses and things to be
+	// refreshed. MAC address changes happens when NC-SI reads the correct
+	// MAC address from the adapter, or a controller hotswap potentially.
+	go ipv6LinkFixer(iface)
+
+	if config.Ipv4Address != "" {
+		if err := addIp(config.Ipv4Address, iface); err != nil {
+			log.Printf("Error adding IPv4 %s to interface %s: %v", config.Ipv4Address, iface, err)
+		}
+	}
+	if config.Ipv6Address != "" {
+		if err := addIp(config.Ipv6Address, iface); err != nil {
+			log.Printf("Error adding IPv6 %s to interface %s: %v", config.Ipv6Address, iface, err)
+		}
 	}
 
 	if len(config.Ipv4Route)+len(config.Ipv6Route) > 0 {
@@ -200,5 +212,15 @@ func ConfigureNetwork(config *pb.Network) error {
 		}
 	}()
 
-	return nil
+	// When we exit this function we must have received a hostname or otherwise
+	// had one configured. The rest of the startup flow depends on it.
+
+	// TODO(bluecmd): Read hostname from config file or DHCP, don't have any default
+	fqdn := "ubmc.local"
+	if config.Hostname != "" {
+		fqdn = config.Hostname
+	}
+	unix.Sethostname([]byte(fqdn))
+
+	return &network{fqdn: fqdn}, nil
 }

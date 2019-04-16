@@ -49,7 +49,7 @@ u-bmc:
 	go get
 	go build
 
-boot/boot.bin: boot/zImage.boot boot/loader.cpio.gz boot/platform.dtb.boot $(shell find $(ROOT_DIR)platform/$(SOC)/ -name \*.S -type f)
+boot/boot.bin: boot/zImage.boot boot/loader.cpio.gz boot/platform.dtb.boot boot/boot-config.auto.h $(shell find $(ROOT_DIR)platform/$(SOC)/ -name \*.S -type f) $(ROOT_DIR)platform/$(PLATFORM)/boot/config.h
 	make -C platform/$(SOC)/boot boot.bin PLATFORM=$(PLATFORM) CROSS_COMPILE=$(CROSS_COMPILE)
 	ln -sf ../platform/$(SOC)/boot/boot.bin $@
 
@@ -256,8 +256,8 @@ clean:
 	\rm -fr root/ boot/modules/ module/.tmp_versions/ boot/out
 
 pebble:
-	PEBBLE_VA_ALWAYS_VALID=1 go run github.com/letsencrypt/pebble/cmd/pebble \
-		-dnsserver locahost:6053 \
+	go run github.com/letsencrypt/pebble/cmd/pebble \
+		-dnsserver 127.0.0.1:6053 \
 		-config config/sim-pebble.json
 
 run-ovmf:

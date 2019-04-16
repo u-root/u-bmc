@@ -21,5 +21,5 @@ var (
 
 func main() {
 	flag.Parse()
-	gpiowatcher.Gpiowatcher(*doBinaryLog, *doPlayback, *ignoreLines, gpiowatcher.NewAst2400Platform(&gpio.Gpio{}))
+	gpiowatcher.Gpiowatcher(*doBinaryLog, *doPlayback, *ignoreLines, gpiowatcher.NewAstPlatform(&gpio.Gpio{}))
 }

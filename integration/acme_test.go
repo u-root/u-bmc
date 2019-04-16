@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-func TestAcme(t *testing.T) {
+func TestACME(t *testing.T) {
 	bmc, bmccleanup := BMCTest(t, &Options{
-		Name: "TestAcme-BMC",
+		Name: "TestACME-BMC",
 		Cmds: []string{
 			"github.com/u-root/u-root/cmds/init",
 			"github.com/u-root/u-bmc/integration/testcmd/acme/uinit",

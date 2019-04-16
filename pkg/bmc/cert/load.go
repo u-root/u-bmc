@@ -14,7 +14,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -28,24 +27,29 @@ const (
 	lifetimePadding = -4 * time.Hour
 )
 
-func Load(c *config.Acme, akey, fqdn, crt, key string) (*tls.Certificate, error) {
-	return load(afero.NewOsFs(), time.Now(), c, akey, fqdn, crt, key)
+type ACMEHandler interface {
+	HandleDNS01Challenge(fqdn string, record string) error
 }
 
-func loadX509KeyPair(fs afero.Fs, certFile, keyFile string) (*tls.Certificate, error) {
-	certPEMBlock, err := afero.ReadFile(fs, certFile)
-	if err != nil {
-		return nil, err
-	}
-	keyPEMBlock, err := afero.ReadFile(fs, keyFile)
-	if err != nil {
-		return nil, err
-	}
-	c, err := tls.X509KeyPair(certPEMBlock, keyPEMBlock)
-	return &c, err
+type Manager struct {
+	FQDN         string
+	AccountKey   *ecdsa.PrivateKey
+	ACMEConfig   *config.ACME
+	ACMEHandlers []ACMEHandler
+}
+
+func (m *Manager) MaybeRenew(kp *tls.Certificate) (*tls.Certificate, error) {
+	return m.maybeRenew(time.Now(), kp)
 }
 
 func validateCert(ct *tls.Certificate, now time.Time) bool {
+	if ct == nil {
+		return false
+	}
+	if len(ct.Certificate) == 0 {
+		return false
+	}
+
 	c, err := x509.ParseCertificate(ct.Certificate[0])
 	if err != nil {
 		return false
@@ -63,23 +67,21 @@ func validateCert(ct *tls.Certificate, now time.Time) bool {
 	return true
 }
 
-func load(fs afero.Fs, n time.Time, c *config.Acme, akey, fqdn, crt, key string) (*tls.Certificate, error) {
-	kp, err := loadX509KeyPair(fs, crt, key)
-	if err == nil && validateCert(kp, n) {
+func (m *Manager) maybeRenew(n time.Time, kp *tls.Certificate) (*tls.Certificate, error) {
+	// Check if there is a need to renew the cert, skip otherwise
+	if validateCert(kp, n) {
 		return kp, nil
 	}
-	kp, err = renewCert(fs, c, akey, fqdn)
+	kp, err := m.renew()
 	if err != nil {
 		return nil, err
 	}
 
-	// Fail soft on failing to write these files. We can still serve from memory
-	// and next reboot we will have to renew instead.
-	if err := saveKeyPair(fs, kp, crt, key); err != nil {
-		log.Printf("WARNING: System will use certificate from memory, but will have to renew it on reboot. Error was: %v", err)
-	}
-
 	return kp, nil
+}
+
+func SaveKeyPair(kp *tls.Certificate, crt, key string) error {
+	return saveKeyPair(afero.NewOsFs(), kp, crt, key)
 }
 
 func saveKeyPair(fs afero.Fs, kp *tls.Certificate, crt, key string) error {
@@ -136,15 +138,19 @@ func encodeKey(pk *ecdsa.PrivateKey) ([]byte, error) {
 	return res.Bytes(), nil
 }
 
-func loadOrGenerateKey(fs afero.Fs, key string) (*ecdsa.PrivateKey, error) {
-	b, err := afero.ReadFile(fs, key)
+func LoadOrGenerateKey(file string) (*ecdsa.PrivateKey, error) {
+	return loadOrGenerateKey(afero.NewOsFs(), file)
+}
+
+func loadOrGenerateKey(fs afero.Fs, file string) (*ecdsa.PrivateKey, error) {
+	b, err := afero.ReadFile(fs, file)
 	if os.IsNotExist(err) {
-		return generateAndSaveKey(fs, key)
+		return generateAndSaveKey(fs, file)
 	}
 	return x509.ParseECPrivateKey(b)
 }
 
-func generateAndSaveKey(fs afero.Fs, key string) (*ecdsa.PrivateKey, error) {
+func generateAndSaveKey(fs afero.Fs, file string) (*ecdsa.PrivateKey, error) {
 	k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		return nil, err
@@ -153,23 +159,18 @@ func generateAndSaveKey(fs afero.Fs, key string) (*ecdsa.PrivateKey, error) {
 	if err != nil {
 		return nil, err
 	}
-	return k, afero.WriteFile(fs, key, b, 0400)
+	return k, afero.WriteFile(fs, file, b, 0400)
 }
 
-func renewCert(fs afero.Fs, conf *config.Acme, akey string, fqdn string) (*tls.Certificate, error) {
-	key, err := loadOrGenerateKey(fs, akey)
-	if err != nil {
-		return nil, err
-	}
-
+func (m *Manager) renew() (*tls.Certificate, error) {
 	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM([]byte(conf.APICA))
+	ok := roots.AppendCertsFromPEM([]byte(m.ACMEConfig.APICA))
 	if !ok {
 		return nil, fmt.Errorf("failed to parse Acme API CA certificate")
 	}
 	c := &acme.Client{
-		Key:          key,
-		DirectoryURL: conf.Directory,
+		Key:          m.AccountKey,
+		DirectoryURL: m.ACMEConfig.Directory,
 		HTTPClient: &http.Client{
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
@@ -179,13 +180,9 @@ func renewCert(fs afero.Fs, conf *config.Acme, akey string, fqdn string) (*tls.C
 		},
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	a := &acme.Account{
-		Contact:     []string{conf.Contact},
-		TermsAgreed: conf.TermsAgreed,
+		Contact:     []string{m.ACMEConfig.Contact},
+		TermsAgreed: m.ACMEConfig.TermsAgreed,
 	}
 	na, err := c.CreateAccount(context.Background(), a)
 	if err != nil {
@@ -196,7 +193,7 @@ func renewCert(fs afero.Fs, conf *config.Acme, akey string, fqdn string) (*tls.C
 		return nil, fmt.Errorf("empty na.URL")
 	}
 
-	order, err := c.CreateOrder(context.Background(), acme.NewOrder(fqdn))
+	order, err := c.CreateOrder(context.Background(), acme.NewOrder(m.FQDN))
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +214,22 @@ func renewCert(fs afero.Fs, conf *config.Acme, akey string, fqdn string) (*tls.C
 		return nil, fmt.Errorf("missing dns-01 challenge")
 	}
 
+	t, err := c.DNS01ChallengeRecord(challenge.Token)
+	if err != nil {
+		return nil, err
+	}
+
+	handled := false
+	for _, h := range m.ACMEHandlers {
+		if err := h.HandleDNS01Challenge("_acme-challenge."+m.FQDN, t); err == nil {
+			handled = true
+			break
+		}
+	}
+	if !handled {
+		return nil, fmt.Errorf("No DNS01 ACME handler could handle challenge")
+	}
+
 	_, err = c.AcceptChallenge(context.Background(), challenge)
 	if err != nil {
 		return nil, err
@@ -233,7 +246,7 @@ func renewCert(fs afero.Fs, conf *config.Acme, akey string, fqdn string) (*tls.C
 		return nil, err
 	}
 
-	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: []string{fqdn}}, cert.PrivateKey)
+	csr, err := x509.CreateCertificateRequest(rand.Reader, &x509.CertificateRequest{DNSNames: []string{m.FQDN}}, cert.PrivateKey)
 	if err != nil {
 		return nil, err
 	}
