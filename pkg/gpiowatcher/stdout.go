@@ -20,8 +20,10 @@ type stdoutLog struct {
 
 func newStdoutLog(p *aspeed.State, ignoreLines string, plt platform) *stdoutLog {
 	ignoredPorts := make(map[uint32]bool)
-	for _, part := range strings.Split(ignoreLines, ",") {
-		ignoredPorts[aspeed.GpioPort(part)] = true
+	if ignoreLines != "" {
+		for _, part := range strings.Split(ignoreLines, ",") {
+			ignoredPorts[aspeed.GpioPort(part)] = true
+		}
 	}
 
 	l := stdoutLog{p, make(map[uint32]bool), ignoredPorts, plt}

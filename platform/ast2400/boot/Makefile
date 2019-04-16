@@ -14,7 +14,7 @@ OBJCOPY := $(CROSS_COMPILE)objcopy
 data.o: data.S $(ROOT_DIR)/boot/zImage.boot $(ROOT_DIR)/boot/platform.dtb.boot $(ROOT_DIR)/boot/loader.cpio.gz
 	(cd $(ROOT_DIR); $(CC) -c -o $(DIR)/$@ $(DIR)/$<)
 
-boot.elf: start.S platform_g4.S main.S data.o
+boot.elf: start.S platform_g4.S main.S data.o $(ROOT_DIR)/boot/boot-config.auto.h $(ROOT_DIR)/platform/$(PLATFORM)/boot/config.h 
 	$(CC) -Wl,--build-id=none \
 		-Wl,-T boot.ld -Wl,--no-dynamic-linker -nostdlib $^ -o $@ \
 		-I$(ROOT_DIR)/platform/$(PLATFORM)/boot/ \
