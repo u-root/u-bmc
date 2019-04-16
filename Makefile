@@ -49,7 +49,7 @@ u-bmc:
 	go get
 	go build
 
-boot/boot.bin: boot/zImage.boot boot/loader.cpio.gz boot/platform.dtb.boot $(shell find $(ROOT_DIR)platform/$(SOC)/ -name \*.S -type f)
+boot/boot.bin: boot/zImage.boot boot/loader.cpio.gz boot/platform.dtb.boot boot/boot-config.auto.h $(shell find $(ROOT_DIR)platform/$(SOC)/ -name \*.S -type f) $(ROOT_DIR)platform/$(PLATFORM)/boot/config.h
 	make -C platform/$(SOC)/boot boot.bin PLATFORM=$(PLATFORM) CROSS_COMPILE=$(CROSS_COMPILE)
 	ln -sf ../platform/$(SOC)/boot/boot.bin $@
 

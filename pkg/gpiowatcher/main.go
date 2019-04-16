@@ -26,16 +26,15 @@ type outputer interface {
 	Log(s *aspeed.State)
 }
 
-// TODO: Does this also support other platforms like ast2500?
-type ast2400Platform struct {
+type astPlatform struct {
 	g GpioPlatform
 }
 
-func NewAst2400Platform(g GpioPlatform) *ast2400Platform {
-	return &ast2400Platform{g}
+func NewAstPlatform(g GpioPlatform) *astPlatform {
+	return &astPlatform{g}
 }
 
-func (a *ast2400Platform) PortName(p uint32) string {
+func (a *astPlatform) PortName(p uint32) string {
 	n, ok := a.g.GpioPortToName(p)
 	if !ok {
 		n = aspeed.GpioPortToFunction(p)

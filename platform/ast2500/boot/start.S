@@ -1,18 +1,17 @@
 /*
- *  armboot - Startup Code for ARM926EJS CPU-core
+ *  armboot - Startup Code for ARM1176 CPU-core
  *
- *  Copyright (c) 2003  Texas Instruments
+ * Copyright (c) 2007	Samsung Electronics
  *
- *  ----- Adapted for OMAP1610 OMAP730 from ARM925t code ------
- *
- *  Copyright (c) 2001	Marius Gröger <mag@sysgo.de>
- *  Copyright (c) 2002	Alex Züpke <azu@sysgo.de>
- *  Copyright (c) 2002	Gary Jennejohn <garyj@denx.de>
- *  Copyright (c) 2003	Richard Woodruff <r-woodruff2@ti.com>
- *  Copyright (c) 2003	Kshitij <kshitij@ti.com>
- *  Copyright (c) 2010	Albert Aribaud <albert.u.boot@aribaud.net>
+ * Copyright (C) 2008
+ * Guennadi Liakhovetki, DENX Software Engineering, <lg@denx.de>
  *
  * SPDX-License-Identifier:	GPL-2.0+
+ *
+ * 2007-09-21 - Restructured codes by jsgood (jsgood.yang@samsung.com)
+ * 2007-09-21 - Added MoviNAND and OneNAND boot codes by
+ * jsgood (jsgood.yang@samsung.com)
+ * Base codes by scsuh (sc.suh)
  */
 
 /*
@@ -28,36 +27,41 @@
  *************************************************************************
  */
 
-	.org	0x0
-	b _start
-	b _start
-	b _start
-	b _start
-	b _start
-	b _start
-	b _start
-	b _start
-
-	.globl	_start
-_start:
+	.globl reset
+reset:
 	/*
 	 * set the cpu to SVC32 mode
 	 */
-	mrs	r0,cpsr
-	bic	r0,r0,#0x1f
-	orr	r0,r0,#0xd3
-	msr	cpsr,r0
+	mrs	r0, cpsr
+	bic	r0, r0, #0x3f
+	orr	r0, r0, #0xd3
+	msr	cpsr, r0
 
-	bl	cpu_init_crit
-	bl	_main
-
+/*
+ *************************************************************************
+ *
+ * CPU_init_critical registers
+ *
+ * setup important registers
+ * setup memory timing
+ *
+ *************************************************************************
+ */
+	/*
+	 * we do sys-critical inits only at reboot,
+	 * not when booting from ram!
+	 */
 cpu_init_crit:
+	/*
+	 * When booting from NAND - it has definitely been a reset, so, no need
+	 * to flush caches and disable the MMU
+	 */
 	/*
 	 * flush v4 I/D caches
 	 */
 	mov	r0, #0
-	mcr	p15, 0, r0, c7, c7, 0	/* Invalidate I+D+BTB caches */
-	mcr	p15, 0, r0, c8, c7, 0	/* Invalidate Unified TLB */
+	mcr	p15, 0, r0, c7, c7, 0	/* flush v3/v4 cache */
+	mcr	p15, 0, r0, c8, c7, 0	/* flush v4 TLB */
 
 	/*
 	 * disable MMU stuff and caches
@@ -67,6 +71,27 @@ cpu_init_crit:
 	bic	r0, r0, #0x00000087	@ clear bits 7, 2:0 (B--- -CAM)
 	orr	r0, r0, #0x00000002	@ set bit 1 (A) Align
 	orr	r0, r0, #0x00001000	@ set bit 12 (I) I-Cache
-	mcr	p15, 0, r0, c1, c0, 0
 
-	mov	pc, lr		/* back to my caller */
+	/* Prepare to disable the MMU */
+	/* Ryan TODO ....*/
+#	adr	r2, mmu_disable_phys
+#	sub	r2, r2, #(CONFIG_SYS_PHY_UBOOT_BASE - CONFIG_SYS_TEXT_BASE)
+	b	mmu_disable
+
+	.align 5
+	/* Run in a single cache-line */
+mmu_disable:
+	mcr	p15, 0, r0, c1, c0, 0
+	nop
+	nop
+#	mov	pc, r2
+mmu_disable_phys:
+
+	/*
+	 * Go setup Memory and board specific bits prior to relocation.
+	 */
+	mov	ip, lr		/* perserve link reg across call */
+	bl	lowlevel_init	/* go setup pll,mux,memory */
+  b	_main
+	/* Will never return */
+
