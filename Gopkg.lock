@@ -130,14 +130,6 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:abb6572474aa961d2aa78aabf5aaa96cf623db17eb690e4dd1714611de999618"
-  name = "github.com/jmhodges/clock"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "880ee4c335489bc78d01e4d0a254ae880734bc15"
-  version = "v1.1"
-
-[[projects]]
   digest = "1:b6bbd2f9e0724bd81890c8644259f920c6d61c08453978faff0bebd25f3e7d3e"
   name = "github.com/jpillora/backoff"
   packages = ["."]
@@ -155,7 +147,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b380421d5e6384644af120efbc677f9850566db580fcf2080864903eae6bc198"
+  digest = "1:475c204f5bd5cdea2163d64c82750dbe72b45d8700d66d027050814ba4cc0384"
   name = "github.com/letsencrypt/pebble"
   packages = [
     "acme",
@@ -166,7 +158,7 @@
     "wfe",
   ]
   pruneopts = "UT"
-  revision = "194da59119430fff75e3249f07e109bb2ba69c24"
+  revision = "22e0a4bcb418c3805cdc9f80c4cc4e3ff425de24"
 
 [[projects]]
   digest = "1:bafd3a9adf27bf1d851160b0e7a0187c3855223b3920771fdbfe44edf066934e"
@@ -521,7 +513,6 @@
     "github.com/grpc-ecosystem/go-grpc-prometheus",
     "github.com/jhump/protoreflect/desc",
     "github.com/jhump/protoreflect/grpcreflect",
-    "github.com/jmhodges/clock",
     "github.com/jpillora/backoff",
     "github.com/letsencrypt/pebble/ca",
     "github.com/letsencrypt/pebble/db",

@@ -21,7 +21,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jmhodges/clock"
 	"github.com/letsencrypt/pebble/ca"
 	"github.com/letsencrypt/pebble/db"
 	"github.com/letsencrypt/pebble/va"
@@ -40,8 +39,7 @@ func (h *fakeACMEHandler) HandleDNS01Challenge(string, string) error {
 func TestACME(t *testing.T) {
 	cert := genCert()
 	logger := Logger(t, "Pebble")
-	clk := clock.New()
-	db := db.NewMemoryStore(clk)
+	db := db.NewMemoryStore()
 	ca := ca.New(logger, db)
 
 	// Responding to challenges is tested in the integration test
@@ -50,8 +48,8 @@ func TestACME(t *testing.T) {
 
 	// Enable strict mode to test upcoming API breaking changes
 	strictMode := true
-	va := va.New(logger, clk, 80, 443, strictMode)
-	wfeImpl := wfe.New(logger, clk, db, va, ca, strictMode)
+	va := va.New(logger, 80, 443, strictMode)
+	wfeImpl := wfe.New(logger, db, va, ca, strictMode)
 	muxHandler := wfeImpl.Handler()
 
 	var tc tls.Config
