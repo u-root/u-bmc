@@ -20,7 +20,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/jmhodges/clock"
 	"github.com/letsencrypt/pebble/ca"
 	"github.com/letsencrypt/pebble/db"
 	"github.com/letsencrypt/pebble/va"
@@ -47,14 +46,13 @@ func NewTestCA() *CAServer {
 	}
 
 	logger := log.New(os.Stdout, "Pebble ", log.LstdFlags)
-	clk := clock.New()
-	db := db.NewMemoryStore(clk)
+	db := db.NewMemoryStore()
 	ca := ca.New(logger, db)
 
 	// Enable strict mode to test upcoming API breaking changes
 	strictMode := true
-	va := va.New(logger, clk, 80, 443, strictMode)
-	wfeImpl := wfe.New(logger, clk, db, va, ca, strictMode)
+	va := va.New(logger, 80, 443, strictMode)
+	wfeImpl := wfe.New(logger, db, va, ca, strictMode)
 	muxHandler := wfeImpl.Handler()
 
 	block := &pem.Block{

@@ -31,9 +31,11 @@ to contribute let us know.
 
 Currently the supported boards are:
 - Open Compute Project: Quanta F06 Leopard DDR3
+- Aspeed AST2500 Evaluation Board
 
 Planned boards are:
 - Open Compute Project: Quanta F20 Yosemite
+- Tyan Tempest CX S7106 
 
 Do you want to become a contributor of a board? Let us know!
 
@@ -66,10 +68,9 @@ Clone:
 ```
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
-git submodule init && git submodule update
+(cd linux/; ../linux-patches/apply.sh)
 # Until https://github.com/u-root/u-root/issues/1024 is fixed
 go get github.com/u-root/u-root
-(cd linux/; ../linux-patches/apply.sh)
 ```
 
 Setup:
