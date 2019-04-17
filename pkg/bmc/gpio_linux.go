@@ -84,7 +84,7 @@ type gpioLnxLine struct {
 	f *os.File
 }
 
-func (g *gpioLnx) requestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error) {
+func (g *gpioLnx) RequestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error) {
 	rinfo := gpiohandle_request{}
 	for i, l := range lines {
 		rinfo.lineoffsets[i] = l
@@ -149,15 +149,19 @@ func setLineValues(f *os.File, out []bool) error {
 	return nil
 }
 
-func (l *gpioLnxLine) setValues(out []bool) error {
+func (l *gpioLnxLine) SetValues(out []bool) error {
 	return setLineValues(l.f, out)
+}
+
+func (l *gpioLnxLine) Close() {
+	l.f.Close()
 }
 
 type gpioLnxEvent struct {
 	f *os.File
 }
 
-func (g *gpioLnx) getLineEvent(line uint32) (gpioEventImpl, error) {
+func (g *gpioLnx) GetLineEvent(line uint32) (gpioEventImpl, error) {
 	req := gpioevent_request{}
 	req.lineoffset = line
 	req.handleflags = uint32(GPIOHANDLE_REQUEST_INPUT)
@@ -173,7 +177,7 @@ func (g *gpioLnx) getLineEvent(line uint32) (gpioEventImpl, error) {
 	return &gpioLnxEvent{os.NewFile(uintptr(req.fd), "gpio-line-event")}, nil
 }
 
-func (l *gpioLnxEvent) getValue() (bool, error) {
+func (l *gpioLnxEvent) State() (bool, error) {
 	b, err := getLineValues(l.f)
 	if err != nil {
 		return false, err
@@ -181,14 +185,14 @@ func (l *gpioLnxEvent) getValue() (bool, error) {
 	return b[0], nil
 }
 
-func (l *gpioLnxEvent) read() (*int, error) {
+func (l *gpioLnxEvent) WaitForEvent() (int, error) {
 	e := gpioevent_data{}
 	err := binary.Read(l.f, NativeEndian(), &e)
 	if err == io.EOF {
-		return nil, nil
+		return 0, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("readEvent: %v", err)
+		return 0, fmt.Errorf("readEvent: %v", err)
 	}
 
 	v := GPIO_EVENT_UNKNOWN
@@ -198,7 +202,7 @@ func (l *gpioLnxEvent) read() (*int, error) {
 	case GPIOEVENT_EVENT_RISING_EDGE:
 		v = GPIO_EVENT_RISING_EDGE
 	default:
-		return &v, fmt.Errorf("unknown event: %v", e)
+		return v, &unknownEventError{fmt.Errorf("unknown event: %v", e)}
 	}
-	return &v, nil
+	return v, nil
 }

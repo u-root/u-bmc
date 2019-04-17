@@ -16,8 +16,9 @@ import (
 )
 
 type platform struct {
-	a *aspeed.Ast
-	g *bmc.GpioSystem
+	a        *aspeed.Ast
+	g        *bmc.GpioSystem
+	powerLed chan bool
 	gpio.Gpio
 }
 
@@ -47,7 +48,7 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"SKU3":                bmc.LogGpio,
 		"SLP_S3_N":            bmc.LogGpio,
 		"SPI_SEL":             bmc.LogGpio,
-		"SYS_PWR_OK":          bmc.LogGpio,
+		"SYS_PWR_OK":          p.PowerChangeHandler,
 		"SYS_THROTTLE":        bmc.LogGpio,
 		"UART_SELECT0":        bmc.LogGpio,
 		"UART_SELECT1":        bmc.LogGpio,
@@ -63,13 +64,14 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"BAT_SENSE_EN_N": false,
 		"BIOS_SEL":       false,
 		"FAST_PROCHOT":   false,
-		"PWR_LED_N":      false,
 		// TODO(bluecmd): Figure out what this controls
 		"UNKN_Q4": false,
 	})
 
 	go g.ManageButton("BMC_PWR_BTN_OUT_N", pb.Button_BUTTON_POWER, bmc.GPIO_INVERTED)
 	go g.ManageButton("BMC_RST_BTN_OUT_N", pb.Button_BUTTON_RESET, bmc.GPIO_INVERTED)
+	go g.ManageHeartbeat("HEARTBEAT_LED", 300*time.Millisecond)
+	go g.ManageOutput("PWR_LED", p.powerLed)
 	return nil
 }
 
@@ -104,6 +106,18 @@ func (p *platform) ResetButtonHandler(_ string, c chan bool, _ bool) {
 			time.Sleep(time.Duration(100) * time.Millisecond)
 			pushc <- false
 			close(pushc)
+		}
+	}
+}
+
+func (p *platform) PowerChangeHandler(_ string, c chan bool, initial bool) {
+	p.powerLed <- initial
+	for state := range c {
+		p.powerLed <- state
+		if state {
+			log.Printf("System reporting powered on")
+		} else {
+			log.Printf("System reporting powered off")
 		}
 	}
 }
@@ -171,6 +185,6 @@ func (p *platform) Close() {
 
 func Platform() *platform {
 	a := aspeed.Open()
-	p := platform{a, nil, gpio.Gpio{}}
+	p := platform{a, nil, make(chan bool), gpio.Gpio{}}
 	return &p
 }

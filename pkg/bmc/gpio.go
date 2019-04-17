@@ -30,17 +30,22 @@ type GpioPlatform interface {
 }
 
 type gpioLineImpl interface {
-	setValues(out []bool) error
+	SetValues(out []bool) error
+	Close()
 }
 
 type gpioEventImpl interface {
-	read() (*int, error)
-	getValue() (bool, error)
+	WaitForEvent() (int, error)
+	State() (bool, error)
 }
 
 type gpioImpl interface {
-	requestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error)
-	getLineEvent(line uint32) (gpioEventImpl, error)
+	RequestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error)
+	GetLineEvent(line uint32) (gpioEventImpl, error)
+}
+
+type unknownEventError struct {
+	Err error
 }
 
 type GpioSystem struct {
@@ -59,6 +64,18 @@ var (
 		Help:      "Monitored u-bmc GPIO line",
 	}, []string{"line"})
 )
+
+func IsUnknownGpioEvent(err error) bool {
+	switch err.(type) {
+	case *unknownEventError:
+		return true
+	}
+	return false
+}
+
+func (e *unknownEventError) Error() string {
+	return e.Err.Error()
+}
 
 func init() {
 	prometheus.MustRegister(gpioLine)
@@ -88,11 +105,11 @@ func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 	if !ok {
 		return fmt.Errorf("Could not resolve GPIO %s", line)
 	}
-	e, err := g.impl.getLineEvent(port)
+	e, err := g.impl.GetLineEvent(port)
 	if err != nil {
 		return err
 	}
-	d, err := e.getValue()
+	d, err := e.State()
 	if err != nil {
 		return err
 	}
@@ -101,15 +118,13 @@ func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 	go cb(line, c, d)
 
 	for {
-		ev, err := e.read()
-		if ev == nil && err != nil {
+		ev, err := e.WaitForEvent()
+		if err != nil && !IsUnknownGpioEvent(err) {
+			close(c)
 			return err
 		}
-		if ev == nil {
-			break
-		}
 
-		switch *ev {
+		switch ev {
 		case GPIO_EVENT_FALLING_EDGE:
 			c <- false
 		case GPIO_EVENT_RISING_EDGE:
@@ -118,9 +133,7 @@ func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 			log.Printf("Received unknown event on GPIO line %s: %v", line, err)
 		}
 	}
-	close(c)
-	log.Printf("Monitoring stopped for GPIO line %s", line)
-	return nil
+	// Should be unreachable
 }
 
 func (g *GpioSystem) Monitor(lines map[string]GpioCallback) {
@@ -162,10 +175,12 @@ func (g *GpioSystem) Hog(lines map[string]bool) {
 		i++
 	}
 
-	_, err := g.impl.requestLineHandle(lidx, vals)
+	_, err := g.impl.RequestLineHandle(lidx, vals)
 	if err != nil {
 		log.Printf("Hog failed: %v", err)
 	}
+	// Don't close the line handle, keep it opened as long as we're alive to
+	// really hog the line
 }
 
 func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32) (chan bool, error) {
@@ -202,17 +217,40 @@ func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32)
 	return cc, nil
 }
 
+func (g *GpioSystem) ManageHeartbeat(line string, dur time.Duration) {
+	port, ok := g.p.GpioNameToPort(line)
+	if !ok {
+		log.Printf("Could not resolve GPIO %s", line)
+		return
+	}
+	l, err := g.impl.RequestLineHandle([]uint32{port}, []bool{true})
+	if err != nil {
+		log.Printf("ManageButton %s failed: %v", line, err)
+		return
+	}
+	defer l.Close()
+	hdur := time.Duration(dur.Nanoseconds()/2) * time.Nanosecond
+	log.Printf("Initialized heartbeat %s", line)
+	for {
+		l.SetValues([]bool{true})
+		time.Sleep(hdur)
+		l.SetValues([]bool{false})
+		time.Sleep(hdur)
+	}
+}
+
 func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
 	port, ok := g.p.GpioNameToPort(line)
 	if !ok {
 		log.Printf("Could not resolve GPIO %s", line)
 		return
 	}
-	l, err := g.impl.requestLineHandle([]uint32{port}, []bool{true})
+	l, err := g.impl.RequestLineHandle([]uint32{port}, []bool{true})
 	if err != nil {
 		log.Printf("ManageButton %s failed: %v", line, err)
 		return
 	}
+	defer l.Close()
 	log.Printf("Initialized button %s", line)
 
 	for {
@@ -227,8 +265,26 @@ func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
 			if flags&GPIO_INVERTED != 0 {
 				p = !p
 			}
-			l.setValues([]bool{p})
+			l.SetValues([]bool{p})
 		}
+	}
+}
+
+func (g *GpioSystem) ManageOutput(line string, c chan bool) {
+	port, ok := g.p.GpioNameToPort(line)
+	if !ok {
+		log.Printf("Could not resolve GPIO %s", line)
+		return
+	}
+	l, err := g.impl.RequestLineHandle([]uint32{port}, []bool{true})
+	if err != nil {
+		log.Printf("SetLine %s failed: %v", line, err)
+		return
+	}
+	defer l.Close()
+
+	for {
+		l.SetValues([]bool{<-c})
 	}
 }
 

@@ -12,6 +12,7 @@ var (
 	linePortMap = map[string]uint32{
 		"UNKN_BOOT1":          aspeed.GpioPort("A2"),
 		"UNKN_PWR_CAP":        aspeed.GpioPort("A3"),
+		"HEARTBEAT_LED":       aspeed.GpioPort("B0"),
 		"FAST_PROCHOT":        aspeed.GpioPort("B3"),
 		"CPU0_THERMTRIP_N":    aspeed.GpioPort("B5"),
 		"CPU1_THERMTRIP_N":    aspeed.GpioPort("B6"),
@@ -49,7 +50,7 @@ var (
 		"CPU0_PROCHOT_N":    aspeed.GpioPort("P6"),
 		"CPU1_PROCHOT_N":    aspeed.GpioPort("P7"),
 		"UNKN_Q4":           aspeed.GpioPort("Q4"),
-		"PWR_LED_N":         aspeed.GpioPort("Q5"),
+		"PWR_LED":           aspeed.GpioPort("Q5"),
 		"CPU0_FIVR_FAULT_N": aspeed.GpioPort("Q6"),
 		"CPU1_FIVR_FAULT_N": aspeed.GpioPort("Q7"),
 		"MB_SLOT_ID":        aspeed.GpioPort("R1"),

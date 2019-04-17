@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm 5.0.4 Kernel Configuration
+# Linux/arm 5.0.7 Kernel Configuration
 #
 
 #

@@ -16,6 +16,8 @@ var (
 	powerOutN    uint32
 	resetButtonN uint32
 	resetOutN    uint32
+	sysPwrOK     uint32
+	powerLed     uint32
 )
 
 func TestMain(t *testing.T) {
@@ -36,6 +38,14 @@ func TestMain(t *testing.T) {
 	resetOutN, ok = p.GpioNameToPort("BMC_RST_BTN_OUT_N")
 	if !ok {
 		t.Fatalf("Button BMC_RST_BTN_OUT_N not defined")
+	}
+	sysPwrOK, ok = p.GpioNameToPort("SYS_PWR_OK")
+	if !ok {
+		t.Fatalf("Port SYS_PWR_OK not defined")
+	}
+	powerLed, ok = p.GpioNameToPort("PWR_LED")
+	if !ok {
+		t.Fatalf("Port PWR_LED not defined")
 	}
 }
 
@@ -106,5 +116,33 @@ func TestResetButton(t *testing.T) {
 	time.Sleep(time.Duration(110) * time.Millisecond)
 	if !f.Get(resetOutN) {
 		t.Fatalf("Reset control line did not release after 100 ms")
+	}
+}
+
+func TestPowerLED(t *testing.T) {
+	p := platform{powerLed: make(chan bool)}
+	f := bmc.FakeGpioImpl(&p, map[uint32]bool{
+		sysPwrOK: false,
+		powerLed: false,
+	})
+
+	g := bmc.NewGpioSystem(&p, f)
+	err := p.InitializeGpio(g)
+	if err != nil {
+		t.Fatalf("platform.InitializeGpio failed with %v", err)
+	}
+
+	if f.Get(powerLed) {
+		t.Fatalf("Power LED active when system is off")
+	}
+
+	f.Set(sysPwrOK, true)
+	if !f.Get(powerLed) {
+		t.Fatalf("Power LED remained inactive when system was turned on")
+	}
+
+	f.Set(sysPwrOK, false)
+	if f.Get(powerLed) {
+		t.Fatalf("Power LED remained active when system was turned off again")
 	}
 }

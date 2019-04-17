@@ -27,7 +27,7 @@ type fakeGpioLine struct {
 	lines []uint32
 }
 
-func (l *fakeGpioLine) setValues(vals []bool) error {
+func (l *fakeGpioLine) SetValues(vals []bool) error {
 	l.g.lock.Lock()
 	defer l.g.lock.Unlock()
 	for i, v := range vals {
@@ -41,6 +41,9 @@ func (l *fakeGpioLine) setValues(vals []bool) error {
 		}
 	}
 	return nil
+}
+
+func (l *fakeGpioLine) Close() {
 }
 
 func (g *fakeGpio) Set(port uint32, v bool) {
@@ -64,21 +67,21 @@ func (g *fakeGpio) Get(port uint32) bool {
 	return g.v[port]
 }
 
-func (g *fakeGpio) requestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error) {
+func (g *fakeGpio) RequestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error) {
 	return &fakeGpioLine{g, lines}, nil
 }
 
-func (g *fakeGpio) getLineEvent(line uint32) (gpioEventImpl, error) {
+func (g *fakeGpio) GetLineEvent(line uint32) (gpioEventImpl, error) {
 	return &fakeGpioEvent{g, line}, nil
 }
 
-func (e *fakeGpioEvent) getValue() (bool, error) {
+func (e *fakeGpioEvent) State() (bool, error) {
 	e.g.lock.Lock()
 	defer e.g.lock.Unlock()
 	return e.g.v[e.line], nil
 }
 
-func (e *fakeGpioEvent) read() (*int, error) {
+func (e *fakeGpioEvent) WaitForEvent() (int, error) {
 	e.g.lock.Lock()
 	c := e.g.ports[e.line]
 	e.g.lock.Unlock()
@@ -89,7 +92,7 @@ func (e *fakeGpioEvent) read() (*int, error) {
 	} else {
 		v = GPIO_EVENT_FALLING_EDGE
 	}
-	return &v, nil
+	return v, nil
 }
 
 func FakeGpioImpl(p GpioPlatform, startupState map[uint32]bool) *fakeGpio {
