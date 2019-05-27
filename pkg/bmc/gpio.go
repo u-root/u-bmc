@@ -213,6 +213,10 @@ func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
 		log.Printf("ManageButton %s failed: %v", line, err)
 		return
 	}
+	_, found := g.Button[b]
+	if !found {
+		g.Button[b] = make(chan chan bool)
+	}
 	log.Printf("Initialized button %s", line)
 
 	for {
@@ -249,12 +253,9 @@ func startGpio(p GpioPlatform) (*GpioSystem, error) {
 
 func NewGpioSystem(p GpioPlatform, impl gpioImpl) *GpioSystem {
 	g := GpioSystem{
-		p:    p,
-		impl: impl,
-		Button: map[pb.Button]chan chan bool{
-			pb.Button_BUTTON_POWER: make(chan chan bool),
-			pb.Button_BUTTON_RESET: make(chan chan bool),
-		},
+		p:      p,
+		impl:   impl,
+		Button: map[pb.Button]chan chan bool{},
 	}
 	return &g
 }
