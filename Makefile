@@ -111,7 +111,7 @@ boot/zImage.%: platform/$(SOC)/linux.config.%
 	$(MAKE) $(MAKE_JOBS) \
 		-C linux/ O=build/$@/ \
 		CROSS_COMPILE=$(CROSS_COMPILE) KCONFIG_CONFIG="$(ABS_ROOT_DIR)$<" \
-		ARCH=$(ARCH) oldconfig all
+		ARCH=$(ARCH) olddefconfig all
 	rm -f $<.old
 	cp linux/build/$@/arch/$(ARCH)/boot/zImage $@
 
