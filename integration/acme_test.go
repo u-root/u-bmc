@@ -14,7 +14,7 @@ func TestACME(t *testing.T) {
 	bmc, bmccleanup := BMCTest(t, &Options{
 		Name: "TestACME-BMC",
 		Cmds: []string{
-			"github.com/u-root/u-root/cmds/init",
+			"github.com/u-root/u-root/cmds/core/init",
 			"github.com/u-root/u-bmc/integration/testcmd/acme/uinit",
 		},
 	})

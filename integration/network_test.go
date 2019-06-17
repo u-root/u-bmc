@@ -18,7 +18,7 @@ func TestMetrics(t *testing.T) {
 	_, bmccleanup := BMCTest(t, &Options{
 		Name: "TestMetrics-BMC",
 		Cmds: []string{
-			"github.com/u-root/u-root/cmds/init",
+			"github.com/u-root/u-root/cmds/core/init",
 			"github.com/u-root/u-bmc/integration/testcmd/noop/uinit",
 		},
 		Network: network,
@@ -28,8 +28,8 @@ func TestMetrics(t *testing.T) {
 	host, hostcleanup := NativeTest(t, &Options{
 		Name: "TestMetrics-Host",
 		Cmds: []string{
-			"github.com/u-root/u-root/cmds/init",
-			"github.com/u-root/u-root/cmds/wget",
+			"github.com/u-root/u-root/cmds/core/init",
+			"github.com/u-root/u-root/cmds/core/wget",
 			// TODO(bluecmd): This could be a "Uinit" script probably when the u-root
 			// integration suite is a package
 			"github.com/u-root/u-bmc/integration/testcmd/metrics-native/uinit",
