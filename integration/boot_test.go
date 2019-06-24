@@ -15,7 +15,7 @@ func TestBoot(t *testing.T) {
 	bmc, bmccleanup := BMCTest(t, &Options{
 		Name: "TestBoot-BMC",
 		Cmds: []string{
-			"github.com/u-root/u-root/cmds/init",
+			"github.com/u-root/u-root/cmds/core/init",
 			"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
 		},
 	})
@@ -34,7 +34,7 @@ func TestVerifyFail(t *testing.T) {
 	bmc, bmccleanup := BMCTest(t, &Options{
 		Name: "TestVerifyFail-BMC",
 		Cmds: []string{
-			"github.com/u-root/u-root/cmds/init",
+			"github.com/u-root/u-root/cmds/core/init",
 			"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
 		},
 		ExtraBuildEnv: []string{"TEST_EXTRA_SIGN=/proc/uptime"},
