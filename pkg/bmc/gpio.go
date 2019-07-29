@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,7 +47,8 @@ type gpioImpl interface {
 type GpioSystem struct {
 	p      GpioPlatform
 	impl   gpioImpl
-	Button map[pb.Button]chan chan bool
+	button map[pb.Button]chan chan bool
+	m      sync.RWMutex
 }
 
 type GpioCallback func(line string, c chan bool, initial bool)
@@ -168,12 +170,24 @@ func (g *GpioSystem) Hog(lines map[string]bool) {
 	}
 }
 
+func (g *GpioSystem) Button(b pb.Button) chan chan bool {
+	g.m.Lock()
+	defer g.m.Unlock()
+	_, found := g.button[b]
+	if !found {
+		g.button[b] = make(chan chan bool)
+	}
+	return g.button[b]
+}
+
 func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32) (chan bool, error) {
 	if durMs > 1000*10 {
 		return nil, fmt.Errorf("Maximum allowed depress duration is 10 seconds")
 	}
 	dur := time.Duration(durMs) * time.Millisecond
-	c, ok := g.Button[b]
+	g.m.RLock()
+	defer g.m.RUnlock()
+	c, ok := g.button[b]
 	if !ok {
 		return nil, fmt.Errorf("Unknown button %v", b)
 	}
@@ -213,14 +227,11 @@ func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
 		log.Printf("ManageButton %s failed: %v", line, err)
 		return
 	}
-	_, found := g.Button[b]
-	if !found {
-		g.Button[b] = make(chan chan bool)
-	}
+	c := g.Button(b)
 	log.Printf("Initialized button %s", line)
 
 	for {
-		pushc := <-g.Button[b]
+		pushc := <-c
 
 		for p := range pushc {
 			if p {
@@ -255,7 +266,7 @@ func NewGpioSystem(p GpioPlatform, impl gpioImpl) *GpioSystem {
 	g := GpioSystem{
 		p:      p,
 		impl:   impl,
-		Button: map[pb.Button]chan chan bool{},
+		button: map[pb.Button]chan chan bool{},
 	}
 	return &g
 }

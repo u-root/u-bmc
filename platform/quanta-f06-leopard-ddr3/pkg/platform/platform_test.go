@@ -56,17 +56,17 @@ func TestPowerButton(t *testing.T) {
 	}
 
 	// Power button out mirrors the power button press
-	if !f.Get(powerOutN) {
+	if !f.Current(powerOutN) {
 		t.Fatalf("Power control line low when power button is in resting state")
 	}
 
 	f.Set(powerButtonN, false)
-	if f.Get(powerOutN) {
+	if f.WaitForChange(powerOutN) {
 		t.Fatalf("Power control line remained high when power button is being pushed")
 	}
 
 	f.Set(powerButtonN, true)
-	if !f.Get(powerOutN) {
+	if !f.WaitForChange(powerOutN) {
 		t.Fatalf("Power control line remained low when power button was released")
 	}
 }
@@ -88,23 +88,25 @@ func TestResetButton(t *testing.T) {
 	}
 
 	// Reset press causes a 100 ms pulse
-	if !f.Get(resetOutN) {
+	if !f.Current(resetOutN) {
 		t.Fatalf("Reset control line low when reset button is in resting state")
 	}
 
 	f.Set(resetButtonN, false)
-	if f.Get(resetOutN) {
+	if f.WaitForChange(resetOutN) {
 		t.Fatalf("Reset control line remained high when reset button is being pushed")
 	}
 
 	f.Set(resetButtonN, true)
-	if f.Get(resetOutN) {
+
+	// TODO(bluecmd): This should be using a fake clock to avoid races and long tests.
+	time.Sleep(time.Duration(10) * time.Millisecond)
+	if f.Current(resetOutN) {
 		t.Fatalf("Reset control line did not remain low when reset button was released")
 	}
 
-	// TODO(bluecmd): This should be using a fake clock to avoid races and long tests.
 	time.Sleep(time.Duration(110) * time.Millisecond)
-	if !f.Get(resetOutN) {
+	if !f.Current(resetOutN) {
 		t.Fatalf("Reset control line did not release after 100 ms")
 	}
 }

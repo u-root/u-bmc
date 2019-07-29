@@ -7,7 +7,6 @@ package bmc
 import (
 	"log"
 	"sync"
-	"time"
 )
 
 type fakeGpio struct {
@@ -51,17 +50,19 @@ func (g *fakeGpio) Set(port uint32, v bool) {
 	g.v[port] = v
 	g.lock.Unlock()
 	c <- v
-
-	// TODO(bluecmd): Hacky hack to allow the tests to be written in a nicer
-	// more imperative way without a lot of magic values.
-	// Essentially, allow the system to react to the value before continuing
-	time.Sleep(time.Duration(10) * time.Millisecond)
 }
 
-func (g *fakeGpio) Get(port uint32) bool {
+func (g *fakeGpio) Current(port uint32) bool {
 	g.lock.Lock()
 	defer g.lock.Unlock()
 	return g.v[port]
+}
+
+func (g *fakeGpio) WaitForChange(port uint32) bool {
+	g.lock.Lock()
+	c := g.ports[port]
+	g.lock.Unlock()
+	return <-c
 }
 
 func (g *fakeGpio) requestLineHandle(lines []uint32, out []bool) (gpioLineImpl, error) {

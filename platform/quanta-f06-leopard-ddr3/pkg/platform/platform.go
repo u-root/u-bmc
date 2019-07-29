@@ -81,7 +81,7 @@ func (p *platform) PowerButtonHandler(_ string, c chan bool, _ bool) {
 		if pressed {
 			log.Printf("Physical power button pressed")
 			pushc = make(chan bool)
-			p.g.Button[pb.Button_BUTTON_POWER] <- pushc
+			p.g.Button(pb.Button_BUTTON_POWER) <- pushc
 			pushc <- true
 		} else if pushc != nil {
 			log.Printf("Physical power button released")
@@ -99,7 +99,7 @@ func (p *platform) ResetButtonHandler(_ string, c chan bool, _ bool) {
 		if pressed {
 			log.Printf("Physical reset button triggered")
 			pushc := make(chan bool)
-			p.g.Button[pb.Button_BUTTON_RESET] <- pushc
+			p.g.Button(pb.Button_BUTTON_RESET) <- pushc
 			pushc <- true
 			time.Sleep(time.Duration(100) * time.Millisecond)
 			pushc <- false
