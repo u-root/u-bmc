@@ -12,6 +12,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 
+	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
 )
 
@@ -67,29 +68,6 @@ var NumericOverflowError = ErrNumericOverflow
 var typeOfProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
 var typeOfDynamicMessage = reflect.TypeOf((*Message)(nil))
 var typeOfBytes = reflect.TypeOf(([]byte)(nil))
-
-var varintTypes = map[descriptor.FieldDescriptorProto_Type]bool{}
-var fixed32Types = map[descriptor.FieldDescriptorProto_Type]bool{}
-var fixed64Types = map[descriptor.FieldDescriptorProto_Type]bool{}
-
-func init() {
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_BOOL] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_INT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_UINT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT32] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_SINT64] = true
-	varintTypes[descriptor.FieldDescriptorProto_TYPE_ENUM] = true
-
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FIXED32] = true
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_SFIXED32] = true
-	fixed32Types[descriptor.FieldDescriptorProto_TYPE_FLOAT] = true
-
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_FIXED64] = true
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_SFIXED64] = true
-	fixed64Types[descriptor.FieldDescriptorProto_TYPE_DOUBLE] = true
-}
 
 // Message is a dynamic protobuf message. Instead of a generated struct,
 // like most protobuf messages, this is a map of field number to values and
@@ -716,41 +694,40 @@ func (m *Message) setField(fd *desc.FieldDescriptor, val interface{}) error {
 }
 
 func (m *Message) internalSetField(fd *desc.FieldDescriptor, val interface{}) {
-	if m.md.IsProto3() && fd.GetOneOf() == nil {
+	if fd.IsRepeated() {
+		// Unset fields and zero-length fields are indistinguishable, in both
+		// proto2 and proto3 syntax
+		if reflect.ValueOf(val).Len() == 0 {
+			if m.values != nil {
+				delete(m.values, fd.GetNumber())
+			}
+			return
+		}
+	} else if m.md.IsProto3() && fd.GetOneOf() == nil {
 		// proto3 considers fields that are set to their zero value as unset
-		if fd.IsRepeated() {
-			// can't use == comparison below for map and slices, so just test length
-			// (zero length is same as default)
-			if reflect.ValueOf(val).Len() == 0 {
-				if m.values != nil {
-					delete(m.values, fd.GetNumber())
-				}
-				return
-			}
-		} else {
+		// (we already handled repeated fields above)
+		var equal bool
+		if b, ok := val.([]byte); ok {
 			// can't compare slices, so we have to special-case []byte values
-			var equal bool
-			if b, ok := val.([]byte); ok {
-				equal = ok && bytes.Equal(b, fd.GetDefaultValue().([]byte))
-			} else {
-				defVal := fd.GetDefaultValue()
-				equal = defVal == val
-				if !equal && defVal == nil {
-					// above just checks if value is the nil interface,
-					// but we should also test if the given value is a
-					// nil pointer
-					rv := reflect.ValueOf(val)
-					if rv.Kind() == reflect.Ptr && rv.IsNil() {
-						equal = true
-					}
+			equal = ok && bytes.Equal(b, fd.GetDefaultValue().([]byte))
+		} else {
+			defVal := fd.GetDefaultValue()
+			equal = defVal == val
+			if !equal && defVal == nil {
+				// above just checks if value is the nil interface,
+				// but we should also test if the given value is a
+				// nil pointer
+				rv := reflect.ValueOf(val)
+				if rv.Kind() == reflect.Ptr && rv.IsNil() {
+					equal = true
 				}
 			}
-			if equal {
-				if m.values != nil {
-					delete(m.values, fd.GetNumber())
-				}
-				return
+		}
+		if equal {
+			if m.values != nil {
+				delete(m.values, fd.GetNumber())
 			}
+			return
 		}
 	}
 	if m.values == nil {
@@ -1222,7 +1199,6 @@ func (m *Message) putMapField(fd *desc.FieldDescriptor, key interface{}, val int
 		if mp, err = m.parseUnknownField(fd); err != nil {
 			return err
 		} else if mp == nil {
-			mp = map[interface{}]interface{}{}
 			m.internalSetField(fd, map[interface{}]interface{}{ki: vi})
 			return nil
 		}
@@ -1778,9 +1754,9 @@ func (m *Message) parseUnknownField(fd *desc.FieldDescriptor) (interface{}, erro
 	for _, unk := range unks {
 		var val interface{}
 		if unk.Encoding == proto.WireBytes || unk.Encoding == proto.WireStartGroup {
-			val, err = unmarshalLengthDelimitedField(fd, unk.Contents, m.mf)
+			val, err = codec.DecodeLengthDelimitedField(fd, unk.Contents, m.mf)
 		} else {
-			val, err = unmarshalSimpleField(fd, unk.Value)
+			val, err = codec.DecodeScalarField(fd, unk.Value)
 		}
 		if err != nil {
 			return nil, err
@@ -1821,32 +1797,7 @@ func validFieldValue(fd *desc.FieldDescriptor, val interface{}) (interface{}, er
 
 func validFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
 	if fd.IsMap() && val.Kind() == reflect.Map {
-		// make a defensive copy while we check the contents
-		// (also converts to map[interface{}]interface{} if it's some other type)
-		keyField := fd.GetMessageType().GetFields()[0]
-		valField := fd.GetMessageType().GetFields()[1]
-		m := map[interface{}]interface{}{}
-		for _, k := range val.MapKeys() {
-			if k.Kind() == reflect.Interface {
-				// unwrap it
-				k = reflect.ValueOf(k.Interface())
-			}
-			kk, err := validFieldValueForRv(keyField, k)
-			if err != nil {
-				return nil, err
-			}
-			v := val.MapIndex(k)
-			if v.Kind() == reflect.Interface {
-				// unwrap it
-				v = reflect.ValueOf(v.Interface())
-			}
-			vv, err := validFieldValueForRv(valField, v)
-			if err != nil {
-				return nil, err
-			}
-			m[kk] = vv
-		}
-		return m, nil
+		return validFieldValueForMapField(fd, val)
 	}
 
 	if fd.IsRepeated() { // this will also catch map fields where given value was not a map
@@ -1922,44 +1873,44 @@ func validElementFieldValue(fd *desc.FieldDescriptor, val interface{}) (interfac
 
 func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (interface{}, error) {
 	t := fd.GetType()
-	typeName := strings.ToLower(t.String())
 	if !val.IsValid() {
-		return nil, fmt.Errorf("%s field %s is not compatible with nil value", typeName, fd.GetFullyQualifiedName())
+		return nil, typeError(fd, nil)
 	}
+
 	switch t {
 	case descriptor.FieldDescriptorProto_TYPE_SFIXED32,
 		descriptor.FieldDescriptorProto_TYPE_INT32,
 		descriptor.FieldDescriptorProto_TYPE_SINT32,
 		descriptor.FieldDescriptorProto_TYPE_ENUM:
-		return toInt32(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toInt32(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_SFIXED64,
 		descriptor.FieldDescriptorProto_TYPE_INT64,
 		descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return toInt64(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toInt64(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED32,
 		descriptor.FieldDescriptorProto_TYPE_UINT32:
-		return toUint32(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toUint32(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_FIXED64,
 		descriptor.FieldDescriptorProto_TYPE_UINT64:
-		return toUint64(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toUint64(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_FLOAT:
-		return toFloat32(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toFloat32(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
-		return toFloat64(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toFloat64(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_BOOL:
-		return toBool(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toBool(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
-		return toBytes(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toBytes(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_STRING:
-		return toString(reflect.Indirect(val), typeName, fd.GetFullyQualifiedName())
+		return toString(reflect.Indirect(val), fd)
 
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE,
 		descriptor.FieldDescriptorProto_TYPE_GROUP:
@@ -1984,67 +1935,77 @@ func validElementFieldValueForRv(fd *desc.FieldDescriptor, val reflect.Value) (i
 	}
 }
 
-func toInt32(v reflect.Value, what string, fieldName string) (int32, error) {
+func toInt32(v reflect.Value, fd *desc.FieldDescriptor) (int32, error) {
 	if v.Kind() == reflect.Int32 {
 		return int32(v.Int()), nil
 	}
-	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
-func toUint32(v reflect.Value, what string, fieldName string) (uint32, error) {
+func toUint32(v reflect.Value, fd *desc.FieldDescriptor) (uint32, error) {
 	if v.Kind() == reflect.Uint32 {
 		return uint32(v.Uint()), nil
 	}
-	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
-func toFloat32(v reflect.Value, what string, fieldName string) (float32, error) {
+func toFloat32(v reflect.Value, fd *desc.FieldDescriptor) (float32, error) {
 	if v.Kind() == reflect.Float32 {
 		return float32(v.Float()), nil
 	}
-	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
-func toInt64(v reflect.Value, what string, fieldName string) (int64, error) {
+func toInt64(v reflect.Value, fd *desc.FieldDescriptor) (int64, error) {
 	if v.Kind() == reflect.Int64 || v.Kind() == reflect.Int || v.Kind() == reflect.Int32 {
 		return v.Int(), nil
 	}
-	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
-func toUint64(v reflect.Value, what string, fieldName string) (uint64, error) {
+func toUint64(v reflect.Value, fd *desc.FieldDescriptor) (uint64, error) {
 	if v.Kind() == reflect.Uint64 || v.Kind() == reflect.Uint || v.Kind() == reflect.Uint32 {
 		return v.Uint(), nil
 	}
-	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
-func toFloat64(v reflect.Value, what string, fieldName string) (float64, error) {
+func toFloat64(v reflect.Value, fd *desc.FieldDescriptor) (float64, error) {
 	if v.Kind() == reflect.Float64 || v.Kind() == reflect.Float32 {
 		return v.Float(), nil
 	}
-	return 0, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return 0, typeError(fd, v.Type())
 }
 
-func toBool(v reflect.Value, what string, fieldName string) (bool, error) {
+func toBool(v reflect.Value, fd *desc.FieldDescriptor) (bool, error) {
 	if v.Kind() == reflect.Bool {
 		return v.Bool(), nil
 	}
-	return false, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return false, typeError(fd, v.Type())
 }
 
-func toBytes(v reflect.Value, what string, fieldName string) ([]byte, error) {
+func toBytes(v reflect.Value, fd *desc.FieldDescriptor) ([]byte, error) {
 	if v.Kind() == reflect.Slice && v.Type().Elem().Kind() == reflect.Uint8 {
 		return v.Bytes(), nil
 	}
-	return nil, fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return nil, typeError(fd, v.Type())
 }
 
-func toString(v reflect.Value, what string, fieldName string) (string, error) {
+func toString(v reflect.Value, fd *desc.FieldDescriptor) (string, error) {
 	if v.Kind() == reflect.String {
 		return v.String(), nil
 	}
-	return "", fmt.Errorf("%s field %s is not compatible with value of type %v", what, fieldName, v.Type())
+	return "", typeError(fd, v.Type())
+}
+
+func typeError(fd *desc.FieldDescriptor, t reflect.Type) error {
+	return fmt.Errorf(
+		"%s field %s is not compatible with value of type %v",
+		getTypeString(fd), fd.GetFullyQualifiedName(), t)
+}
+
+func getTypeString(fd *desc.FieldDescriptor) string {
+	return strings.ToLower(fd.GetType().String())
 }
 
 func asMessage(v reflect.Value, fieldName string) (proto.Message, error) {
@@ -2059,8 +2020,12 @@ func asMessage(v reflect.Value, fieldName string) (proto.Message, error) {
 // Reset resets this message to an empty message. It removes all values set in
 // the message.
 func (m *Message) Reset() {
-	m.values = nil
-	m.unknownFields = nil
+	for k := range m.values {
+		delete(m.values, k)
+	}
+	for k := range m.unknownFields {
+		delete(m.unknownFields, k)
+	}
 }
 
 // String returns this message rendered in compact text format.
@@ -2148,6 +2113,9 @@ func (m *Message) Merge(source proto.Message) {
 		// To support proto.Clone, initialize the descriptor from the source.
 		if dm, ok := source.(*Message); ok {
 			m.md = dm.md
+			// also make sure the clone uses the same message factory and
+			// extensions and also knows about the same extra fields (if any)
+			m.mf = dm.mf
 			m.er = dm.er
 			m.extraFields = dm.extraFields
 		} else if md, err := desc.LoadMessageDescriptorForMessage(source); err != nil {
@@ -2263,7 +2231,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 			continue
 		}
 		f := target.FieldByName(prop.Name)
-		mergeVal(reflect.ValueOf(v), f)
+		if err := mergeVal(reflect.ValueOf(v), f); err != nil {
+			return err
+		}
 	}
 	// merge one-ofs
 	for _, oop := range structProps.OneofTypes {
@@ -2275,7 +2245,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 		}
 		oov := reflect.New(oop.Type.Elem())
 		f := oov.Elem().FieldByName(prop.Name)
-		mergeVal(reflect.ValueOf(v), f)
+		if err := mergeVal(reflect.ValueOf(v), f); err != nil {
+			return err
+		}
 		target.Field(oop.Field).Set(oov)
 	}
 	// merge extensions, too
@@ -2285,7 +2257,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 			continue
 		}
 		e := reflect.New(reflect.TypeOf(ext.ExtensionType)).Elem()
-		mergeVal(reflect.ValueOf(v), e)
+		if err := mergeVal(reflect.ValueOf(v), e); err != nil {
+			return err
+		}
 		if err := proto.SetExtension(pm, ext, e.Interface()); err != nil {
 			// shouldn't happen since we already checked that the extension type was compatible above
 			return err
@@ -2295,14 +2269,15 @@ func (m *Message) mergeInto(pm proto.Message) error {
 	// if we have fields that the given message doesn't know about, add to its unknown fields
 	if len(unknownTags) > 0 {
 		ub := u.Interface().([]byte)
-		var b codedBuffer
+		var b codec.Buffer
+		b.SetDeterministic(defaultDeterminism)
 		for tag := range unknownTags {
 			fd := m.FindFieldDescriptor(tag)
-			if err := marshalField(tag, fd, m.values[tag], &b, false); err != nil {
+			if err := b.EncodeFieldValue(fd, m.values[tag]); err != nil {
 				return err
 			}
 		}
-		ub = append(ub, b.buf...)
+		ub = append(ub, b.Bytes()...)
 		u.Set(reflect.ValueOf(ub))
 	}
 
@@ -2310,9 +2285,9 @@ func (m *Message) mergeInto(pm proto.Message) error {
 	// (this will append to its unknown fields if not known; if somehow the given message recognizes
 	// a field even though the dynamic message did not, it will get correctly unmarshalled)
 	if unknownTags != nil && len(m.unknownFields) > 0 {
-		var b codedBuffer
-		m.marshalUnknownFields(&b)
-		proto.UnmarshalMerge(b.buf, pm)
+		var b codec.Buffer
+		_ = m.marshalUnknownFields(&b)
+		_ = proto.UnmarshalMerge(b.Bytes(), pm)
 	}
 
 	return nil
@@ -2346,17 +2321,7 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 		if srcType.Kind() != reflect.Map {
 			return false
 		}
-		kt := target.Key()
-		vt := target.Elem()
-		for _, k := range src.MapKeys() {
-			if !canConvert(k, kt) {
-				return false
-			}
-			if !canConvert(src.MapIndex(k), vt) {
-				return false
-			}
-		}
-		return true
+		return canConvertMap(src, target)
 	} else if srcType == typeOfDynamicMessage && target.Implements(typeOfProtoMessage) {
 		z := reflect.Zero(target).Interface()
 		msgType := proto.MessageName(z.(proto.Message))
@@ -2366,7 +2331,7 @@ func canConvert(src reflect.Value, target reflect.Type) bool {
 	}
 }
 
-func mergeVal(src, target reflect.Value) {
+func mergeVal(src, target reflect.Value) error {
 	if src.Kind() == reflect.Interface && !src.IsNil() {
 		src = src.Elem()
 	}
@@ -2403,47 +2368,25 @@ func mergeVal(src, target reflect.Value) {
 			if dest.Kind() == reflect.Ptr {
 				dest.Set(reflect.New(dest.Type().Elem()))
 			}
-			mergeVal(src.Index(i), dest)
+			if err := mergeVal(src.Index(i), dest); err != nil {
+				return err
+			}
 		}
 	} else if targetType.Kind() == reflect.Map {
-		tkt := targetType.Key()
-		tvt := targetType.Elem()
-		for _, k := range src.MapKeys() {
-			v := src.MapIndex(k)
-			skt := k.Type()
-			svt := v.Type()
-			var nk, nv reflect.Value
-			if tkt == skt {
-				nk = k
-			} else if tkt.Kind() == reflect.Ptr && tkt.Elem() == skt {
-				nk = k.Addr()
-			} else {
-				nk = reflect.New(tkt).Elem()
-				mergeVal(k, nk)
-			}
-			if tvt == svt {
-				nv = v
-			} else if tvt.Kind() == reflect.Ptr && tvt.Elem() == svt {
-				nv = v.Addr()
-			} else {
-				nv = reflect.New(tvt).Elem()
-				mergeVal(v, nv)
-			}
-			if target.IsNil() {
-				target.Set(reflect.MakeMap(targetType))
-			}
-			target.SetMapIndex(nk, nv)
-		}
+		return mergeMapVal(src, target, targetType)
 	} else if srcType == typeOfDynamicMessage && targetType.Implements(typeOfProtoMessage) {
 		dm := src.Interface().(*Message)
 		if target.IsNil() {
 			target.Set(reflect.New(targetType.Elem()))
 		}
 		m := target.Interface().(proto.Message)
-		dm.mergeInto(m)
+		if err := dm.mergeInto(m); err != nil {
+			return err
+		}
 	} else {
-		panic(fmt.Sprintf("cannot convert %v to %v", srcType, targetType))
+		return fmt.Errorf("cannot convert %v to %v", srcType, targetType)
 	}
+	return nil
 }
 
 func (m *Message) mergeFrom(pm proto.Message) error {
@@ -2570,7 +2513,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	u := src.FieldByName("XXX_unrecognized")
 	if u.IsValid() && u.Type() == typeOfBytes {
 		// ignore any error returned: pulling in unknown fields is best-effort
-		m.UnmarshalMerge(u.Interface().([]byte))
+		_ = m.UnmarshalMerge(u.Interface().([]byte))
 	}
 
 	// lastly, also extract any unknown extensions the message may have (unknown extensions
@@ -2578,7 +2521,7 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 	// more than just the step above...)
 	if len(unknownExtensions) > 0 {
 		// pulling in unknown fields is best-effort, so we just ignore errors
-		m.UnmarshalMerge(unknownExtensions)
+		_ = m.UnmarshalMerge(unknownExtensions)
 	}
 	return nil
 }

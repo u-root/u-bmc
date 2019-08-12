@@ -1,15 +1,19 @@
 package wfe
 
 import (
+	"bytes"
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"math/rand"
 	"net"
 	"net/http"
@@ -34,9 +38,8 @@ import (
 const (
 	// Note: We deliberately pick endpoint paths that differ from Boulder to
 	// exercise clients processing of the /directory response
-	// We export the DirectoryPath and RootCertPath so that the pebble binary can reference it
+	// We export the DirectoryPath so that the pebble binary can reference it
 	DirectoryPath     = "/dir"
-	RootCertPath      = "/root"
 	noncePath         = "/nonce-plz"
 	newAccountPath    = "/sign-me-up"
 	acctPath          = "/my-account/"
@@ -48,6 +51,15 @@ const (
 	certPath          = "/certZ/"
 	revokeCertPath    = "/revoke-cert"
 	keyRolloverPath   = "/rollover-account-key"
+
+	// Theses entrypoints are not a part of the standard ACME endpoints,
+	// and are exposed by Pebble as an integration test tool. We export
+	// RootCertPath so that the pebble binary can reference it.
+	RootCertPath         = "/roots/"
+	rootKeyPath          = "/root-keys/"
+	intermediateCertPath = "/intermediates/"
+	intermediateKeyPath  = "/intermediate-keys/"
+	certStatusBySerial   = "/cert-status-by-serial/"
 
 	// How long do pending authorizations last before expiring?
 	pendingAuthzExpire = time.Hour
@@ -82,6 +94,16 @@ const (
 	// http://www.itu.int/rec/T-REC-X.509-201210-I/en
 	unusedRevocationReason       = 7
 	aACompromiseRevocationReason = 10
+
+	// authzReuseEnvVar defines an environment variable name used to provide a
+	// percentage value for how often Pebble should try to reuse valid authorizations
+	// for each identifier in an order. The percentage is independent of whether a
+	// valid authorization exists or not for each identifier in an order.
+	authzReuseEnvVar = "PEBBLE_AUTHZREUSE"
+
+	// The default value when PEBBLE_WFE_AUTHZREUSE is not set, how often to try
+	// and reuse valid authorizations.
+	defaultAuthzReuse = 50
 )
 
 type wfeHandlerFunc func(context.Context, http.ResponseWriter, *http.Request)
@@ -104,13 +126,14 @@ func (th *topHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 type WebFrontEndImpl struct {
-	log             *log.Logger
-	db              *db.MemoryStore
-	nonce           *nonceMap
-	nonceErrPercent int
-	va              *va.VAImpl
-	ca              *ca.CAImpl
-	strict          bool
+	log               *log.Logger
+	db                *db.MemoryStore
+	nonce             *nonceMap
+	nonceErrPercent   int
+	authzReusePercent int
+	va                *va.VAImpl
+	ca                *ca.CAImpl
+	strict            bool
 }
 
 const ToSURL = "data:text/plain,Do%20what%20thou%20wilt"
@@ -144,14 +167,24 @@ func New(
 	}
 	log.Printf("Configured to reject %d%% of good nonces", nonceErrPercent)
 
+	// Get authz reuse percent from the environment
+	authzReusePercent := defaultAuthzReuse
+	if val, err := strconv.ParseInt(os.Getenv(authzReuseEnvVar), 10, 0); err == nil &&
+		val >= 0 && val <= 100 {
+		authzReusePercent = int(val)
+	}
+	log.Printf("Configured to attempt authz reuse for each identifier %d%% of the time",
+		authzReusePercent)
+
 	return WebFrontEndImpl{
-		log:             log,
-		db:              db,
-		nonce:           newNonceMap(),
-		nonceErrPercent: nonceErrPercent,
-		va:              va,
-		ca:              ca,
-		strict:          strict,
+		log:               log,
+		db:                db,
+		nonce:             newNonceMap(),
+		nonceErrPercent:   nonceErrPercent,
+		authzReusePercent: authzReusePercent,
+		va:                va,
+		ca:                ca,
+		strict:            strict,
 	}
 }
 
@@ -211,10 +244,17 @@ func (wfe *WebFrontEndImpl) HandleFunc(
 	mux.Handle(pattern, defaultHandler)
 }
 
+func (wfe *WebFrontEndImpl) HandleManagementFunc(
+	mux *http.ServeMux,
+	pattern string,
+	handler wfeHandlerFunc) { // nolint:interfacer
+	mux.Handle(pattern, http.StripPrefix(pattern, handler))
+}
+
 func (wfe *WebFrontEndImpl) sendError(prob *acme.ProblemDetails, response http.ResponseWriter) {
 	problemDoc, err := marshalIndent(prob)
 	if err != nil {
-		problemDoc = []byte("{\"detail\": \"Problem marshalling error message.\"}")
+		problemDoc = []byte("{\"detail\": \"Problem marshaling error message.\"}")
 	}
 
 	response.Header().Set("Content-Type", "application/problem+json; charset=utf-8")
@@ -222,20 +262,145 @@ func (wfe *WebFrontEndImpl) sendError(prob *acme.ProblemDetails, response http.R
 	_, _ = response.Write(problemDoc)
 }
 
-func (wfe *WebFrontEndImpl) RootCert(
+type certGetter func(no int) *core.Certificate
+type keyGetter func(no int) *rsa.PrivateKey
+
+func (wfe *WebFrontEndImpl) handleCert(
+	certGet certGetter,
+	relPath string) func(
+	ctx context.Context,
+	response http.ResponseWriter,
+	request *http.Request) {
+	return func(ctx context.Context, response http.ResponseWriter, request *http.Request) {
+		// Check for parameter
+		no, err := strconv.Atoi(request.URL.Path)
+		if err != nil {
+			response.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		// Get hold of root certificate
+		cert := certGet(no)
+		if cert == nil {
+			response.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		// Add links to alternate roots
+		basePath := wfe.relativeEndpoint(request, relPath)
+		for i := 0; i < wfe.ca.GetNumberOfRootCerts(); i++ {
+			if no == i {
+				continue
+			}
+			path := fmt.Sprintf("%s%d", basePath, i)
+			response.Header().Add("Link", link(path, "alternate"))
+		}
+
+		// Write main response
+		response.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
+		response.WriteHeader(http.StatusOK)
+		_, _ = response.Write(cert.PEM())
+	}
+}
+
+func (wfe *WebFrontEndImpl) handleKey(
+	keyGet keyGetter,
+	relPath string) func(
+	ctx context.Context,
+	response http.ResponseWriter,
+	request *http.Request) {
+	return func(ctx context.Context, response http.ResponseWriter, request *http.Request) {
+		// Check for parameter
+		no, err := strconv.Atoi(request.URL.Path)
+		if err != nil {
+			response.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		// Get hold of root certificate's key
+		key := keyGet(no)
+		if key == nil {
+			response.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		// Add links to alternate root keys
+		basePath := wfe.relativeEndpoint(request, relPath)
+		for i := 0; i < wfe.ca.GetNumberOfRootCerts(); i++ {
+			if no == i {
+				continue
+			}
+			path := fmt.Sprintf("%s%d", basePath, i)
+			response.Header().Add("Link", link(path, "alternate"))
+		}
+
+		// Write main response
+		var buf bytes.Buffer
+
+		err = pem.Encode(&buf, &pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: x509.MarshalPKCS1PrivateKey(key),
+		})
+		if err != nil {
+			wfe.sendError(acme.InternalErrorProblem("unable to encode private key to PEM"), response)
+			return
+		}
+
+		response.Header().Set("Content-Type", "application/x-pem-file; charset=utf-8")
+		response.WriteHeader(http.StatusOK)
+		_, _ = response.Write(buf.Bytes())
+	}
+}
+
+func (wfe *WebFrontEndImpl) handleCertStatusBySerial(
 	ctx context.Context,
 	response http.ResponseWriter,
 	request *http.Request) {
 
-	root := wfe.ca.GetRootCert()
-	if root == nil {
-		response.WriteHeader(http.StatusServiceUnavailable)
+	serialStr := strings.TrimPrefix(request.URL.Path, certStatusBySerial)
+	serial := big.NewInt(0)
+	if _, ok := serial.SetString(serialStr, 16); !ok {
+		response.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	response.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
-	response.WriteHeader(http.StatusOK)
-	_, _ = response.Write(root.PEM())
+	var status string
+	var cert *core.Certificate
+	var rcert *core.RevokedCertificate
+	if rcert = wfe.db.GetRevokedCertificateBySerial(serial); rcert != nil {
+		status = "Revoked"
+		cert = rcert.Certificate
+	} else if cert = wfe.db.GetCertificateBySerial(serial); cert != nil {
+		status = "Valid"
+	}
+
+	if status == "" || cert == nil {
+		response.WriteHeader(http.StatusNotFound)
+		return
+	}
+	result := struct {
+		Status      string
+		Serial      string
+		Certificate string
+		Reason      *uint  `json:",omitempty"`
+		RevokedAt   string `json:",omitempty"`
+	}{
+		Status:      status,
+		Serial:      serial.Text(16),
+		Certificate: string(cert.PEM()),
+	}
+	if rcert != nil {
+		if rcert.Reason != nil {
+			result.Reason = rcert.Reason
+		}
+		result.RevokedAt = rcert.RevokedAt.UTC().String()
+	}
+
+	err := wfe.writeJSONResponse(response, http.StatusOK, result)
+	if err != nil {
+		response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 }
 
 func (wfe *WebFrontEndImpl) Handler() http.Handler {
@@ -244,7 +409,6 @@ func (wfe *WebFrontEndImpl) Handler() http.Handler {
 	wfe.HandleFunc(m, DirectoryPath, wfe.Directory, "GET")
 	// Note for noncePath: "GET" also implies "HEAD"
 	wfe.HandleFunc(m, noncePath, wfe.Nonce, "GET")
-	wfe.HandleFunc(m, RootCertPath, wfe.RootCert, "GET")
 
 	// POST only handlers
 	wfe.HandleFunc(m, newAccountPath, wfe.NewAccount, "POST")
@@ -258,6 +422,19 @@ func (wfe *WebFrontEndImpl) Handler() http.Handler {
 	wfe.HandleFunc(m, authzPath, wfe.Authz, "POST")
 	wfe.HandleFunc(m, challengePath, wfe.Challenge, "POST")
 
+	return m
+}
+
+// ManagementHandler handles the endpoints exposed on the management interface that is configured
+// by the `managementListenAddress` parameter in Pebble JSON config file.
+func (wfe *WebFrontEndImpl) ManagementHandler() http.Handler {
+	m := http.NewServeMux()
+	// GET only handlers
+	wfe.HandleManagementFunc(m, RootCertPath, wfe.handleCert(wfe.ca.GetRootCert, RootCertPath))
+	wfe.HandleManagementFunc(m, rootKeyPath, wfe.handleKey(wfe.ca.GetRootKey, rootKeyPath))
+	wfe.HandleManagementFunc(m, intermediateCertPath, wfe.handleCert(wfe.ca.GetIntermediateCert, intermediateCertPath))
+	wfe.HandleManagementFunc(m, intermediateKeyPath, wfe.handleKey(wfe.ca.GetIntermediateKey, intermediateKeyPath))
+	wfe.HandleManagementFunc(m, certStatusBySerial, wfe.handleCertStatusBySerial)
 	return m
 }
 
@@ -621,6 +798,22 @@ func (wfe *WebFrontEndImpl) verifyJWS(
 			expectedURL.String(), headerURL))
 	}
 
+	// In -strict mode, verify that any JWS body that is valid JSON doesn't
+	// include a non-empty "resource" field. This is a legacy artifiact from ACME
+	// v1. This won't catch an empty "resource" field but that would have been
+	// broken in ACMEv1 anyway and is hopefully less likely to occur in code that
+	// is updated for ACMEv2.
+	if wfe.strict {
+		var bodyObj struct {
+			Resource string
+		}
+		if err := json.Unmarshal(payload, &bodyObj); err == nil && bodyObj.Resource != "" {
+			return nil, acme.MalformedProblem(fmt.Sprintf(
+				`JWS body included JSON with a deprecated ACME v1 "resource" field (%q)`,
+				bodyObj.Resource))
+		}
+	}
+
 	return &authenticatedPOST{
 		postAsGet: string(payload) == "",
 		body:      payload,
@@ -729,7 +922,7 @@ func (wfe *WebFrontEndImpl) UpdateAccount(
 		}
 		err := wfe.writeJSONResponse(response, http.StatusOK, existingAcct)
 		if err != nil {
-			wfe.sendError(acme.InternalErrorProblem("Error marshalling account"), response)
+			wfe.sendError(acme.InternalErrorProblem("Error marshaling account"), response)
 			return
 		}
 		return
@@ -773,7 +966,7 @@ func (wfe *WebFrontEndImpl) UpdateAccount(
 
 	err = wfe.writeJSONResponse(response, http.StatusOK, newAcct)
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling account"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling account"), response)
 		return
 	}
 }
@@ -978,7 +1171,7 @@ func (wfe *WebFrontEndImpl) NewAccount(
 	response.Header().Add("Location", acctURL)
 	err = wfe.writeJSONResponse(response, http.StatusCreated, newAcct)
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling account"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling account"), response)
 		return
 	}
 }
@@ -1013,11 +1206,20 @@ func (wfe *WebFrontEndImpl) verifyOrder(order *core.Order) *acme.ProblemDetails 
 	if len(idents) == 0 {
 		return acme.MalformedProblem("Order did not specify any identifiers")
 	}
-	// Check that all of the identifiers in the new-order are DNS type
+	// Check that all of the identifiers in the new-order are DNS or IPaddress type
+	// Validity check of ipaddresses are done here.
 	for _, ident := range idents {
+		if ident.Type == acme.IdentifierIP {
+			if net.ParseIP(ident.Value) == nil {
+				return acme.MalformedProblem(fmt.Sprintf(
+					"Order included malformed IP type identifier value: %q\n",
+					ident.Value))
+			}
+			continue
+		}
 		if ident.Type != acme.IdentifierDNS {
 			return acme.MalformedProblem(fmt.Sprintf(
-				"Order included non-DNS type identifier: type %q, value %q",
+				"Order included unsupported type identifier: type %q, value %q",
 				ident.Type, ident.Value))
 		}
 
@@ -1082,36 +1284,42 @@ func (wfe *WebFrontEndImpl) makeAuthorizations(order *core.Order, request *http.
 
 	// Lock the order for reading
 	order.RLock()
-	// Create one authz for each name in the order's parsed CSR
-	for _, name := range order.Names {
+	// Add one authz for each name in the order's parsed CSR
+	for _, name := range order.Identifiers {
 		now := time.Now().UTC()
 		expires := now.Add(pendingAuthzExpire)
 		ident := acme.Identifier{
-			Type:  acme.IdentifierDNS,
-			Value: name,
+			Type:  name.Type,
+			Value: name.Value,
 		}
-		authz := &core.Authorization{
-			ID:          newToken(),
-			ExpiresDate: expires,
-			Order:       order,
-			Authorization: acme.Authorization{
-				Status:     acme.StatusPending,
-				Identifier: ident,
-				Expires:    expires.UTC().Format(time.RFC3339),
-			},
+		// If there is an existing valid authz for this identifier, we can reuse it
+		authz := wfe.db.FindValidAuthorization(order.AccountID, ident)
+		// Otherwise create a new pending authz (and randomly not)
+		if authz == nil || rand.Intn(100) > wfe.authzReusePercent {
+			authz = &core.Authorization{
+				ID:          newToken(),
+				ExpiresDate: expires,
+				Order:       order,
+				Authorization: acme.Authorization{
+					Status:     acme.StatusPending,
+					Identifier: ident,
+					Expires:    expires.UTC().Format(time.RFC3339),
+				},
+			}
+			authz.URL = wfe.relativeEndpoint(request, fmt.Sprintf("%s%s", authzPath, authz.ID))
+			// Create the challenges for this authz
+			err := wfe.makeChallenges(authz, request)
+			if err != nil {
+				return err
+			}
+			// Save the authorization in memory
+			count, err := wfe.db.AddAuthorization(authz)
+			if err != nil {
+				return err
+			}
+			wfe.log.Printf("There are now %d authorizations in the db\n", count)
 		}
-		authz.URL = wfe.relativeEndpoint(request, fmt.Sprintf("%s%s", authzPath, authz.ID))
-		// Create the challenges for this authz
-		err := wfe.makeChallenges(authz, request)
-		if err != nil {
-			return err
-		}
-		// Save the authorization in memory
-		count, err := wfe.db.AddAuthorization(authz)
-		if err != nil {
-			return err
-		}
-		wfe.log.Printf("There are now %d authorizations in the db\n", count)
+
 		authzURL := wfe.relativeEndpoint(request, fmt.Sprintf("%s%s", authzPath, authz.ID))
 		auths = append(auths, authzURL)
 		authObs = append(authObs, authz)
@@ -1166,8 +1374,14 @@ func (wfe *WebFrontEndImpl) makeChallenges(authz *core.Authorization, request *h
 		}
 		chals = []*core.Challenge{chal}
 	} else {
-		// Non-wildcard authorizations get all of the enabled challenge types
-		enabledChallenges := []string{acme.ChallengeHTTP01, acme.ChallengeTLSALPN01, acme.ChallengeDNS01}
+		// IP addresses get HTTP-01 and TLS-ALPN challenges
+		var enabledChallenges []string
+		if authz.Identifier.Value == acme.IdentifierIP {
+			enabledChallenges = []string{acme.ChallengeHTTP01, acme.ChallengeTLSALPN01}
+		} else {
+			// Non-wildcard, non-IP identifier authorizations get all of the enabled challenge types
+			enabledChallenges = []string{acme.ChallengeHTTP01, acme.ChallengeTLSALPN01, acme.ChallengeDNS01}
+		}
 		for _, chalType := range enabledChallenges {
 			chal, err := wfe.makeChallenge(chalType, authz, request)
 			if err != nil {
@@ -1211,6 +1425,29 @@ func (wfe *WebFrontEndImpl) NewOrder(
 		return
 	}
 
+	var orderDNSs []string
+	var orderIPs []net.IP
+	for _, ident := range newOrder.Identifiers {
+		switch ident.Type {
+		case acme.IdentifierDNS:
+			orderDNSs = append(orderDNSs, ident.Value)
+		case acme.IdentifierIP:
+			orderIPs = append(orderIPs, net.ParseIP(ident.Value))
+		default:
+			wfe.sendError(acme.MalformedProblem(
+				fmt.Sprintf("Order includes unknown identifier type %s", ident.Type)), response)
+			return
+		}
+	}
+	orderDNSs = uniqueLowerNames(orderDNSs)
+	orderIPs = uniqueIPs(orderIPs)
+	var uniquenames []acme.Identifier
+	for _, name := range orderDNSs {
+		uniquenames = append(uniquenames, acme.Identifier{Value: name, Type: acme.IdentifierDNS})
+	}
+	for _, ip := range orderIPs {
+		uniquenames = append(uniquenames, acme.Identifier{Value: ip.String(), Type: acme.IdentifierIP})
+	}
 	expires := time.Now().AddDate(0, 0, 1)
 	order := &core.Order{
 		ID:        newToken(),
@@ -1220,7 +1457,7 @@ func (wfe *WebFrontEndImpl) NewOrder(
 			Expires: expires.UTC().Format(time.RFC3339),
 			// Only the Identifiers, NotBefore and NotAfter from the submitted order
 			// are carried forward
-			Identifiers: newOrder.Identifiers,
+			Identifiers: uniquenames,
 			NotBefore:   newOrder.NotBefore,
 			NotAfter:    newOrder.NotAfter,
 		},
@@ -1232,15 +1469,6 @@ func (wfe *WebFrontEndImpl) NewOrder(
 		wfe.sendError(err, response)
 		return
 	}
-
-	// Collect all of the DNS identifier values up into a []string
-	var orderNames []string
-	for _, ident := range order.Identifiers {
-		orderNames = append(orderNames, ident.Value)
-	}
-
-	// Store the unique lower version of the names on the order object
-	order.Names = uniqueLowerNames(orderNames)
 
 	// Create the authorizations for the order
 	err = wfe.makeAuthorizations(order, request)
@@ -1270,7 +1498,7 @@ func (wfe *WebFrontEndImpl) NewOrder(
 	orderResp := wfe.orderForDisplay(storedOrder, request)
 	err = wfe.writeJSONResponse(response, http.StatusCreated, orderResp)
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling order"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling order"), response)
 		return
 	}
 }
@@ -1358,7 +1586,7 @@ func (wfe *WebFrontEndImpl) Order(
 	orderReq := wfe.orderForDisplay(order, request)
 	err := wfe.writeJSONResponse(response, http.StatusOK, orderReq)
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling order"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling order"), response)
 		return
 	}
 }
@@ -1397,7 +1625,7 @@ func (wfe *WebFrontEndImpl) FinalizeOrder(
 	orderAccountID := existingOrder.AccountID
 	orderStatus := existingOrder.Status
 	orderExpires := existingOrder.ExpiresDate
-	orderNames := existingOrder.Names
+	orderIdentifiers := existingOrder.Identifiers
 	// And then immediately unlock it again - we don't defer() here because
 	// `maybeIssue` will also acquire a read lock and we call that before
 	// returning
@@ -1450,19 +1678,53 @@ func (wfe *WebFrontEndImpl) FinalizeOrder(
 		return
 	}
 
+	// split order identifiers per types
+	var orderDNSs []string
+	var orderIPs []net.IP
+	for _, ident := range orderIdentifiers {
+		switch ident.Type {
+		case acme.IdentifierDNS:
+			orderDNSs = append(orderDNSs, ident.Value)
+		case acme.IdentifierIP:
+			orderIPs = append(orderIPs, net.ParseIP(ident.Value))
+		default:
+			wfe.sendError(acme.MalformedProblem(
+				fmt.Sprintf("Order includes unknown identifier type %s", ident.Type)), response)
+			return
+		}
+	}
+	// looks like saving order to db doesn't preserve order of Identifiers, so sort them again.
+	orderDNSs = uniqueLowerNames(orderDNSs)
+	orderIPs = uniqueIPs(orderIPs)
+
+	// sort and deduplicate CSR SANs
+	csrDNSs := uniqueLowerNames(parsedCSR.DNSNames)
+	csrIPs := uniqueIPs(parsedCSR.IPAddresses)
+
 	// Check that the CSR has the same number of names as the initial order contained
-	csrNames := uniqueLowerNames(parsedCSR.DNSNames)
-	if len(csrNames) != len(orderNames) {
+	if len(csrDNSs) != len(orderDNSs) {
 		wfe.sendError(acme.UnauthorizedProblem(
-			"Order includes different number of names than CSR specifies"), response)
+			"Order includes different number of DNSnames identifiers than CSR specifies"), response)
+		return
+	}
+	if len(csrIPs) != len(orderIPs) {
+		wfe.sendError(acme.UnauthorizedProblem(
+			"Order includes different number of IP address identifiers than CSR specifies"), response)
 		return
 	}
 
 	// Check that the CSR's names match the order names exactly
-	for i, name := range orderNames {
-		if name != csrNames[i] {
+	for i, name := range orderDNSs {
+		if name != csrDNSs[i] {
 			wfe.sendError(acme.UnauthorizedProblem(
 				fmt.Sprintf("CSR is missing Order domain %q", name)), response)
+			return
+		}
+	}
+	for i, IP := range orderIPs {
+		if !csrIPs[i].Equal(IP) {
+			wfe.sendError(acme.UnauthorizedProblem(
+				fmt.Sprintf("CSR is missing Order IP %q", IP)), response)
 			return
 		}
 	}
@@ -1487,7 +1749,7 @@ func (wfe *WebFrontEndImpl) FinalizeOrder(
 	response.Header().Add("Location", orderURL)
 	err = wfe.writeJSONResponse(response, http.StatusOK, orderReq)
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling order"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling order"), response)
 		return
 	}
 }
@@ -1509,7 +1771,7 @@ func prepAuthorizationForDisplay(authz *core.Authorization) acme.Authorization {
 
 	// Build a list of plain acme.Challenges to display using the core.Challenge
 	// objects from the authorization.
-	var chals []acme.Challenge
+	chals := make([]acme.Challenge, 0)
 	for _, c := range authz.Challenges {
 		c.RLock()
 		// If the authz isn't pending then we need to filter the challenges displayed
@@ -1614,7 +1876,7 @@ func (wfe *WebFrontEndImpl) Authz(
 		http.StatusOK,
 		prepAuthorizationForDisplay(authz))
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling authz"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling authz"), response)
 		return
 	}
 }
@@ -1666,7 +1928,7 @@ func (wfe *WebFrontEndImpl) Challenge(
 
 	err := wfe.writeJSONResponse(response, http.StatusOK, chal.Challenge)
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling challenge"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling challenge"), response)
 		return
 	}
 }
@@ -1718,12 +1980,11 @@ func (wfe *WebFrontEndImpl) validateAuthzForChallenge(authz *core.Authorization)
 	defer authz.RUnlock()
 
 	ident := authz.Identifier
-	if ident.Type != acme.IdentifierDNS {
+	if ident.Type != acme.IdentifierDNS && ident.Type != acme.IdentifierIP {
 		return nil, acme.MalformedProblem(
-			fmt.Sprintf("Authorization identifier was type %s, only %s is supported",
-				ident.Type, acme.IdentifierDNS))
+			fmt.Sprintf("Authorization identifier was type %s, only %s and %s are supported",
+				ident.Type, acme.IdentifierDNS, acme.IdentifierIP))
 	}
-
 	now := time.Now()
 	if now.After(authz.ExpiresDate) {
 		return nil, acme.MalformedProblem(
@@ -1750,27 +2011,41 @@ func (wfe *WebFrontEndImpl) updateChallenge(
 		return
 	}
 
-	var chalResp struct {
-		KeyAuthorization *string
-	}
-	err := json.Unmarshal(postData.body, &chalResp)
-	if err != nil {
+	// In strict mode we reject any challenge POST with a body other than `{}`.
+	// This matches RFC 8555 Section 7.5.1 and the ACME challenge types that
+	// Pebble has implemented. Per ACME errata 5729[0] it may not be true for
+	// extensions to ACME that add new challenge types.
+	//
+	// [0]: https://www.rfc-editor.org/errata/eid5729
+	if wfe.strict && !bytes.Equal(postData.body, []byte("{}")) {
 		wfe.sendError(
-			acme.MalformedProblem("Error unmarshaling body JSON"), response)
+			acme.MalformedProblem(`challenge initiation POST JWS body was not "{}"`), response)
 		return
-	}
+	} else {
+		// When not in strict mode we still want to be strict about the legacy key
+		// authorization field not being present in the POST JSON.
+		var chalResp struct {
+			KeyAuthorization *string
+		}
+		err := json.Unmarshal(postData.body, &chalResp)
+		if err != nil {
+			wfe.sendError(
+				acme.MalformedProblem("Error unmarshaling body JSON"), response)
+			return
+		}
 
-	// Historically challenges were updated by POSTing a KeyAuthorization. This is
-	// unnecessary, the server can calculate this itself. We could ignore this if
-	// sent (and that's what Boulder will do) but for Pebble we'd like to offer
-	// a way to be more aggressive about pushing clients implementations in the
-	// right direction, so we treat this as a malformed request.
-	if chalResp.KeyAuthorization != nil {
-		wfe.sendError(
-			acme.MalformedProblem(
-				"Challenge response body contained legacy KeyAuthorization field, "+
-					"POST body should be `{}`"), response)
-		return
+		// Historically challenges were updated by POSTing a KeyAuthorization. This is
+		// unnecessary, the server can calculate this itself. We could ignore this if
+		// sent (and that's what Boulder will do) but for Pebble we'd like to offer
+		// a way to be more aggressive about pushing clients implementations in the
+		// right direction, so we treat this as a malformed request.
+		if chalResp.KeyAuthorization != nil {
+			wfe.sendError(
+				acme.MalformedProblem(
+					"Challenge response body contained legacy KeyAuthorization field, "+
+						"POST body should be `{}`"), response)
+			return
+		}
 	}
 
 	chalID := strings.TrimPrefix(request.URL.Path, challengePath)
@@ -1812,25 +2087,27 @@ func (wfe *WebFrontEndImpl) updateChallenge(
 
 	// Lock the order for reading to check the expiry date
 	existingOrder.RLock()
+	expiry := existingOrder.ExpiresDate
+	existingOrder.RUnlock()
+
 	now := time.Now()
-	if now.After(existingOrder.ExpiresDate) {
+	if now.After(expiry) {
 		wfe.sendError(
 			acme.MalformedProblem(fmt.Sprintf("order expired %s",
-				existingOrder.ExpiresDate.Format(time.RFC3339))), response)
+				expiry.Format(time.RFC3339))), response)
 		return
 	}
-	existingOrder.RUnlock()
 
 	// Lock the authorization to get the identifier value
 	authz.RLock()
-	ident := authz.Identifier.Value
+	ident := authz.Identifier
 	authz.RUnlock()
 
 	// If the identifier value is for a wildcard domain then strip the wildcard
 	// prefix before dispatching the validation to ensure the base domain is
 	// validated.
-	if strings.HasPrefix(ident, "*.") {
-		ident = strings.TrimPrefix(ident, "*.")
+	if strings.HasPrefix(ident.Value, "*.") {
+		ident.Value = strings.TrimPrefix(ident.Value, "*.")
 	}
 
 	// Submit a validation job to the VA, this will be processed asynchronously
@@ -1840,10 +2117,52 @@ func (wfe *WebFrontEndImpl) updateChallenge(
 	existingChal.RLock()
 	defer existingChal.RUnlock()
 	response.Header().Add("Link", link(existingChal.Authz.URL, "up"))
-	err = wfe.writeJSONResponse(response, http.StatusOK, existingChal.Challenge)
+	err := wfe.writeJSONResponse(response, http.StatusOK, existingChal.Challenge)
 	if err != nil {
-		wfe.sendError(acme.InternalErrorProblem("Error marshalling challenge"), response)
+		wfe.sendError(acme.InternalErrorProblem("Error marshaling challenge"), response)
 		return
+	}
+}
+
+// Parse the URL to extract alternate number (if available, default 0). Returns the
+// remaining URL, the number (0 or larger), and an error (or nil for success).
+//
+// If the URL contains "/alternate/", everything following that will be interpreted as
+// the number. If it cannot be parsed as an integer, or the number is negative, an error
+// will be returned. The remaining URL is everything before "/alternate/".
+func getAlternateNo(url string) (string, int, error) {
+	urlSplit := strings.SplitN(url, "/alternate/", 2)
+	if len(urlSplit) == 0 {
+		// URL is the empty string: return
+		return url, 0, nil
+	}
+	if len(urlSplit) == 1 {
+		// URL does not contain "/alternate/".
+		return url, 0, nil
+	}
+	no, err := strconv.Atoi(urlSplit[1])
+	if err != nil {
+		return url, 0, err
+	}
+	if no < 0 {
+		return url, 0, fmt.Errorf("number is negative")
+	}
+	return urlSplit[0], no, nil
+}
+
+// Adds HTTP Link headers for alternate versions of the resource. To the given
+// URL, "/alternate/<no>" will be added as the address of the alternative. Will
+// add links to all alternatives from 0 up to number-1 except for no.
+func addAlternateLinks(response http.ResponseWriter, url string, no int, number int) {
+	if no != 0 {
+		response.Header().Add("Link", link(url, "alternate"))
+	}
+	for i := 1; i < number; i++ {
+		if no == i {
+			continue
+		}
+		path := fmt.Sprintf("%s/alternate/%d", url, i)
+		response.Header().Add("Link", link(path, "alternate"))
 	}
 }
 
@@ -1862,7 +2181,12 @@ func (wfe *WebFrontEndImpl) Certificate(
 		return
 	}
 
-	serial := strings.TrimPrefix(request.URL.Path, certPath)
+	serialAlt := strings.TrimPrefix(request.URL.Path, certPath)
+	serial, no, err := getAlternateNo(serialAlt)
+	if err != nil {
+		response.WriteHeader(http.StatusNotFound)
+		return
+	}
 	cert := wfe.db.GetCertificateByID(serial)
 	if cert == nil {
 		response.WriteHeader(http.StatusNotFound)
@@ -1876,9 +2200,18 @@ func (wfe *WebFrontEndImpl) Certificate(
 		return
 	}
 
+	if no >= len(cert.Issuers) {
+		response.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Add links to alternate roots
+	basePath := wfe.relativeEndpoint(request, fmt.Sprintf("%s%s", certPath, serial))
+	addAlternateLinks(response, basePath, no, len(cert.Issuers))
+
 	response.Header().Set("Content-Type", "application/pem-certificate-chain; charset=utf-8")
 	response.WriteHeader(http.StatusOK)
-	_, _ = response.Write(cert.Chain())
+	_, _ = response.Write(cert.Chain(no))
 }
 
 func (wfe *WebFrontEndImpl) writeJSONResponse(response http.ResponseWriter, status int, v interface{}) error {
@@ -1922,6 +2255,23 @@ func uniqueLowerNames(names []string) []string {
 	}
 	sort.Strings(unique)
 	return unique
+}
+
+// uniqueIPs returns the set of all unique IP addresses in the input.
+// The returned IP addresses will be sorted in ascending order in text form.
+func uniqueIPs(IPs []net.IP) []net.IP {
+	uniqMap := make(map[string]net.IP)
+	for _, ip := range IPs {
+		uniqMap[ip.String()] = ip
+	}
+	results := make([]net.IP, 0, len(uniqMap))
+	for _, v := range uniqMap {
+		results = append(results, v)
+	}
+	sort.Slice(results, func(i, j int) bool {
+		return bytes.Compare(results[i], results[j]) < 0
+	})
+	return results
 }
 
 // RevokeCert revokes an ACME certificate.
@@ -2103,6 +2453,10 @@ func (wfe *WebFrontEndImpl) processRevocation(
 		return prob
 	}
 
-	wfe.db.RevokeCertificate(cert)
+	wfe.db.RevokeCertificate(&core.RevokedCertificate{
+		Certificate: cert,
+		RevokedAt:   time.Now(),
+		Reason:      revokeCertReq.Reason,
+	})
 	return nil
 }

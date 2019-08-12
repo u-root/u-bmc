@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -62,12 +63,45 @@ type pendingCh struct {
 	ch chan<- *dhcpv4.DHCPv4
 }
 
+type logger interface {
+	Printf(format string, v ...interface{})
+	PrintMessage(prefix string, message *dhcpv4.DHCPv4)
+}
+
+type emptyLogger struct{}
+
+func (e emptyLogger) Printf(format string, v ...interface{})             {}
+func (e emptyLogger) PrintMessage(prefix string, message *dhcpv4.DHCPv4) {}
+
+type shortSummaryLogger struct {
+	*log.Logger
+}
+
+func (s shortSummaryLogger) Printf(format string, v ...interface{}) {
+	s.Logger.Printf(format, v...)
+}
+func (s shortSummaryLogger) PrintMessage(prefix string, message *dhcpv4.DHCPv4) {
+	s.Printf("%s: %s", prefix, message)
+}
+
+type debugLogger struct {
+	*log.Logger
+}
+
+func (d debugLogger) Printf(format string, v ...interface{}) {
+	d.Logger.Printf(format, v...)
+}
+func (d debugLogger) PrintMessage(prefix string, message *dhcpv4.DHCPv4) {
+	d.Printf("%s: %s", prefix, message.Summary())
+}
+
 // Client is an IPv4 DHCP client.
 type Client struct {
 	ifaceHWAddr net.HardwareAddr
 	conn        net.PacketConn
 	timeout     time.Duration
 	retry       int
+	logger      logger
 
 	// bufferCap is the channel capacity for each TransactionID.
 	bufferCap int
@@ -99,23 +133,16 @@ func New(iface string, opts ...ClientOpt) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	c := NewWithConn(nil, i.HardwareAddr, opts...)
-
-	// Do this after so that a caller can still use a WithConn to override
-	// the connection.
-	if c.conn == nil {
-		pc, err := NewRawUDPConn(iface, ClientPort)
-		if err != nil {
-			return nil, err
-		}
-		c.conn = pc
+	pc, err := NewRawUDPConn(iface, ClientPort)
+	if err != nil {
+		return nil, err
 	}
-	return c, nil
+	return NewWithConn(pc, i.HardwareAddr, opts...)
 }
 
 // NewWithConn creates a new DHCP client that sends and receives packets on the
 // given interface.
-func NewWithConn(conn net.PacketConn, ifaceHWAddr net.HardwareAddr, opts ...ClientOpt) *Client {
+func NewWithConn(conn net.PacketConn, ifaceHWAddr net.HardwareAddr, opts ...ClientOpt) (*Client, error) {
 	c := &Client{
 		ifaceHWAddr: ifaceHWAddr,
 		timeout:     defaultTimeout,
@@ -123,6 +150,7 @@ func NewWithConn(conn net.PacketConn, ifaceHWAddr net.HardwareAddr, opts ...Clie
 		serverAddr:  DefaultServers,
 		bufferCap:   defaultBufferCap,
 		conn:        conn,
+		logger:      emptyLogger{},
 
 		done:    make(chan struct{}),
 		pending: make(map[dhcpv4.TransactionID]*pendingCh),
@@ -132,9 +160,12 @@ func NewWithConn(conn net.PacketConn, ifaceHWAddr net.HardwareAddr, opts ...Clie
 		opt(c)
 	}
 
+	if c.conn == nil {
+		return nil, fmt.Errorf("no connection given")
+	}
 	c.wg.Add(1)
 	go c.receiveLoop()
-	return c
+	return c, nil
 }
 
 // Close closes the underlying connection.
@@ -177,7 +208,7 @@ func (c *Client) receiveLoop() {
 		n, _, err := c.conn.ReadFrom(b)
 		if err != nil {
 			if !isErrClosing(err) {
-				log.Printf("error reading from UDP connection: %v", err)
+				c.logger.Printf("error reading from UDP connection: %v", err)
 			}
 			return
 		}
@@ -229,6 +260,24 @@ func WithTimeout(d time.Duration) ClientOpt {
 	}
 }
 
+// WithSummaryLogger logs one-line DHCPv4 message summarys when sent & received.
+func WithSummaryLogger() ClientOpt {
+	return func(c *Client) {
+		c.logger = shortSummaryLogger{
+			Logger: log.New(os.Stderr, "[dhcpv4]", log.LstdFlags),
+		}
+	}
+}
+
+// WithDebugLogger logs multi-line full DHCPv4 messages when sent & received.
+func WithDebugLogger() ClientOpt {
+	return func(c *Client) {
+		c.logger = debugLogger{
+			Logger: log.New(os.Stderr, "[dhcpv4]", log.LstdFlags),
+		}
+	}
+}
+
 func withBufferCap(n int) ClientOpt {
 	return func(c *Client) {
 		c.bufferCap = n
@@ -241,13 +290,6 @@ func withBufferCap(n int) ClientOpt {
 func WithRetry(r int) ClientOpt {
 	return func(c *Client) {
 		c.retry = r
-	}
-}
-
-// WithConn configures the packet connection to use.
-func WithConn(conn net.PacketConn) ClientOpt {
-	return func(c *Client) {
-		c.conn = conn
 	}
 }
 
@@ -363,6 +405,7 @@ func (c *Client) SendAndRead(ctx context.Context, dest *net.UDPAddr, p *dhcpv4.D
 		if err != nil {
 			return err
 		}
+		c.logger.PrintMessage("sent message", p)
 		defer rem()
 
 		for {
@@ -378,6 +421,7 @@ func (c *Client) SendAndRead(ctx context.Context, dest *net.UDPAddr, p *dhcpv4.D
 
 			case packet := <-ch:
 				if match == nil || match(packet) {
+					c.logger.PrintMessage("received message", packet)
 					response = packet
 					return nil
 				}

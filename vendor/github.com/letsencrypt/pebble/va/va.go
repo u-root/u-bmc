@@ -21,6 +21,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/miekg/dns"
+
 	"github.com/letsencrypt/challtestsrv"
 	"github.com/letsencrypt/pebble/acme"
 	"github.com/letsencrypt/pebble/core"
@@ -87,34 +89,44 @@ func certNames(cert *x509.Certificate) string {
 }
 
 type vaTask struct {
-	Identifier string
+	Identifier acme.Identifier
 	Challenge  *core.Challenge
 	Account    *core.Account
 }
 
 type VAImpl struct {
-	log         *log.Logger
-	httpPort    int
-	tlsPort     int
-	tasks       chan *vaTask
-	sleep       bool
-	sleepTime   int
-	alwaysValid bool
-	strict      bool
+	log                *log.Logger
+	httpPort           int
+	tlsPort            int
+	tasks              chan *vaTask
+	sleep              bool
+	sleepTime          int
+	alwaysValid        bool
+	strict             bool
+	customResolverAddr string
+	dnsClient          *dns.Client
 }
 
 func New(
 	log *log.Logger,
 	httpPort, tlsPort int,
-	strict bool) *VAImpl {
+	strict bool, customResolverAddr string) *VAImpl {
 	va := &VAImpl{
-		log:       log,
-		httpPort:  httpPort,
-		tlsPort:   tlsPort,
-		tasks:     make(chan *vaTask, taskQueueSize),
-		sleep:     true,
-		sleepTime: defaultSleepTime,
-		strict:    strict,
+		log:                log,
+		httpPort:           httpPort,
+		tlsPort:            tlsPort,
+		tasks:              make(chan *vaTask, taskQueueSize),
+		sleep:              true,
+		sleepTime:          defaultSleepTime,
+		strict:             strict,
+		customResolverAddr: customResolverAddr,
+	}
+
+	if customResolverAddr != "" {
+		va.log.Printf("Using custom DNS resolver for ACME challenges: %s", customResolverAddr)
+		va.dnsClient = new(dns.Client)
+	} else {
+		va.log.Print("Using system DNS resolver for ACME challenges")
 	}
 
 	// Read the PEBBLE_VA_NOSLEEP environment variable string
@@ -144,7 +156,7 @@ func New(
 	return va
 }
 
-func (va VAImpl) ValidateChallenge(ident string, chal *core.Challenge, acct *core.Account) {
+func (va VAImpl) ValidateChallenge(ident acme.Identifier, chal *core.Challenge, acct *core.Account) {
 	task := &vaTask{
 		Identifier: ident,
 		Challenge:  chal,
@@ -272,7 +284,7 @@ func (va VAImpl) performValidation(task *vaTask, results chan<- *core.Validation
 		// type. For example comparison, a real DNS-01 validation would set
 		// the URL to the `_acme-challenge` subdomain.
 		results <- &core.ValidationRecord{
-			URL:         task.Identifier,
+			URL:         task.Identifier.Value,
 			ValidatedAt: time.Now(),
 		}
 		return
@@ -292,19 +304,16 @@ func (va VAImpl) performValidation(task *vaTask, results chan<- *core.Validation
 
 func (va VAImpl) validateDNS01(task *vaTask) *core.ValidationRecord {
 	const dns01Prefix = "_acme-challenge"
-	challengeSubdomain := fmt.Sprintf("%s.%s", dns01Prefix, task.Identifier)
+	challengeSubdomain := fmt.Sprintf("%s.%s", dns01Prefix, task.Identifier.Value)
 
 	result := &core.ValidationRecord{
 		URL:         challengeSubdomain,
 		ValidatedAt: time.Now(),
 	}
 
-	ctx, cancelfunc := context.WithTimeout(context.Background(), validationTimeout)
-	defer cancelfunc()
-
-	txts, err := net.DefaultResolver.LookupTXT(ctx, challengeSubdomain)
+	txts, err := va.getTXTEntry(challengeSubdomain)
 	if err != nil {
-		result.Error = acme.UnauthorizedProblem("Error retrieving TXT records for DNS challenge")
+		result.Error = acme.UnauthorizedProblem(fmt.Sprintf("Error retrieving TXT records for DNS challenge (%q)", err))
 		return result
 	}
 
@@ -333,15 +342,35 @@ func (va VAImpl) validateDNS01(task *vaTask) *core.ValidationRecord {
 
 func (va VAImpl) validateTLSALPN01(task *vaTask) *core.ValidationRecord {
 	portString := strconv.Itoa(va.tlsPort)
-	hostPort := net.JoinHostPort(task.Identifier, portString)
 
+	var serverNameIdentifier string
+	switch task.Identifier.Type {
+	case acme.IdentifierDNS:
+		serverNameIdentifier = task.Identifier.Value
+	case acme.IdentifierIP:
+		serverNameIdentifier = reverseaddr(task.Identifier.Value)
+	}
 	result := &core.ValidationRecord{
-		URL:         hostPort,
+		URL:         net.JoinHostPort(task.Identifier.Value, portString),
 		ValidatedAt: time.Now(),
 	}
 
-	cs, problem := va.fetchConnectionState(hostPort, &tls.Config{
-		ServerName:         task.Identifier,
+	addrs, err := va.resolveIP(task.Identifier.Value)
+
+	if err != nil {
+		result.Error = acme.MalformedProblem(
+			fmt.Sprintf("Error occurred while resolving URL %q: %q", task.Identifier.Value, err))
+		return result
+	}
+
+	if len(addrs) == 0 {
+		result.Error = acme.MalformedProblem(
+			fmt.Sprintf("Could not resolve URL %q", task.Identifier.Value))
+		return result
+	}
+
+	cs, problem := va.fetchConnectionState(net.JoinHostPort(addrs[0], portString), &tls.Config{
+		ServerName:         serverNameIdentifier,
 		NextProtos:         []string{acme.ACMETLS1Protocol},
 		InsecureSkipVerify: true,
 	})
@@ -367,13 +396,22 @@ func (va VAImpl) validateTLSALPN01(task *vaTask) *core.ValidationRecord {
 	leafCert := certs[0]
 
 	// Verify SNI - certificate returned must be issued only for the domain we are verifying.
-	if len(leafCert.DNSNames) != 1 || !strings.EqualFold(leafCert.DNSNames[0], task.Identifier) {
+	var namematch bool
+	switch task.Identifier.Type {
+	case acme.IdentifierDNS:
+		namematch = len(leafCert.DNSNames) == 1 && strings.EqualFold(leafCert.DNSNames[0], task.Identifier.Value)
+	case acme.IdentifierIP:
+		namematch = len(leafCert.IPAddresses) == 1 && leafCert.IPAddresses[0].Equal(net.ParseIP(task.Identifier.Value))
+	default:
+		namematch = false
+	}
+	if !namematch {
 		names := certNames(leafCert)
 		errText := fmt.Sprintf(
 			"Incorrect validation certificate for %s challenge. "+
 				"Requested %s from %s. Received %d certificate(s), "+
 				"first certificate had names %q",
-			acme.ChallengeTLSALPN01, task.Identifier, hostPort, len(certs), names)
+			acme.ChallengeTLSALPN01, task.Identifier, net.JoinHostPort(task.Identifier.Value, portString), len(certs), names)
 		result.Error = acme.UnauthorizedProblem(errText)
 		return result
 	}
@@ -430,7 +468,7 @@ func (va VAImpl) fetchConnectionState(hostPort string, config *tls.Config) (*tls
 }
 
 func (va VAImpl) validateHTTP01(task *vaTask) *core.ValidationRecord {
-	body, url, err := va.fetchHTTP(task.Identifier, task.Challenge.Token)
+	body, url, err := va.fetchHTTP(task.Identifier.Value, task.Challenge.Token)
 
 	result := &core.ValidationRecord{
 		URL:         url,
@@ -458,10 +496,11 @@ func (va VAImpl) validateHTTP01(task *vaTask) *core.ValidationRecord {
 // purpose HTTP function
 func (va VAImpl) fetchHTTP(identifier string, token string) ([]byte, string, *acme.ProblemDetails) {
 	path := fmt.Sprintf("%s%s", acme.HTTP01BaseURL, token)
+	portString := strconv.Itoa(va.httpPort)
 
 	url := &url.URL{
 		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%d", identifier, va.httpPort),
+		Host:   net.JoinHostPort(identifier, portString),
 		Path:   path,
 	}
 
@@ -474,6 +513,18 @@ func (va VAImpl) fetchHTTP(identifier string, token string) ([]byte, string, *ac
 	httpRequest.Header.Set("User-Agent", userAgent())
 	httpRequest.Header.Set("Accept", "*/*")
 
+	addrs, err := va.resolveIP(identifier)
+
+	if err != nil {
+		return nil, url.String(), acme.MalformedProblem(
+			fmt.Sprintf("Error occurred while resolving URL %q: %q", url.String(), err))
+	}
+
+	if len(addrs) == 0 {
+		return nil, url.String(), acme.MalformedProblem(
+			fmt.Sprintf("Could not resolve URL %q", url.String()))
+	}
+
 	transport := &http.Transport{
 		// We don't expect to make multiple requests to a client, so close
 		// connection immediately.
@@ -484,6 +535,12 @@ func (va VAImpl) fetchHTTP(identifier string, token string) ([]byte, string, *ac
 		// to an HTTPS host.
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
+		},
+
+		// Control specifically which IP will be used for this request
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			dialer := &net.Dialer{}
+			return dialer.DialContext(ctx, network, net.JoinHostPort(addrs[0], portString))
 		},
 	}
 
@@ -516,4 +573,107 @@ func (va VAImpl) fetchHTTP(identifier string, token string) ([]byte, string, *ac
 	}
 
 	return body, url.String(), nil
+}
+
+// getTXTEntry fetches TXT entries for the given domain name using the recursive resolver located at
+// `va.customResolverAddr`, or the default system resolver if no custom resolver addr is specified
+func (va VAImpl) getTXTEntry(name string) ([]string, error) {
+	ctx, cancelfunc := context.WithTimeout(context.Background(), validationTimeout)
+	defer cancelfunc()
+
+	if va.customResolverAddr == "" {
+		return net.DefaultResolver.LookupTXT(ctx, name)
+	}
+
+	var txts []string
+	message := new(dns.Msg)
+	message.SetQuestion(dns.Fqdn(name), dns.TypeTXT)
+	in, _, err := va.dnsClient.ExchangeContext(ctx, message, va.customResolverAddr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if in.Rcode != dns.RcodeSuccess {
+		return nil, fmt.Errorf("DNS lookup for %q returned an unsuccessful response: %q", name, in.Rcode)
+	}
+
+	for _, record := range in.Answer {
+		if t, ok := record.(*dns.TXT); ok {
+			txts = append(txts, t.Txt...)
+		}
+	}
+
+	return txts, nil
+}
+
+// resolveIP find all IPs for the given domain name using the recursive resolver located at
+// `va.customResolverAddr`, or the default system resolver if no custom resolver addr is specified
+func (va VAImpl) resolveIP(name string) ([]string, error) {
+	ctx, cancelfunc := context.WithTimeout(context.Background(), validationTimeout)
+	defer cancelfunc()
+
+	if va.customResolverAddr == "" {
+		return net.DefaultResolver.LookupHost(ctx, name)
+	}
+
+	// Check if the given name is not already an IP. If it is the case, just return it untouched.
+	addrs := []string{}
+	parsed := net.ParseIP(name)
+	if parsed != nil {
+		addrs = append(addrs, name)
+		return addrs, nil
+	}
+
+	messageAAAA := new(dns.Msg)
+	messageAAAA.SetQuestion(dns.Fqdn(name), dns.TypeAAAA)
+	inAAAA, _, err := va.dnsClient.ExchangeContext(ctx, messageAAAA, va.customResolverAddr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range inAAAA.Answer {
+		if t, ok := record.(*dns.AAAA); ok {
+			addrs = append(addrs, t.AAAA.String())
+		}
+	}
+
+	messageA := new(dns.Msg)
+	messageA.SetQuestion(dns.Fqdn(name), dns.TypeA)
+	inA, _, err := va.dnsClient.ExchangeContext(ctx, messageA, va.customResolverAddr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, record := range inA.Answer {
+		if t, ok := record.(*dns.A); ok {
+			addrs = append(addrs, t.A.String())
+		}
+	}
+
+	return addrs, nil
+}
+
+// reverseaddr function is borrowed from net/dnsclient.go[0] and the Go std library.
+// [0]: https://golang.org/src/net/dnsclient.go
+func reverseaddr(addr string) string {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return ""
+	}
+	// Apperently IP type in net package saves all ip in ipv6 formant, from biggest byte to smallest. we need last 4 bytes, so ip[15] to ip[12]
+	if ip.To4() != nil {
+		return fmt.Sprintf("%d.%d.%d.%d.in-addr.arpa.", ip[15], ip[14], ip[13], ip[12])
+	}
+	// Must be IPv6
+	buf := make([]string, 0, len(ip)+1)
+	// Add it, in reverse, to the buffer
+	for i := len(ip) - 1; i >= 0; i-- {
+		buf = append(buf, fmt.Sprintf("%x.%x", ip[i]&0x0F, ip[i]>>4))
+	}
+	// Append "ip6.arpa." and return (buf already has the final '.') see RFC3152 for how this address is constructed.
+	buf = append(buf, "ip6.arpa.")
+	return strings.Join(buf, ".")
 }

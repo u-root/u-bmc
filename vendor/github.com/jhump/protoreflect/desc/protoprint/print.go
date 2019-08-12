@@ -94,7 +94,7 @@ type Printer struct {
 	TrailingCommentsOnSeparateLine bool
 
 	// If true, the printed output will eschew any blank lines, which otherwise
-	// appear between descriptor elements and comment blocks. Note that this if
+	// appear between descriptor elements and comment blocks. Note that if
 	// detached comments are being printed, this will cause them to be merged
 	// into the subsequent leading comments. Similarly, any element trailing
 	// comments will be merged into the subsequent leading comments.
@@ -266,7 +266,7 @@ func (p *Printer) printProto(dsc desc.Descriptor, out io.Writer) error {
 	mf := dynamic.NewMessageFactoryWithExtensionRegistry(&er)
 	fdp := dsc.GetFile().AsFileDescriptorProto()
 	sourceInfo := internal.CreateSourceInfoMap(fdp)
-	extendOptionLocations(sourceInfo)
+	extendOptionLocations(sourceInfo, fdp.GetSourceCodeInfo().GetLocation())
 
 	path := findElement(dsc)
 	switch d := dsc.(type) {
@@ -449,6 +449,8 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 	})
 	p.newLine(w)
 
+	skip := map[interface{}]bool{}
+
 	elements := elementAddrs{dsc: fd, opts: opts}
 	if fdp.Package != nil {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_packageTag, elementIndex: 0, order: -3})
@@ -466,7 +468,13 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 	for i := range fd.GetServices() {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_servicesTag, elementIndex: i})
 	}
-	for i := range fd.GetExtensions() {
+	exts := p.computeExtensions(sourceInfo, fd.GetExtensions(), []int32{internal.File_extensionsTag})
+	for i, extd := range fd.GetExtensions() {
+		if extd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
+			// we don't emit nested messages for groups since
+			// they get special treatment
+			skip[extd.GetMessageType()] = true
+		}
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.File_extensionsTag, elementIndex: i})
 	}
 
@@ -474,69 +482,123 @@ func (p *Printer) printFile(fd *desc.FileDescriptor, mf *dynamic.MessageFactory,
 
 	pkgName := fd.GetPackage()
 
-	var ext *desc.FieldDescriptor
 	for i, el := range elements.addrs {
 		d := elements.at(el)
+
+		// skip[d] will panic if d is a slice (which it could be for []option),
+		// so just ignore it since we don't try to skip options
+		if reflect.TypeOf(d).Kind() != reflect.Slice && skip[d] {
+			// skip this element
+			continue
+		}
+
+		if i > 0 {
+			p.newLine(w)
+		}
+
 		path = []int32{el.elementType, int32(el.elementIndex)}
-		if el.elementType == internal.File_extensionsTag {
-			fld := d.(*desc.FieldDescriptor)
-			if ext == nil || ext.GetOwner() != fld.GetOwner() {
-				// need to open a new extend block
-				if ext != nil {
-					// close preceding extend block
-					fmt.Fprintln(w, "}")
-				}
-				if i > 0 {
-					p.newLine(w)
-				}
 
-				ext = fld
-				fmt.Fprint(w, "extend ")
-				extNameSi := sourceInfo.Get(append(path, internal.Field_extendeeTag))
-				p.printElementString(extNameSi, w, 0, p.qualifyName(pkgName, pkgName, fld.GetOwner().GetFullyQualifiedName()))
-				fmt.Fprintln(w, "{")
-			} else {
-				p.newLine(w)
-			}
-			p.printField(fld, mf, w, sourceInfo, path, pkgName, 1)
-		} else {
-			if ext != nil {
-				// close preceding extend block
-				fmt.Fprintln(w, "}")
-				ext = nil
-			}
-
-			if i > 0 {
-				p.newLine(w)
-			}
-
-			switch d := d.(type) {
-			case pkg:
-				si := sourceInfo.Get(path)
-				p.printElement(false, si, w, 0, func(w *writer) {
-					fmt.Fprintf(w, "package %s;", d)
-				})
-			case imp:
-				si := sourceInfo.Get(path)
-				p.printElement(false, si, w, 0, func(w *writer) {
-					fmt.Fprintf(w, "import %q;", d)
-				})
-			case []option:
-				p.printOptionsLong(d, w, sourceInfo, path, 0)
-			case *desc.MessageDescriptor:
-				p.printMessage(d, mf, w, sourceInfo, path, 0)
-			case *desc.EnumDescriptor:
-				p.printEnum(d, mf, w, sourceInfo, path, 0)
-			case *desc.ServiceDescriptor:
-				p.printService(d, mf, w, sourceInfo, path, 0)
+		switch d := d.(type) {
+		case pkg:
+			si := sourceInfo.Get(path)
+			p.printElement(false, si, w, 0, func(w *writer) {
+				fmt.Fprintf(w, "package %s;", d)
+			})
+		case imp:
+			si := sourceInfo.Get(path)
+			p.printElement(false, si, w, 0, func(w *writer) {
+				fmt.Fprintf(w, "import %q;", d)
+			})
+		case []option:
+			p.printOptionsLong(d, w, sourceInfo, path, 0)
+		case *desc.MessageDescriptor:
+			p.printMessage(d, mf, w, sourceInfo, path, 0)
+		case *desc.EnumDescriptor:
+			p.printEnum(d, mf, w, sourceInfo, path, 0)
+		case *desc.ServiceDescriptor:
+			p.printService(d, mf, w, sourceInfo, path, 0)
+		case *desc.FieldDescriptor:
+			extDecl := exts[d]
+			p.printExtensions(extDecl, exts, elements, i, mf, w, sourceInfo, nil, internal.File_extensionsTag, pkgName, pkgName, 0)
+			// we printed all extensions in the group, so we can skip the others
+			for _, fld := range extDecl.fields {
+				skip[fld] = true
 			}
 		}
 	}
+}
 
-	if ext != nil {
-		// close trailing extend block
-		fmt.Fprintln(w, "}")
+func findExtSi(fieldSi *descriptor.SourceCodeInfo_Location, extSis []*descriptor.SourceCodeInfo_Location) *descriptor.SourceCodeInfo_Location {
+	if len(fieldSi.GetSpan()) == 0 {
+		return nil
 	}
+	for _, extSi := range extSis {
+		if isSpanWithin(fieldSi.Span, extSi.Span) {
+			return extSi
+		}
+	}
+	return nil
+}
+
+func isSpanWithin(span, enclosing []int32) bool {
+	start := enclosing[0]
+	var end int32
+	if len(enclosing) == 3 {
+		end = enclosing[0]
+	} else {
+		end = enclosing[2]
+	}
+	if span[0] < start || span[0] > end {
+		return false
+	}
+
+	if span[0] == start {
+		return span[1] >= enclosing[1]
+	} else if span[0] == end {
+		return span[1] <= enclosing[len(enclosing)-1]
+	}
+	return true
+}
+
+type extensionDecl struct {
+	extendee   string
+	sourceInfo *descriptor.SourceCodeInfo_Location
+	fields     []*desc.FieldDescriptor
+}
+
+type extensions map[*desc.FieldDescriptor]*extensionDecl
+
+func (p *Printer) computeExtensions(sourceInfo internal.SourceInfoMap, exts []*desc.FieldDescriptor, path []int32) extensions {
+	extsMap := map[string]map[*descriptor.SourceCodeInfo_Location]*extensionDecl{}
+	extSis := sourceInfo.GetAll(path)
+	for _, extd := range exts {
+		name := extd.GetOwner().GetFullyQualifiedName()
+		extSi := findExtSi(extd.GetSourceInfo(), extSis)
+		extsBySi := extsMap[name]
+		if extsBySi == nil {
+			extsBySi = map[*descriptor.SourceCodeInfo_Location]*extensionDecl{}
+			extsMap[name] = extsBySi
+		}
+		extDecl := extsBySi[extSi]
+		if extDecl == nil {
+			extDecl = &extensionDecl{
+				sourceInfo: extSi,
+				extendee:   name,
+			}
+			extsBySi[extSi] = extDecl
+		}
+		extDecl.fields = append(extDecl.fields, extd)
+	}
+
+	ret := extensions{}
+	for _, extsBySi := range extsMap {
+		for _, extDecl := range extsBySi {
+			for _, extd := range extDecl.fields {
+				ret[extd] = extDecl
+			}
+		}
+	}
+	return ret
 }
 
 func (p *Printer) sort(elements elementAddrs, sourceInfo internal.SourceInfoMap, path []int32) {
@@ -680,7 +742,13 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 	for i := range md.GetNestedEnumTypes() {
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_enumsTag, elementIndex: i})
 	}
-	for i := range md.GetNestedExtensions() {
+	exts := p.computeExtensions(sourceInfo, md.GetNestedExtensions(), append(path, internal.Message_extensionsTag))
+	for i, extd := range md.GetNestedExtensions() {
+		if extd.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP {
+			// we don't emit nested messages for groups since
+			// they get special treatment
+			skip[extd.GetMessageType()] = true
+		}
 		elements.addrs = append(elements.addrs, elementAddr{elementType: internal.Message_extensionsTag, elementIndex: i})
 	}
 
@@ -689,9 +757,9 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 	pkg := md.GetFile().GetPackage()
 	scope := md.GetFullyQualifiedName()
 
-	var ext *desc.FieldDescriptor
 	for i, el := range elements.addrs {
 		d := elements.at(el)
+
 		// skip[d] will panic if d is a slice (which it could be for []option),
 		// so just ignore it since we don't try to skip options
 		if reflect.TypeOf(d).Kind() != reflect.Slice && skip[d] {
@@ -699,115 +767,88 @@ func (p *Printer) printMessageBody(md *desc.MessageDescriptor, mf *dynamic.Messa
 			continue
 		}
 
+		if i > 0 {
+			p.newLine(w)
+		}
+
 		childPath := append(path, el.elementType, int32(el.elementIndex))
-		if el.elementType == internal.Message_extensionsTag {
-			// extension
-			fld := d.(*desc.FieldDescriptor)
-			if ext == nil || ext.GetOwner() != fld.GetOwner() {
-				// need to open a new extend block
-				if ext != nil {
-					// close preceding extend block
-					p.indent(w, indent)
-					fmt.Fprintln(w, "}")
-				}
-				if i > 0 {
-					p.newLine(w)
-				}
 
-				ext = fld
-				p.indent(w, indent)
-				fmt.Fprint(w, "extend ")
-				extNameSi := sourceInfo.Get(append(childPath, internal.Field_extendeeTag))
-				p.printElementString(extNameSi, w, indent, p.qualifyName(pkg, scope, fld.GetOwner().GetFullyQualifiedName()))
-				fmt.Fprintln(w, "{")
+		switch d := d.(type) {
+		case []option:
+			p.printOptionsLong(d, w, sourceInfo, childPath, indent)
+		case *desc.FieldDescriptor:
+			if d.IsExtension() {
+				extDecl := exts[d]
+				p.printExtensions(extDecl, exts, elements, i, mf, w, sourceInfo, path, internal.Message_extensionsTag, pkg, scope, indent)
+				// we printed all extensions in the group, so we can skip the others
+				for _, fld := range extDecl.fields {
+					skip[fld] = true
+				}
 			} else {
-				p.newLine(w)
-			}
-			p.printField(fld, mf, w, sourceInfo, childPath, scope, indent+1)
-		} else {
-			if ext != nil {
-				// close preceding extend block
-				p.indent(w, indent)
-				fmt.Fprintln(w, "}")
-				ext = nil
-			}
-
-			if i > 0 {
-				p.newLine(w)
-			}
-
-			switch d := d.(type) {
-			case []option:
-				p.printOptionsLong(d, w, sourceInfo, childPath, indent)
-			case *desc.FieldDescriptor:
 				ood := d.GetOneOf()
 				if ood == nil {
 					p.printField(d, mf, w, sourceInfo, childPath, scope, indent)
-				} else if !skip[ood] {
+				} else {
 					// print the one-of, including all of its fields
 					p.printOneOf(ood, elements, i, mf, w, sourceInfo, path, indent, d.AsFieldDescriptorProto().GetOneofIndex())
-					skip[ood] = true
-				}
-			case *desc.MessageDescriptor:
-				p.printMessage(d, mf, w, sourceInfo, childPath, indent)
-			case *desc.EnumDescriptor:
-				p.printEnum(d, mf, w, sourceInfo, childPath, indent)
-			case *descriptor.DescriptorProto_ExtensionRange:
-				// collapse ranges into a single "extensions" block
-				ranges := []*descriptor.DescriptorProto_ExtensionRange{d}
-				addrs := []elementAddr{el}
-				for idx := i + 1; idx < len(elements.addrs); idx++ {
-					elnext := elements.addrs[idx]
-					if elnext.elementType != el.elementType {
-						break
+					for _, fld := range ood.GetChoices() {
+						skip[fld] = true
 					}
-					extr := elements.at(elnext).(*descriptor.DescriptorProto_ExtensionRange)
-					if !areEqual(d.Options, extr.Options, mf) {
-						break
-					}
-					ranges = append(ranges, extr)
-					addrs = append(addrs, elnext)
-					skip[extr] = true
 				}
-				p.printExtensionRanges(md, ranges, addrs, mf, w, sourceInfo, path, indent)
-			case reservedRange:
-				// collapse reserved ranges into a single "reserved" block
-				ranges := []reservedRange{d}
-				addrs := []elementAddr{el}
-				for idx := i + 1; idx < len(elements.addrs); idx++ {
-					elnext := elements.addrs[idx]
-					if elnext.elementType != el.elementType {
-						break
-					}
-					rr := elements.at(elnext).(reservedRange)
-					ranges = append(ranges, rr)
-					addrs = append(addrs, elnext)
-					skip[rr] = true
-				}
-				p.printReservedRanges(ranges, false, addrs, w, sourceInfo, path, indent)
-			case string: // reserved name
-				// collapse reserved names into a single "reserved" block
-				names := []string{d}
-				addrs := []elementAddr{el}
-				for idx := i + 1; idx < len(elements.addrs); idx++ {
-					elnext := elements.addrs[idx]
-					if elnext.elementType != el.elementType {
-						break
-					}
-					rn := elements.at(elnext).(string)
-					names = append(names, rn)
-					addrs = append(addrs, elnext)
-					skip[rn] = true
-				}
-				p.printReservedNames(names, addrs, w, sourceInfo, path, indent)
 			}
+		case *desc.MessageDescriptor:
+			p.printMessage(d, mf, w, sourceInfo, childPath, indent)
+		case *desc.EnumDescriptor:
+			p.printEnum(d, mf, w, sourceInfo, childPath, indent)
+		case *descriptor.DescriptorProto_ExtensionRange:
+			// collapse ranges into a single "extensions" block
+			ranges := []*descriptor.DescriptorProto_ExtensionRange{d}
+			addrs := []elementAddr{el}
+			for idx := i + 1; idx < len(elements.addrs); idx++ {
+				elnext := elements.addrs[idx]
+				if elnext.elementType != el.elementType {
+					break
+				}
+				extr := elements.at(elnext).(*descriptor.DescriptorProto_ExtensionRange)
+				if !areEqual(d.Options, extr.Options, mf) {
+					break
+				}
+				ranges = append(ranges, extr)
+				addrs = append(addrs, elnext)
+				skip[extr] = true
+			}
+			p.printExtensionRanges(md, ranges, addrs, mf, w, sourceInfo, path, indent)
+		case reservedRange:
+			// collapse reserved ranges into a single "reserved" block
+			ranges := []reservedRange{d}
+			addrs := []elementAddr{el}
+			for idx := i + 1; idx < len(elements.addrs); idx++ {
+				elnext := elements.addrs[idx]
+				if elnext.elementType != el.elementType {
+					break
+				}
+				rr := elements.at(elnext).(reservedRange)
+				ranges = append(ranges, rr)
+				addrs = append(addrs, elnext)
+				skip[rr] = true
+			}
+			p.printReservedRanges(ranges, false, addrs, w, sourceInfo, path, indent)
+		case string: // reserved name
+			// collapse reserved names into a single "reserved" block
+			names := []string{d}
+			addrs := []elementAddr{el}
+			for idx := i + 1; idx < len(elements.addrs); idx++ {
+				elnext := elements.addrs[idx]
+				if elnext.elementType != el.elementType {
+					break
+				}
+				rn := elements.at(elnext).(string)
+				names = append(names, rn)
+				addrs = append(addrs, elnext)
+				skip[rn] = true
+			}
+			p.printReservedNames(names, addrs, w, sourceInfo, path, indent)
 		}
-	}
-
-	if ext != nil {
-		// close trailing extend block
-		p.indent(w, indent)
-		fmt.Fprintln(w, "}")
 	}
 }
 
@@ -840,16 +881,29 @@ func (p *Printer) printField(fld *desc.FieldDescriptor, mf *dynamic.MessageFacto
 		// compute path to group message type
 		groupPath = make([]int32, len(path)-2)
 		copy(groupPath, path)
+
+		var candidates []*desc.MessageDescriptor
+		var parentTag int32
+		switch parent := fld.GetParent().(type) {
+		case *desc.MessageDescriptor:
+			// group in a message
+			candidates = parent.GetNestedMessageTypes()
+			parentTag = internal.Message_nestedMessagesTag
+		case *desc.FileDescriptor:
+			// group that is a top-level extension
+			candidates = parent.GetMessageTypes()
+			parentTag = internal.File_messagesTag
+		}
+
 		var groupMsgIndex int32
-		md := fld.GetParent().(*desc.MessageDescriptor)
-		for i, nmd := range md.GetNestedMessageTypes() {
+		for i, nmd := range candidates {
 			if nmd == fld.GetMessageType() {
 				// found it
 				groupMsgIndex = int32(i)
 				break
 			}
 		}
-		groupPath = append(groupPath, internal.Message_nestedMessagesTag, groupMsgIndex)
+		groupPath = append(groupPath, parentTag, groupMsgIndex)
 
 		// the group message is where the field's comments and position are stored
 		si = sourceInfo.Get(groupPath)
@@ -979,8 +1033,10 @@ func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAd
 			}
 		}
 
+		// the fields are already sorted, but we have to re-sort in order to
+		// interleave the options (in the event that we are using file location
+		// order and the option locations are interleaved with the fields)
 		p.sort(elements, sourceInfo, oopath)
-
 		scope := ood.GetOwner().GetFullyQualifiedName()
 
 		for i, el := range elements.addrs {
@@ -1001,6 +1057,44 @@ func (p *Printer) printOneOf(ood *desc.OneOfDescriptor, parentElements elementAd
 		p.indent(w, indent-1)
 		fmt.Fprintln(w, "}")
 	})
+}
+
+func (p *Printer) printExtensions(exts *extensionDecl, allExts extensions, parentElements elementAddrs, startFieldIndex int, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, extTag int32, pkg, scope string, indent int) {
+	path := append(parentPath, extTag)
+	p.printLeadingComments(exts.sourceInfo, w, indent)
+	p.indent(w, indent)
+	fmt.Fprint(w, "extend ")
+	extNameSi := sourceInfo.Get(append(path, 0, internal.Field_extendeeTag))
+	p.printElementString(extNameSi, w, indent, p.qualifyName(pkg, scope, exts.extendee))
+	fmt.Fprintln(w, "{")
+
+	count := len(exts.fields)
+	first := true
+	for idx := startFieldIndex; count > 0 && idx < len(parentElements.addrs); idx++ {
+		el := parentElements.addrs[idx]
+		if el.elementType != extTag {
+			continue
+		}
+		fld := parentElements.at(el).(*desc.FieldDescriptor)
+		if allExts[fld] == exts {
+			if first {
+				first = false
+			} else {
+				p.newLine(w)
+			}
+			childPath := append(path, int32(el.elementIndex))
+			p.printField(fld, mf, w, sourceInfo, childPath, scope, indent+1)
+			count--
+		}
+	}
+
+	p.indent(w, indent)
+	fmt.Fprintln(w, "}")
+	p.printTrailingComments(exts.sourceInfo, w, indent)
+	if indent >= 0 && !w.newline {
+		// if we're not printing inline but element did not have trailing newline, add one now
+		fmt.Fprintln(w)
+	}
 }
 
 func (p *Printer) printExtensionRanges(parent *desc.MessageDescriptor, ranges []*descriptor.DescriptorProto_ExtensionRange, addrs []elementAddr, mf *dynamic.MessageFactory, w *writer, sourceInfo internal.SourceInfoMap, parentPath []int32, indent int) {
@@ -1523,8 +1617,11 @@ var edges = map[edgeKind]map[int32]edgeKind{
 	},
 }
 
-func extendOptionLocations(sc internal.SourceInfoMap) {
-	for _, loc := range sc {
+func extendOptionLocations(sc internal.SourceInfoMap, locs []*descriptor.SourceCodeInfo_Location) {
+	// we iterate in the order that locations appear in descriptor
+	// for determinism (if we ranged over the map, order and thus
+	// potentially results are non-deterministic)
+	for _, loc := range locs {
 		allowed := edges[edgeKindFile]
 		for i := 0; i+1 < len(loc.Path); i += 2 {
 			nextKind, ok := allowed[loc.Path[i]]
@@ -1967,19 +2064,51 @@ func (a elementSrcOrder) Less(i, j int) bool {
 
 	if (si == nil) != (sj == nil) {
 		// generally, we put unknown elements after known ones;
-		// except package and option elements go first
+		// except package, imports, and option elements go first
 
 		// i will be unknown and j will be known
 		swapped := false
 		if si != nil {
 			si, sj = sj, si
-			// no need to swap ti and tj because we don't use tj anywhere below
-			ti = tj
+			ti, tj = tj, ti
 			swapped = true
 		}
 		switch a.dsc.(type) {
 		case *desc.FileDescriptor:
-			if ti == internal.File_packageTag || ti == internal.File_optionsTag {
+			// NB: These comparisons are *trying* to get things ordered so that
+			// 1) If the package element has no source info, it appears _first_.
+			// 2) If any import element has no source info, it appears _after_
+			//    the package element but _before_ any other element.
+			// 3) If any option element has no source info, it appears _after_
+			//    the package and import elements but _before_ any other element.
+			// If the package, imports, and options are all missing source info,
+			// this will sort them all to the top in expected order. But if they
+			// are mixed (some _do_ have source info, some do not), and elements
+			// with source info have spans that positions them _after_ other
+			// elements in the file, then this Less function will be unstable
+			// since the above dual objectives for imports and options ("before
+			// this but after that") may be in conflict with one another. This
+			// should not cause any problems, other than elements being possibly
+			// sorted in a confusing order.
+			//
+			// Well-formed descriptors should instead have consistent source
+			// info: either all elements have source info or none do. So this
+			// should not be an issue in practice.
+			if ti == internal.File_packageTag {
+				return !swapped
+			}
+			if ti == internal.File_dependencyTag {
+				if tj == internal.File_packageTag {
+					// imports will come *after* package
+					return swapped
+				}
+				return !swapped
+			}
+			if ti == internal.File_optionsTag {
+				if tj == internal.File_packageTag || tj == internal.File_dependencyTag {
+					// options will come *after* package and imports
+					return swapped
+				}
 				return !swapped
 			}
 		case *desc.MessageDescriptor:

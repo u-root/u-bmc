@@ -130,7 +130,7 @@ type Opts struct {
 	// packages.
 	//
 	// Shared library dependencies will automatically also be added to the
-	// archive using ldd.
+	// archive using ldd, unless SkipLDD (below) is true.
 	//
 	// The following formats are allowed in the list:
 	//
@@ -139,6 +139,15 @@ type Opts struct {
 	//     archive.
 	//   - "/home/foo" is equivalent to "/home/foo:home/foo".
 	ExtraFiles []string
+
+	// If true, do not use ldd to pick up dependencies from local machine for
+	// ExtraFiles. Useful if you have all deps revision controlled and wish to
+	// ensure builds are repeatable, and/or if the local machine's binaries use
+	// instructions unavailable on the emulated cpu.
+	//
+	// If you turn this on but do not manually list all deps, affected binaries
+	// will misbehave.
+	SkipLDD bool
 
 	// OutputFile is the archive output file.
 	OutputFile initramfs.Writer
@@ -252,7 +261,7 @@ func CreateInitramfs(logger logger.Logger, opts Opts) error {
 		}
 	}
 
-	if err := ParseExtraFiles(logger, archive.Files, opts.ExtraFiles, true); err != nil {
+	if err := ParseExtraFiles(logger, archive.Files, opts.ExtraFiles, !opts.SkipLDD); err != nil {
 		return err
 	}
 
@@ -415,4 +424,47 @@ func ParseExtraFiles(logger logger.Logger, archive *initramfs.Files, extraFiles 
 		}
 	}
 	return nil
+}
+
+// AddCommands adds commands to the build.
+func (o *Opts) AddCommands(c ...Commands) {
+	o.Commands = append(o.Commands, c...)
+}
+
+func (o *Opts) AddBusyBoxCommands(pkgs ...string) {
+	for i, cmds := range o.Commands {
+		if cmds.Builder == builder.BusyBox {
+			o.Commands[i].Packages = append(cmds.Packages, pkgs...)
+			return
+		}
+	}
+
+	// Not found? Add first busybox.
+	o.AddCommands(BusyBoxCmds(pkgs...)...)
+}
+
+// BinaryCmds returns a list of Commands with cmds built as a busybox.
+func BinaryCmds(cmds ...string) []Commands {
+	if len(cmds) == 0 {
+		return nil
+	}
+	return []Commands{
+		{
+			Builder:  builder.Binary,
+			Packages: cmds,
+		},
+	}
+}
+
+// BusyBoxCmds returns a list of Commands with cmds built as a busybox.
+func BusyBoxCmds(cmds ...string) []Commands {
+	if len(cmds) == 0 {
+		return nil
+	}
+	return []Commands{
+		{
+			Builder:  builder.BusyBox,
+			Packages: cmds,
+		},
+	}
 }

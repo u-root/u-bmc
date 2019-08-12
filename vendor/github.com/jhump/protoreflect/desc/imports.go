@@ -103,6 +103,12 @@ func ResolveImport(importPath string) string {
 type ImportResolver struct {
 	children    map[string]*ImportResolver
 	importPaths map[string]string
+
+	// By default, an ImportResolver will fallback to consulting any paths
+	// registered via the top-level RegisterImportPath function. Setting this
+	// field to true will cause the ImportResolver to skip that fallback and
+	// only examine its own locally registered paths.
+	SkipFallbackRules bool
 }
 
 // ResolveImport resolves the given import path in the context of the given
@@ -115,6 +121,9 @@ func (r *ImportResolver) ResolveImport(source, importPath string) string {
 		res := r.resolveImport(clean(source), clean(importPath))
 		if res != "" {
 			return res
+		}
+		if r.SkipFallbackRules {
+			return importPath
 		}
 	}
 	return ResolveImport(importPath)
@@ -281,6 +290,13 @@ func (r *ImportResolver) CreateFileDescriptors(fds []*dpb.FileDescriptorProto) (
 // linking the descriptor protos in the given set.
 func (r *ImportResolver) CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
 	return createFileDescriptorFromSet(fds, r)
+}
+
+// CreateFileDescriptorsFromSet is the same as the package function of the same
+// name, but any alternate paths configured in this resolver are used when
+// linking the descriptor protos in the given set.
+func (r *ImportResolver) CreateFileDescriptorsFromSet(fds *dpb.FileDescriptorSet) (map[string]*FileDescriptor, error) {
+	return createFileDescriptorsFromSet(fds, r)
 }
 
 const dotPrefix = "." + string(filepath.Separator)

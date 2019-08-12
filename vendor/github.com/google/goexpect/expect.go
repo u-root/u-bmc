@@ -44,7 +44,7 @@ func NewStatus(code codes.Code, msg string) *Status {
 	return &Status{code, msg}
 }
 
-// NewStatusf returns a Status with the providead code and a formatted message.
+// NewStatusf returns a Status with the provided code and a formatted message.
 func NewStatusf(code codes.Code, format string, a ...interface{}) *Status {
 	return NewStatus(code, fmt.Sprintf(fmt.Sprintf(format, a...)))
 }
@@ -176,6 +176,15 @@ func SetSysProcAttr(args *syscall.SysProcAttr) Option {
 		prev := e.cmd.SysProcAttr
 		e.cmd.SysProcAttr = args
 		return SetSysProcAttr(prev)
+	}
+}
+
+// PartialMatch enables/disables the returning of unmatched buffer so that consecutive expect call works.
+func PartialMatch(v bool) Option {
+	return func(e *GExpect) Option {
+		prev := e.partialMatch
+		e.partialMatch = v
+		return PartialMatch(prev)
 	}
 }
 
@@ -559,6 +568,8 @@ type GExpect struct {
 	verboseWriter io.Writer
 	// teeWriter receives a duplicate of the spawned process's output when set.
 	teeWriter io.WriteCloser
+	// PartialMatch enables the returning of unmatched buffer so that consecutive expect call works.
+	partialMatch bool
 
 	// mu protects the output buffer. It must be held for any operations on out.
 	mu  sync.Mutex
@@ -713,8 +724,16 @@ func (e *GExpect) ExpectSwitchCase(cs []Caser, timeout time.Duration) (string, [
 				}
 			}
 
-			// Clear the buffer directly after match.
-			o := tbuf.String()
+			tbufString := tbuf.String()
+			o := tbufString
+
+			if e.partialMatch {
+				// Return the part of the buffer that is not matched by the regular expression so that the next expect call will be able to match it.
+				matchIndex := rs[i].FindStringIndex(tbufString)
+				o = tbufString[0:matchIndex[1]]
+				e.returnUnmatchedSuffix(tbufString[matchIndex[1]:])
+			} 
+
 			tbuf.Reset()
 
 			st := c.String()
@@ -861,6 +880,8 @@ func SpawnFake(b []Batcher, timeout time.Duration, opt ...Option) (*GExpect, <-c
 	if err != nil {
 		return nil, nil, err
 	}
+	// The Tee option should only affect the output not the batcher
+	srv.teeWriter = nil
 
 	go func() {
 		res, err := srv.ExpectBatch(b, timeout)
@@ -874,6 +895,7 @@ func SpawnFake(b []Batcher, timeout time.Duration, opt ...Option) (*GExpect, <-c
 		In:  rw,
 		Out: wr,
 		Close: func() error {
+			srv.Close()
 			return rw.Close()
 		},
 		Check: func() bool { return true },
@@ -1054,6 +1076,9 @@ func (e *GExpect) waitForSession(r chan error, wait func() error, sIn io.WriteCl
 		for {
 			nr, err := out.Read(buf)
 			if err != nil || !e.check() {
+				if e.teeWriter != nil {
+					e.teeWriter.Close()
+				}
 				if err == io.EOF {
 					if e.verbose {
 						log.Printf("read closing down: %v", err)
@@ -1062,6 +1087,11 @@ func (e *GExpect) waitForSession(r chan error, wait func() error, sIn io.WriteCl
 				}
 				return
 			}
+			// Tee output to writer
+			if e.teeWriter != nil {
+				e.teeWriter.Write(buf[:nr])
+			}
+			// Add to buffer
 			e.mu.Lock()
 			e.out.Write(buf[:nr])
 			e.mu.Unlock()
@@ -1094,6 +1124,14 @@ func (e *GExpect) Read(p []byte) (nr int, err error) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.out.Read(p)
+}
+
+func (e *GExpect) returnUnmatchedSuffix(p string) {
+    e.mu.Lock()
+    defer e.mu.Unlock()
+    newBuffer := bytes.NewBufferString(p)
+    newBuffer.WriteString(e.out.String())
+    e.out = *newBuffer
 }
 
 // Send sends a string to spawned process.

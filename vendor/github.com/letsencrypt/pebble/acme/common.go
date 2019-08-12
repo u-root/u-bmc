@@ -13,6 +13,7 @@ const (
 	StatusDeactivated = "deactivated"
 
 	IdentifierDNS = "dns"
+	IdentifierIP  = "ip"
 
 	ChallengeHTTP01    = "http-01"
 	ChallengeTLSALPN01 = "tls-alpn-01"
@@ -28,9 +29,13 @@ type Identifier struct {
 	Value string `json:"value"`
 }
 
+func (ident Identifier) Equals(other Identifier) bool {
+	return ident.Type == other.Type && ident.Value == other.Value
+}
+
 type Account struct {
 	Status  string   `json:"status"`
-	Contact []string `json:"contact"`
+	Contact []string `json:"contact,omitempty"`
 	Orders  string   `json:"orders,omitempty"`
 }
 

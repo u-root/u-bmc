@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 
@@ -30,8 +29,6 @@ func init() {
 	setTokenName(_INT_LIT, "int literal")
 	setTokenName(_FLOAT_LIT, "float literal")
 	setTokenName(_NAME, "identifier")
-	setTokenName(_FQNAME, "fully-qualified name")
-	setTokenName(_TYPENAME, "type name")
 	setTokenName(_ERROR, "error")
 	// for keywords, just show the keyword itself wrapped in quotes
 	for str, i := range keywords {
@@ -135,6 +132,14 @@ type Parser struct {
 	// fields, excluding enums. (Interpreting default values for enum fields
 	// requires resolving enum names, which requires linking.)
 	InterpretOptionsInUnlinkedFiles bool
+
+	// A custom reporter of syntax and link errors. If not specified, the
+	// default reporter just returns the reported error, which causes parsing
+	// to abort after encountering a single error.
+	//
+	// The reporter is not invoked for system or I/O errors, only for syntax and
+	// link errors.
+	ErrorReporter ErrorReporter
 }
 
 // ParseFiles parses the named files into descriptors. The returned slice has
@@ -147,6 +152,12 @@ type Parser struct {
 // files -- e.g. google/protobuf/*.proto -- without needing to supply sources
 // for these files. Like protoc, this parser has a built-in version of these
 // files it can use if they aren't explicitly supplied.
+//
+// If the Parser has no ErrorReporter set and a syntax or link error occurs,
+// parsing will abort with the first such error encountered. If there is an
+// ErrorReporter configured and it returns non-nil, parsing will abort with the
+// error it returns. If syntax or link errors are encountered but the configured
+// ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
 	accessor := p.Accessor
 	if accessor == nil {
@@ -174,14 +185,17 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	protos := map[string]*parseResult{}
-	err := parseProtoFiles(accessor, filenames, true, true, protos)
-	if err != nil {
+	results := &parseResults{resultsByFilename: protos}
+	errs := newErrorHandler(p.ErrorReporter)
+	parseProtoFiles(accessor, filenames, errs, true, true, results)
+	if err := errs.getError(); err != nil {
 		return nil, err
 	}
 	if p.InferImportPaths {
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
-	linkedProtos, err := newLinker(protos).linkFiles()
+	linkedProtos, err := newLinker(results, errs).linkFiles()
 	if err != nil {
 		return nil, err
 	}
@@ -225,6 +239,12 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 // This method will still validate the syntax of parsed files. If the parser's
 // ValidateUnlinkedFiles field is true, additional checks, beyond syntax will
 // also be performed.
+//
+// If the Parser has no ErrorReporter set and a syntax or link error occurs,
+// parsing will abort with the first such error encountered. If there is an
+// ErrorReporter configured and it returns non-nil, parsing will abort with the
+// error it returns. If syntax or link errors are encountered but the configured
+// ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescriptorProto, error) {
 	accessor := p.Accessor
 	if accessor == nil {
@@ -234,11 +254,13 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 	}
 
 	protos := map[string]*parseResult{}
-	err := parseProtoFiles(accessor, filenames, false, p.ValidateUnlinkedFiles, protos)
-	if err != nil {
+	errs := newErrorHandler(p.ErrorReporter)
+	parseProtoFiles(accessor, filenames, errs, false, p.ValidateUnlinkedFiles, &parseResults{resultsByFilename: protos})
+	if err := errs.getError(); err != nil {
 		return nil, err
 	}
 	if p.InferImportPaths {
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
 		protos = fixupFilenames(protos)
 	}
 	fds := make([]*dpb.FileDescriptorProto, len(filenames))
@@ -247,7 +269,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 		fd := pr.fd
 		if p.InterpretOptionsInUnlinkedFiles {
 			pr.lenient = true
-			interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})
+			_ = interpretFileOptions(pr, poorFileDescriptorish{FileDescriptorProto: fd})
 		}
 		if p.IncludeSourceCodeInfo {
 			fd.SourceCodeInfo = pr.generateSourceCodeInfo()
@@ -365,37 +387,103 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	return revisedProtos
 }
 
-func parseProtoFiles(acc FileAccessor, filenames []string, recursive, validate bool, parsed map[string]*parseResult) error {
+func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, recursive, validate bool, parsed *parseResults) {
 	for _, name := range filenames {
-		if _, ok := parsed[name]; ok {
-			continue
+		parseProtoFile(acc, name, nil, errs, recursive, validate, parsed)
+		if errs.err != nil {
+			return
 		}
-		in, err := acc(name)
-		if err != nil {
-			if d, ok := standardImports[name]; ok {
-				parsed[name] = &parseResult{fd: d}
-				continue
-			}
-			return err
-		}
+	}
+}
+
+func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, recursive, validate bool, parsed *parseResults) {
+	if parsed.has(filename) {
+		return
+	}
+	in, err := acc(filename)
+	var result *parseResult
+	if err == nil {
+		// try to parse the bytes accessed
 		func() {
-			defer in.Close()
-			parsed[name], err = parseProto(name, in, validate)
+			defer func() {
+				// if we've already parsed contents, an error
+				// closing need not fail this operation
+				_ = in.Close()
+			}()
+			result = parseProto(filename, in, errs, validate)
 		}()
-		if err != nil {
-			return err
+	} else if d, ok := standardImports[filename]; ok {
+		// it's a well-known import
+		// (we clone it to make sure we're not sharing state with other
+		//  parsers, which could result in unsafe races if multiple
+		//  parsers are trying to access it concurrently)
+		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto)}
+	} else {
+		if !strings.Contains(err.Error(), filename) {
+			// an error message that doesn't indicate the file is awful!
+			err = fmt.Errorf("%s: %v", filename, err)
 		}
-		if recursive {
-			err = parseProtoFiles(acc, parsed[name].fd.Dependency, true, validate, parsed)
-			if err != nil {
-				return fmt.Errorf("failed to load imports for %q: %s", name, err)
+		if _, ok := err.(ErrorWithPos); !ok && importLoc != nil {
+			// error has no source position? report it as the import line
+			err = ErrorWithSourcePos{
+				Pos:        importLoc,
+				Underlying: err,
+			}
+		}
+		_ = errs.handleError(err)
+		return
+	}
+
+	parsed.add(filename, result)
+
+	if errs.getError() != nil {
+		return // abort
+	}
+
+	if recursive {
+		fd := result.fd
+		decl := result.getFileNode(fd)
+		fnode, ok := decl.(*fileNode)
+		if !ok {
+			// no AST for this file? use imports in descriptor
+			for _, dep := range fd.Dependency {
+				parseProtoFile(acc, dep, decl.start(), errs, true, validate, parsed)
+				if errs.getError() != nil {
+					return // abort
+				}
+			}
+			return
+		}
+		// we have an AST; use it so we can report import location in errors
+		for _, dep := range fnode.imports {
+			parseProtoFile(acc, dep.name.val, dep.name.start(), errs, true, validate, parsed)
+			if errs.getError() != nil {
+				return // abort
 			}
 		}
 	}
-	return nil
+}
+
+type parseResults struct {
+	resultsByFilename map[string]*parseResult
+	filenames         []string
+}
+
+func (r *parseResults) has(filename string) bool {
+	_, ok := r.resultsByFilename[filename]
+	return ok
+}
+
+func (r *parseResults) add(filename string, result *parseResult) {
+	r.resultsByFilename[filename] = result
+	r.filenames = append(r.filenames, filename)
 }
 
 type parseResult struct {
+	// handles any errors encountered during parsing, construction of file descriptor,
+	// or validation
+	errs *errorHandler
+
 	// the parsed file descriptor
 	fd *dpb.FileDescriptorProto
 
@@ -434,25 +522,11 @@ func (r *parseResult) getOptionNamePartNode(o *dpb.UninterpretedOption_NamePart)
 	return r.nodes[o]
 }
 
-func (r *parseResult) getMessageNode(m *dpb.DescriptorProto) msgDecl {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[m].(msgDecl)
-}
-
 func (r *parseResult) getFieldNode(f *dpb.FieldDescriptorProto) fieldDecl {
 	if r.nodes == nil {
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
 	}
 	return r.nodes[f].(fieldDecl)
-}
-
-func (r *parseResult) getOneOfNode(o *dpb.OneofDescriptorProto) node {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[o]
 }
 
 func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange) rangeDecl {
@@ -469,13 +543,6 @@ func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_Reserv
 	return r.nodes[rr].(rangeDecl)
 }
 
-func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) node {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[e]
-}
-
 func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) enumValueDecl {
 	if r.nodes == nil {
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
@@ -488,13 +555,6 @@ func (r *parseResult) getEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumR
 		return noSourceNode{pos: unknownPos(r.fd.GetName())}
 	}
 	return r.nodes[rr].(rangeDecl)
-}
-
-func (r *parseResult) getServiceNode(s *dpb.ServiceDescriptorProto) node {
-	if r.nodes == nil {
-		return noSourceNode{pos: unknownPos(r.fd.GetName())}
-	}
-	return r.nodes[s]
 }
 
 func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) methodDecl {
@@ -556,47 +616,47 @@ func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *methodNode)
 	r.nodes[m] = n
 }
 
-func parseProto(filename string, r io.Reader, validate bool) (*parseResult, error) {
-	lx := newLexer(r)
-	lx.filename = filename
+func parseProto(filename string, r io.Reader, errs *errorHandler, validate bool) *parseResult {
+	lx := newLexer(r, filename, errs)
 	protoParse(lx)
-	if lx.err != nil {
-		if _, ok := lx.err.(ErrorWithSourcePos); ok {
-			return nil, lx.err
-		} else {
-			return nil, ErrorWithSourcePos{Pos: lx.prev(), Underlying: lx.err}
-		}
+
+	res := createParseResult(filename, lx.res, errs)
+	if validate {
+		basicValidate(res)
 	}
 
-	res, err := createParseResult(filename, lx.res)
-	if err != nil {
-		return nil, err
-	}
-	if validate {
-		if err := basicValidate(res); err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
+	return res
 }
 
-func createParseResult(filename string, file *fileNode) (*parseResult, error) {
+func createParseResult(filename string, file *fileNode, errs *errorHandler) *parseResult {
 	res := &parseResult{
+		errs:               errs,
 		nodes:              map[proto.Message]node{},
 		interpretedOptions: map[*optionNode][]int32{},
 	}
-	err := res.createFileDescriptor(filename, file)
-	return res, err
+	if file == nil {
+		// nil AST means there was an error that prevented any parsing
+		// or the file was empty; synthesize empty non-nil AST
+		file = &fileNode{}
+		n := noSourceNode{pos: unknownPos(filename)}
+		file.setRange(&n, &n)
+	}
+	res.createFileDescriptor(filename, file)
+	return res
 }
 
-func (r *parseResult) createFileDescriptor(filename string, file *fileNode) error {
+func (r *parseResult) createFileDescriptor(filename string, file *fileNode) {
 	fd := &dpb.FileDescriptorProto{Name: proto.String(filename)}
+	r.fd = fd
 	r.putFileNode(fd, file)
 
 	isProto3 := false
 	if file.syntax != nil {
-		fd.Syntax = proto.String(file.syntax.syntax.val)
 		isProto3 = file.syntax.syntax.val == "proto3"
+		// proto2 is the default, so no need to set unless proto3
+		if isProto3 {
+			fd.Syntax = proto.String(file.syntax.syntax.val)
+		}
 	}
 
 	for _, decl := range file.decls {
@@ -624,17 +684,19 @@ func (r *parseResult) createFileDescriptor(filename string, file *fileNode) erro
 			fd.Service = append(fd.Service, r.asServiceDescriptor(decl.service))
 		} else if decl.pkg != nil {
 			if fd.Package != nil {
-				return ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}
+				if r.errs.handleError(ErrorWithSourcePos{Pos: decl.pkg.start(), Underlying: errors.New("files should have only one package declaration")}) != nil {
+					return
+				}
 			}
-			file.pkg = decl.pkg
 			fd.Package = proto.String(decl.pkg.name.val)
 		}
 	}
-	r.fd = fd
-	return nil
 }
 
 func (r *parseResult) asUninterpretedOptions(nodes []*optionNode) []*dpb.UninterpretedOption {
+	if len(nodes) == 0 {
+		return nil
+	}
 	opts := make([]*dpb.UninterpretedOption, len(nodes))
 	for i, n := range nodes {
 		opts[i] = r.asUninterpretedOption(n)
@@ -707,8 +769,8 @@ func (r *parseResult) addExtensions(ext *extendNode, flds *[]*dpb.FieldDescripto
 	}
 }
 
-func asLabel(lbl *labelNode) *dpb.FieldDescriptorProto_Label {
-	if lbl == nil {
+func asLabel(lbl *fieldLabel) *dpb.FieldDescriptorProto_Label {
+	if lbl.identNode == nil {
 		return nil
 	}
 	switch {
@@ -722,12 +784,30 @@ func asLabel(lbl *labelNode) *dpb.FieldDescriptorProto_Label {
 }
 
 func (r *parseResult) asFieldDescriptor(node *fieldNode) *dpb.FieldDescriptorProto {
-	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(node.tag.val), asLabel(node.label))
+	fd := newFieldDescriptor(node.name.val, node.fldType.val, int32(node.tag.val), asLabel(&node.label))
 	r.putFieldNode(fd, node)
-	if len(node.options) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
+	if opts := node.options.Elements(); len(opts) > 0 {
+		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	return fd
+}
+
+var fieldTypes = map[string]dpb.FieldDescriptorProto_Type{
+	"double":   dpb.FieldDescriptorProto_TYPE_DOUBLE,
+	"float":    dpb.FieldDescriptorProto_TYPE_FLOAT,
+	"int32":    dpb.FieldDescriptorProto_TYPE_INT32,
+	"int64":    dpb.FieldDescriptorProto_TYPE_INT64,
+	"uint32":   dpb.FieldDescriptorProto_TYPE_UINT32,
+	"uint64":   dpb.FieldDescriptorProto_TYPE_UINT64,
+	"sint32":   dpb.FieldDescriptorProto_TYPE_SINT32,
+	"sint64":   dpb.FieldDescriptorProto_TYPE_SINT64,
+	"fixed32":  dpb.FieldDescriptorProto_TYPE_FIXED32,
+	"fixed64":  dpb.FieldDescriptorProto_TYPE_FIXED64,
+	"sfixed32": dpb.FieldDescriptorProto_TYPE_SFIXED32,
+	"sfixed64": dpb.FieldDescriptorProto_TYPE_SFIXED64,
+	"bool":     dpb.FieldDescriptorProto_TYPE_BOOL,
+	"string":   dpb.FieldDescriptorProto_TYPE_STRING,
+	"bytes":    dpb.FieldDescriptorProto_TYPE_BYTES,
 }
 
 func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.FieldDescriptorProto_Label) *dpb.FieldDescriptorProto {
@@ -737,41 +817,13 @@ func newFieldDescriptor(name string, fieldType string, tag int32, lbl *dpb.Field
 		Number:   proto.Int32(tag),
 		Label:    lbl,
 	}
-	switch fieldType {
-	case "double":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_DOUBLE.Enum()
-	case "float":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_FLOAT.Enum()
-	case "int32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_INT32.Enum()
-	case "int64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_INT64.Enum()
-	case "uint32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_UINT32.Enum()
-	case "uint64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_UINT64.Enum()
-	case "sint32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SINT32.Enum()
-	case "sint64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SINT64.Enum()
-	case "fixed32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_FIXED32.Enum()
-	case "fixed64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_FIXED64.Enum()
-	case "sfixed32":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SFIXED32.Enum()
-	case "sfixed64":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_SFIXED64.Enum()
-	case "bool":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_BOOL.Enum()
-	case "string":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_STRING.Enum()
-	case "bytes":
-		fd.Type = dpb.FieldDescriptorProto_TYPE_BYTES.Enum()
-	default:
-		// NB: we don't have enough info to determine whether this is an enum or a message type,
-		// so we'll change it to enum later once we can ascertain if it's an enum reference
-		fd.Type = dpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+	t, ok := fieldTypes[fieldType]
+	if ok {
+		fd.Type = t.Enum()
+	} else {
+		// NB: we don't have enough info to determine whether this is an enum
+		// or a message type, so we'll leave Type nil and set it later
+		// (during linking)
 		fd.TypeName = proto.String(fieldType)
 	}
 	return fd
@@ -783,14 +835,14 @@ func (r *parseResult) asGroupDescriptors(group *groupNode, isProto3 bool) (*dpb.
 		Name:     proto.String(fieldName),
 		JsonName: proto.String(internal.JsonName(fieldName)),
 		Number:   proto.Int32(int32(group.tag.val)),
-		Label:    asLabel(group.label),
+		Label:    asLabel(&group.label),
 		Type:     dpb.FieldDescriptorProto_TYPE_GROUP.Enum(),
 		TypeName: proto.String(group.name.val),
 	}
 	r.putFieldNode(fd, group)
 	md := &dpb.DescriptorProto{Name: proto.String(group.name.val)}
 	r.putMessageNode(md, group)
-	r.addMessageDecls(md, &group.reserved, group.decls, isProto3)
+	r.addMessageDecls(md, group.decls, isProto3)
 	return fd, md
 }
 
@@ -799,14 +851,14 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*
 	if !isProto3 {
 		lbl = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
-	keyFd := newFieldDescriptor("key", mapField.keyType.val, 1, lbl)
+	keyFd := newFieldDescriptor("key", mapField.mapType.keyType.val, 1, lbl)
 	r.putFieldNode(keyFd, mapField.keyField())
-	valFd := newFieldDescriptor("value", mapField.valueType.val, 2, lbl)
+	valFd := newFieldDescriptor("value", mapField.mapType.valueType.val, 2, lbl)
 	r.putFieldNode(valFd, mapField.valueField())
 	entryName := internal.InitCap(internal.JsonName(mapField.name.val)) + "Entry"
 	fd := newFieldDescriptor(mapField.name.val, entryName, int32(mapField.tag.val), dpb.FieldDescriptorProto_LABEL_REPEATED.Enum())
-	if len(mapField.options) > 0 {
-		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(mapField.options)}
+	if opts := mapField.options.Elements(); len(opts) > 0 {
+		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	r.putFieldNode(fd, mapField)
 	md := &dpb.DescriptorProto{
@@ -819,7 +871,7 @@ func (r *parseResult) asMapDescriptors(mapField *mapFieldNode, isProto3 bool) (*
 }
 
 func (r *parseResult) asExtensionRanges(node *extensionRangeNode) []*dpb.DescriptorProto_ExtensionRange {
-	opts := r.asUninterpretedOptions(node.options)
+	opts := r.asUninterpretedOptions(node.options.Elements())
 	ers := make([]*dpb.DescriptorProto_ExtensionRange, len(node.ranges))
 	for i, rng := range node.ranges {
 		er := &dpb.DescriptorProto_ExtensionRange{
@@ -836,16 +888,11 @@ func (r *parseResult) asExtensionRanges(node *extensionRangeNode) []*dpb.Descrip
 }
 
 func (r *parseResult) asEnumValue(ev *enumValueNode) *dpb.EnumValueDescriptorProto {
-	var num int32
-	if ev.numberP != nil {
-		num = int32(ev.numberP.val)
-	} else {
-		num = int32(ev.numberN.val)
-	}
+	num := int32(ev.number.val)
 	evd := &dpb.EnumValueDescriptorProto{Name: proto.String(ev.name.val), Number: proto.Int32(num)}
 	r.putEnumValueNode(evd, ev)
-	if len(ev.options) > 0 {
-		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(ev.options)}
+	if opts := ev.options.Elements(); len(opts) > 0 {
+		evd.Options = &dpb.EnumValueOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	return evd
 }
@@ -863,7 +910,11 @@ func (r *parseResult) asMethodDescriptor(node *methodNode) *dpb.MethodDescriptor
 	if node.output.streamKeyword != nil {
 		md.ServerStreaming = proto.Bool(true)
 	}
-	if len(node.options) > 0 {
+	// protoc always adds a MethodOptions if there are brackets
+	// We have a non-nil node.options if there are brackets
+	// We do the same to match protoc as closely as possible
+	// https://github.com/protocolbuffers/protobuf/blob/0c3f43a6190b77f1f68b7425d1b7e1a8257a8d0c/src/google/protobuf/compiler/parser.cc#L2152
+	if node.options != nil {
 		md.Options = &dpb.MethodOptions{UninterpretedOption: r.asUninterpretedOptions(node.options)}
 	}
 	return md
@@ -882,7 +933,6 @@ func (r *parseResult) asEnumDescriptor(en *enumNode) *dpb.EnumDescriptorProto {
 			ed.Value = append(ed.Value, r.asEnumValue(decl.value))
 		} else if decl.reserved != nil {
 			for _, n := range decl.reserved.names {
-				en.reserved = append(en.reserved, n)
 				ed.ReservedName = append(ed.ReservedName, n.val)
 			}
 			for _, rng := range decl.reserved.ranges {
@@ -905,11 +955,11 @@ func (r *parseResult) asEnumReservedRange(rng *rangeNode) *dpb.EnumDescriptorPro
 func (r *parseResult) asMessageDescriptor(node *messageNode, isProto3 bool) *dpb.DescriptorProto {
 	msgd := &dpb.DescriptorProto{Name: proto.String(node.name.val)}
 	r.putMessageNode(msgd, node)
-	r.addMessageDecls(msgd, &node.reserved, node.decls, isProto3)
+	r.addMessageDecls(msgd, node.decls, isProto3)
 	return msgd
 }
 
-func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *[]*stringLiteralNode, decls []*messageElement, isProto3 bool) {
+func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, decls []*messageElement, isProto3 bool) {
 	for _, decl := range decls {
 		if decl.enum != nil {
 			msgd.EnumType = append(msgd.EnumType, r.asEnumDescriptor(decl.enum))
@@ -942,6 +992,11 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *
 					fd := r.asFieldDescriptor(oodecl.field)
 					fd.OneofIndex = proto.Int32(int32(oodIndex))
 					msgd.Field = append(msgd.Field, fd)
+				} else if oodecl.group != nil {
+					fd, md := r.asGroupDescriptors(oodecl.group, isProto3)
+					fd.OneofIndex = proto.Int32(int32(oodIndex))
+					msgd.Field = append(msgd.Field, fd)
+					msgd.NestedType = append(msgd.NestedType, md)
 				}
 			}
 		} else if decl.option != nil {
@@ -953,7 +1008,6 @@ func (r *parseResult) addMessageDecls(msgd *dpb.DescriptorProto, reservedNames *
 			msgd.NestedType = append(msgd.NestedType, r.asMessageDescriptor(decl.nested, isProto3))
 		} else if decl.reserved != nil {
 			for _, n := range decl.reserved.names {
-				*reservedNames = append(*reservedNames, n)
 				msgd.ReservedName = append(msgd.ReservedName, n.val)
 			}
 			for _, rng := range decl.reserved.ranges {
@@ -988,451 +1042,7 @@ func (r *parseResult) asServiceDescriptor(svc *serviceNode) *dpb.ServiceDescript
 	return sd
 }
 
-type sourceCodeInfo struct {
-	locs         []*dpb.SourceCodeInfo_Location
-	commentsUsed map[*comment]struct{}
-}
-
-func (r *parseResult) generateSourceCodeInfo() *dpb.SourceCodeInfo {
-	if r.nodes == nil {
-		// skip files that do not have AST info (these will be files
-		// that came from well-known descriptors, instead of from source)
-		return nil
-	}
-
-	sci := sourceCodeInfo{commentsUsed: map[*comment]struct{}{}}
-	path := make([]int32, 0, 10)
-
-	fn := r.getFileNode(r.fd).(*fileNode)
-	if fn.syntax != nil {
-		sci.newLoc(fn.syntax, append(path, internal.File_syntaxTag))
-	}
-	if fn.pkg != nil {
-		sci.newLoc(fn.pkg, append(path, internal.File_packageTag))
-	}
-	for i, imp := range fn.imports {
-		sci.newLoc(imp, append(path, internal.File_dependencyTag, int32(i)))
-	}
-
-	// file options
-	r.generateSourceCodeInfoForOptions(&sci, fn.decls, func(n interface{}) *optionNode {
-		return n.(*fileElement).option
-	}, r.fd.Options.GetUninterpretedOption(), append(path, internal.File_optionsTag))
-
-	// message types
-	for i, msg := range r.fd.GetMessageType() {
-		r.generateSourceCodeInfoForMessage(&sci, msg, append(path, internal.File_messagesTag, int32(i)))
-	}
-
-	// enum types
-	for i, enum := range r.fd.GetEnumType() {
-		r.generateSourceCodeInfoForEnum(&sci, enum, append(path, internal.File_enumsTag, int32(i)))
-	}
-
-	// extension fields
-	for i, ext := range r.fd.GetExtension() {
-		r.generateSourceCodeInfoForField(&sci, ext, append(path, internal.File_extensionsTag, int32(i)))
-	}
-
-	// services and methods
-	for i, svc := range r.fd.GetService() {
-		n := r.getServiceNode(svc).(*serviceNode)
-		svcPath := append(path, internal.File_servicesTag, int32(i))
-		sci.newLoc(n, svcPath)
-		sci.newLoc(n.name, append(svcPath, internal.Service_nameTag))
-
-		// service options
-		r.generateSourceCodeInfoForOptions(&sci, n.decls, func(n interface{}) *optionNode {
-			return n.(*serviceElement).option
-		}, svc.Options.GetUninterpretedOption(), append(svcPath, internal.Service_optionsTag))
-
-		// methods
-		for j, mtd := range svc.GetMethod() {
-			mn := r.getMethodNode(mtd).(*methodNode)
-			mtdPath := append(svcPath, internal.Service_methodsTag, int32(j))
-			sci.newLoc(mn, mtdPath)
-			sci.newLoc(mn.name, append(mtdPath, internal.Method_nameTag))
-
-			sci.newLoc(mn.input.msgType, append(mtdPath, internal.Method_inputTag))
-			if mn.input.streamKeyword != nil {
-				sci.newLoc(mn.input.streamKeyword, append(mtdPath, internal.Method_inputStreamTag))
-			}
-			sci.newLoc(mn.output.msgType, append(mtdPath, internal.Method_outputTag))
-			if mn.output.streamKeyword != nil {
-				sci.newLoc(mn.output.streamKeyword, append(mtdPath, internal.Method_outputStreamTag))
-			}
-
-			// method options
-			r.generateSourceCodeInfoForOptions(&sci, mn.options, func(n interface{}) *optionNode {
-				return n.(*optionNode)
-			}, mtd.Options.GetUninterpretedOption(), append(mtdPath, internal.Method_optionsTag))
-		}
-	}
-	return &dpb.SourceCodeInfo{Location: sci.locs}
-}
-
-func (r *parseResult) generateSourceCodeInfoForOptions(sci *sourceCodeInfo, elements interface{}, extractor func(interface{}) *optionNode, uninterp []*dpb.UninterpretedOption, path []int32) {
-	// Known options are option node elements that have a corresponding
-	// path in r.interpretedOptions. We'll do those first.
-	rv := reflect.ValueOf(elements)
-	for i := 0; i < rv.Len(); i++ {
-		on := extractor(rv.Index(i).Interface())
-		if on == nil {
-			continue
-		}
-		optPath := r.interpretedOptions[on]
-		if len(optPath) > 0 {
-			p := path
-			if optPath[0] == -1 {
-				// used by "default" and "json_name" field pseudo-options
-				// to attribute path to parent element (since those are
-				// stored directly on the descriptor, not its options)
-				p = make([]int32, len(path)-1)
-				copy(p, path)
-				optPath = optPath[1:]
-			}
-			sci.newLoc(on, append(p, optPath...))
-		}
-	}
-
-	// Now uninterpreted options
-	for i, uo := range uninterp {
-		optPath := append(path, internal.UninterpretedOptionsTag, int32(i))
-		on := r.getOptionNode(uo).(*optionNode)
-		sci.newLoc(on, optPath)
-
-		var valTag int32
-		switch {
-		case uo.IdentifierValue != nil:
-			valTag = internal.Uninterpreted_identTag
-		case uo.PositiveIntValue != nil:
-			valTag = internal.Uninterpreted_posIntTag
-		case uo.NegativeIntValue != nil:
-			valTag = internal.Uninterpreted_negIntTag
-		case uo.DoubleValue != nil:
-			valTag = internal.Uninterpreted_doubleTag
-		case uo.StringValue != nil:
-			valTag = internal.Uninterpreted_stringTag
-		case uo.AggregateValue != nil:
-			valTag = internal.Uninterpreted_aggregateTag
-		}
-		if valTag != 0 {
-			sci.newLoc(on.val, append(optPath, valTag))
-		}
-
-		for j, n := range uo.Name {
-			optNmPath := append(optPath, internal.Uninterpreted_nameTag, int32(j))
-			nn := r.getOptionNamePartNode(n).(*optionNamePartNode)
-			sci.newLoc(nn, optNmPath)
-			sci.newLoc(nn.text, append(optNmPath, internal.UninterpretedName_nameTag))
-		}
-	}
-}
-
-func (r *parseResult) generateSourceCodeInfoForMessage(sci *sourceCodeInfo, msg *dpb.DescriptorProto, path []int32) {
-	n := r.getMessageNode(msg)
-	sci.newLoc(n, path)
-
-	var decls []*messageElement
-	var resvdNames []*stringLiteralNode
-	switch n := n.(type) {
-	case *messageNode:
-		decls = n.decls
-		resvdNames = n.reserved
-	case *groupNode:
-		decls = n.decls
-		resvdNames = n.reserved
-	}
-	if decls == nil {
-		// map entry so nothing else to do
-		return
-	}
-
-	sci.newLoc(n.messageName(), append(path, internal.Message_nameTag))
-
-	// message options
-	r.generateSourceCodeInfoForOptions(sci, decls, func(n interface{}) *optionNode {
-		return n.(*messageElement).option
-	}, msg.Options.GetUninterpretedOption(), append(path, internal.Message_optionsTag))
-
-	// fields
-	for i, fld := range msg.GetField() {
-		r.generateSourceCodeInfoForField(sci, fld, append(path, internal.Message_fieldsTag, int32(i)))
-	}
-
-	// one-ofs
-	for i, ood := range msg.GetOneofDecl() {
-		oon := r.getOneOfNode(ood).(*oneOfNode)
-		ooPath := append(path, internal.Message_oneOfsTag, int32(i))
-		sci.newLoc(oon, ooPath)
-		sci.newLoc(oon.name, append(ooPath, internal.OneOf_nameTag))
-
-		// one-of options
-		r.generateSourceCodeInfoForOptions(sci, oon.decls, func(n interface{}) *optionNode {
-			return n.(*oneOfElement).option
-		}, ood.Options.GetUninterpretedOption(), append(ooPath, internal.OneOf_optionsTag))
-	}
-
-	// nested messages
-	for i, nm := range msg.GetNestedType() {
-		r.generateSourceCodeInfoForMessage(sci, nm, append(path, internal.Message_nestedMessagesTag, int32(i)))
-	}
-
-	// nested enums
-	for i, enum := range msg.GetEnumType() {
-		r.generateSourceCodeInfoForEnum(sci, enum, append(path, internal.Message_enumsTag, int32(i)))
-	}
-
-	// nested extensions
-	for i, ext := range msg.GetExtension() {
-		r.generateSourceCodeInfoForField(sci, ext, append(path, internal.Message_extensionsTag, int32(i)))
-	}
-
-	// extension ranges
-	for i, er := range msg.ExtensionRange {
-		rangePath := append(path, internal.Message_extensionRangeTag, int32(i))
-		rn := r.getExtensionRangeNode(er).(*rangeNode)
-		sci.newLoc(rn, rangePath)
-		sci.newLoc(rn.stNode, append(rangePath, internal.ExtensionRange_startTag))
-		if rn.stNode != rn.enNode {
-			sci.newLoc(rn.enNode, append(rangePath, internal.ExtensionRange_endTag))
-		}
-		// now we have to find the extension decl and options that correspond to this range :(
-		for _, d := range decls {
-			found := false
-			if d.extensionRange != nil {
-				for _, r := range d.extensionRange.ranges {
-					if rn == r {
-						found = true
-						break
-					}
-				}
-			}
-			if found {
-				r.generateSourceCodeInfoForOptions(sci, d.extensionRange.options, func(n interface{}) *optionNode {
-					return n.(*optionNode)
-				}, er.Options.GetUninterpretedOption(), append(rangePath, internal.ExtensionRange_optionsTag))
-				break
-			}
-		}
-	}
-
-	// reserved ranges
-	for i, rr := range msg.ReservedRange {
-		rangePath := append(path, internal.Message_reservedRangeTag, int32(i))
-		rn := r.getMessageReservedRangeNode(rr).(*rangeNode)
-		sci.newLoc(rn, rangePath)
-		sci.newLoc(rn.stNode, append(rangePath, internal.ReservedRange_startTag))
-		if rn.stNode != rn.enNode {
-			sci.newLoc(rn.enNode, append(rangePath, internal.ReservedRange_endTag))
-		}
-	}
-
-	// reserved names
-	for i, n := range resvdNames {
-		sci.newLoc(n, append(path, internal.Message_reservedNameTag, int32(i)))
-	}
-}
-
-func (r *parseResult) generateSourceCodeInfoForEnum(sci *sourceCodeInfo, enum *dpb.EnumDescriptorProto, path []int32) {
-	n := r.getEnumNode(enum).(*enumNode)
-	sci.newLoc(n, path)
-	sci.newLoc(n.name, append(path, internal.Enum_nameTag))
-
-	// enum options
-	r.generateSourceCodeInfoForOptions(sci, n.decls, func(n interface{}) *optionNode {
-		return n.(*enumElement).option
-	}, enum.Options.GetUninterpretedOption(), append(path, internal.Enum_optionsTag))
-
-	// enum values
-	for j, ev := range enum.GetValue() {
-		evn := r.getEnumValueNode(ev).(*enumValueNode)
-		evPath := append(path, internal.Enum_valuesTag, int32(j))
-		sci.newLoc(evn, evPath)
-		sci.newLoc(evn.name, append(evPath, internal.EnumVal_nameTag))
-		sci.newLoc(evn.getNumber(), append(evPath, internal.EnumVal_numberTag))
-
-		// enum value options
-		r.generateSourceCodeInfoForOptions(sci, evn.options, func(n interface{}) *optionNode {
-			return n.(*optionNode)
-		}, ev.Options.GetUninterpretedOption(), append(evPath, internal.EnumVal_optionsTag))
-	}
-
-	// reserved ranges
-	for i, rr := range enum.GetReservedRange() {
-		rangePath := append(path, internal.Enum_reservedRangeTag, int32(i))
-		rn := r.getEnumReservedRangeNode(rr).(*rangeNode)
-		sci.newLoc(rn, rangePath)
-		sci.newLoc(rn.stNode, append(rangePath, internal.ReservedRange_startTag))
-		if rn.stNode != rn.enNode {
-			sci.newLoc(rn.enNode, append(rangePath, internal.ReservedRange_endTag))
-		}
-	}
-
-	// reserved names
-	for i, rn := range n.reserved {
-		sci.newLoc(rn, append(path, internal.Enum_reservedNameTag, int32(i)))
-	}
-}
-
-func (r *parseResult) generateSourceCodeInfoForField(sci *sourceCodeInfo, fld *dpb.FieldDescriptorProto, path []int32) {
-	n := r.getFieldNode(fld)
-
-	isGroup := false
-	var opts []*optionNode
-	var extendee *extendNode
-	switch n := n.(type) {
-	case *fieldNode:
-		opts = n.options
-		extendee = n.extendee
-	case *mapFieldNode:
-		opts = n.options
-	case *groupNode:
-		isGroup = true
-		extendee = n.extendee
-	case *syntheticMapField:
-		// shouldn't get here since we don't recurse into fields from a mapNode
-		// in generateSourceCodeInfoForMessage... but just in case
-		return
-	}
-
-	sci.newLoc(n, path)
-	if !isGroup {
-		sci.newLoc(n.fieldName(), append(path, internal.Field_nameTag))
-		sci.newLoc(n.fieldType(), append(path, internal.Field_typeTag))
-	}
-	if n.fieldLabel() != nil {
-		sci.newLoc(n.fieldLabel(), append(path, internal.Field_labelTag))
-	}
-	sci.newLoc(n.fieldTag(), append(path, internal.Field_numberTag))
-	if extendee != nil {
-		sci.newLoc(extendee.extendee, append(path, internal.Field_extendeeTag))
-	}
-
-	r.generateSourceCodeInfoForOptions(sci, opts, func(n interface{}) *optionNode {
-		return n.(*optionNode)
-	}, fld.Options.GetUninterpretedOption(), append(path, internal.Field_optionsTag))
-}
-
-func (sci *sourceCodeInfo) newLoc(n node, path []int32) {
-	leadingComments := n.leadingComments()
-	trailingComments := n.trailingComment()
-	if sci.commentUsed(leadingComments) {
-		leadingComments = nil
-	}
-	if sci.commentUsed(trailingComments) {
-		trailingComments = nil
-	}
-	detached := groupComments(leadingComments)
-	trail := combineComments(trailingComments)
-	var lead *string
-	if len(leadingComments) > 0 && leadingComments[len(leadingComments)-1].end.Line >= n.start().Line-1 {
-		lead = proto.String(detached[len(detached)-1])
-		detached = detached[:len(detached)-1]
-	}
-	dup := make([]int32, len(path))
-	copy(dup, path)
-	var span []int32
-	if n.start().Line == n.end().Line {
-		span = []int32{int32(n.start().Line) - 1, int32(n.start().Col) - 1, int32(n.end().Col) - 1}
-	} else {
-		span = []int32{int32(n.start().Line) - 1, int32(n.start().Col) - 1, int32(n.end().Line) - 1, int32(n.end().Col) - 1}
-	}
-	sci.locs = append(sci.locs, &dpb.SourceCodeInfo_Location{
-		LeadingDetachedComments: detached,
-		LeadingComments:         lead,
-		TrailingComments:        trail,
-		Path:                    dup,
-		Span:                    span,
-	})
-}
-
-func (sci *sourceCodeInfo) commentUsed(c []*comment) bool {
-	if len(c) == 0 {
-		return false
-	}
-	if _, ok := sci.commentsUsed[c[0]]; ok {
-		return true
-	}
-
-	sci.commentsUsed[c[0]] = struct{}{}
-	return false
-}
-
-func groupComments(comments []*comment) []string {
-	if len(comments) == 0 {
-		return nil
-	}
-
-	var groups []string
-	singleLineStyle := comments[0].text[:2] == "//"
-	line := comments[0].end.Line
-	start := 0
-	for i := 1; i < len(comments); i++ {
-		c := comments[i]
-		prevSingleLine := singleLineStyle
-		singleLineStyle = strings.HasPrefix(comments[i].text, "//")
-		if !singleLineStyle || prevSingleLine != singleLineStyle || c.start.Line > line+1 {
-			// new group!
-			groups = append(groups, *combineComments(comments[start:i]))
-			start = i
-		}
-		line = c.end.Line
-	}
-	// don't forget last group
-	groups = append(groups, *combineComments(comments[start:]))
-
-	return groups
-}
-
-func combineComments(comments []*comment) *string {
-	if len(comments) == 0 {
-		return nil
-	}
-	first := true
-	var buf bytes.Buffer
-	for _, c := range comments {
-		if first {
-			first = false
-		} else {
-			buf.WriteByte('\n')
-		}
-		if c.text[:2] == "//" {
-			buf.WriteString(c.text[2:])
-		} else {
-			lines := strings.Split(c.text[2:len(c.text)-2], "\n")
-			first := true
-			for _, l := range lines {
-				if first {
-					first = false
-				} else {
-					buf.WriteByte('\n')
-				}
-
-				// strip a prefix of whitespace followed by '*'
-				j := 0
-				for j < len(l) {
-					if l[j] != ' ' && l[j] != '\t' {
-						break
-					}
-					j++
-				}
-				if j == len(l) {
-					l = ""
-				} else if l[j] == '*' {
-					l = l[j+1:]
-				} else if j > 0 {
-					l = " " + l[j:]
-				}
-
-				buf.WriteString(l)
-			}
-		}
-	}
-	return proto.String(buf.String())
-}
-
-func toNameParts(ident *identNode, offset int) []*optionNamePartNode {
+func toNameParts(ident *compoundIdentNode, offset int) []*optionNamePartNode {
 	parts := strings.Split(ident.val[offset:], ".")
 	ret := make([]*optionNamePartNode, len(parts))
 	for i, p := range parts {
@@ -1456,7 +1066,9 @@ func checkInt64InInt32Range(lex protoLexer, pos *SourcePos, v int64) {
 }
 
 func checkTag(lex protoLexer, pos *SourcePos, v uint64) {
-	if v > internal.MaxTag {
+	if v < 1 {
+		lexError(lex, pos, fmt.Sprintf("tag number %d must be greater than zero", v))
+	} else if v > internal.MaxTag {
 		lexError(lex, pos, fmt.Sprintf("tag number %d is higher than max allowed tag number (%d)", v, internal.MaxTag))
 	} else if v >= internal.SpecialReservedStart && v <= internal.SpecialReservedEnd {
 		lexError(lex, pos, fmt.Sprintf("tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd))
@@ -1543,28 +1155,27 @@ func writeEscapedBytes(buf *bytes.Buffer, b []byte) {
 	}
 }
 
-func basicValidate(res *parseResult) error {
+func basicValidate(res *parseResult) {
 	fd := res.fd
 	isProto3 := fd.GetSyntax() == "proto3"
 
 	for _, md := range fd.MessageType {
-		if err := validateMessage(res, isProto3, "", md); err != nil {
-			return err
+		if validateMessage(res, isProto3, "", md) != nil {
+			return
 		}
 	}
 
 	for _, ed := range fd.EnumType {
-		if err := validateEnum(res, isProto3, "", ed); err != nil {
-			return err
+		if validateEnum(res, isProto3, "", ed) != nil {
+			return
 		}
 	}
 
 	for _, fld := range fd.Extension {
-		if err := validateField(res, isProto3, "", fld); err != nil {
-			return err
+		if validateField(res, isProto3, "", fld) != nil {
+			return
 		}
 	}
-	return nil
 }
 
 func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.DescriptorProto) error {
@@ -1595,11 +1206,15 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 
 	if isProto3 && len(md.ExtensionRange) > 0 {
 		n := res.getExtensionRangeNode(md.ExtensionRange[0])
-		return ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: extension ranges are not allowed in proto3", scope)}
+		if err := res.errs.handleError(ErrorWithSourcePos{Pos: n.start(), Underlying: fmt.Errorf("%s: extension ranges are not allowed in proto3", scope)}); err != nil {
+			return err
+		}
 	}
 
 	if index, err := findOption(res, scope, md.Options.GetUninterpretedOption(), "map_entry"); err != nil {
-		return err
+		if err := res.errs.handleError(err); err != nil {
+			return err
+		}
 	} else if index >= 0 {
 		opt := md.Options.UninterpretedOption[index]
 		optn := res.getOptionNode(opt)
@@ -1607,14 +1222,19 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 		valid := false
 		if opt.IdentifierValue != nil {
 			if opt.GetIdentifierValue() == "true" {
-				return ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: map_entry option should not be set explicitly; use map type instead", scope)}
-			} else if opt.GetIdentifierValue() == "false" {
-				md.Options.MapEntry = proto.Bool(false)
 				valid = true
+				if err := res.errs.handleError(ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: map_entry option should not be set explicitly; use map type instead", scope)}); err != nil {
+					return err
+				}
+			} else if opt.GetIdentifierValue() == "false" {
+				valid = true
+				md.Options.MapEntry = proto.Bool(false)
 			}
 		}
 		if !valid {
-			return ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for map_entry option", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: optn.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for map_entry option", scope)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1628,7 +1248,9 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	sort.Sort(rsvd)
 	for i := 1; i < len(rsvd); i++ {
 		if rsvd[i].start < rsvd[i-1].end {
-			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1641,7 +1263,9 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	sort.Sort(exts)
 	for i := 1; i < len(exts); i++ {
 		if exts[i].start < exts[i-1].end {
-			return ErrorWithSourcePos{Pos: exts[i].node.start(), Underlying: fmt.Errorf("%s: extension ranges overlap: %d to %d and %d to %d", scope, exts[i-1].start, exts[i-1].end-1, exts[i].start, exts[i].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: exts[i].node.start(), Underlying: fmt.Errorf("%s: extension ranges overlap: %d to %d and %d to %d", scope, exts[i-1].start, exts[i-1].end-1, exts[i].start, exts[i].end-1)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1658,7 +1282,9 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 				pos = exts[j].node.start()
 			}
 			// ranges overlap
-			return ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf("%s: extension range %d to %d overlaps reserved range %d to %d", scope, exts[j].start, exts[j].end-1, rsvd[i].start, rsvd[i].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: pos, Underlying: fmt.Errorf("%s: extension range %d to %d overlaps reserved range %d to %d", scope, exts[j].start, exts[j].end-1, rsvd[i].start, rsvd[i].end-1)}); err != nil {
+				return err
+			}
 		}
 		if rsvd[i].start < exts[j].start {
 			i++
@@ -1677,21 +1303,29 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 	for _, fld := range md.Field {
 		fn := res.getFieldNode(fld)
 		if _, ok := rsvdNames[fld.GetName()]; ok {
-			return ErrorWithSourcePos{Pos: fn.fieldName().start(), Underlying: fmt.Errorf("%s: field %s is using a reserved name", scope, fld.GetName())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldName().start(), Underlying: fmt.Errorf("%s: field %s is using a reserved name", scope, fld.GetName())}); err != nil {
+				return err
+			}
 		}
 		if existing := fieldTags[fld.GetNumber()]; existing != "" {
-			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: fields %s and %s both have the same tag %d", scope, existing, fld.GetName(), fld.GetNumber())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: fields %s and %s both have the same tag %d", scope, existing, fld.GetName(), fld.GetNumber())}); err != nil {
+				return err
+			}
 		}
 		fieldTags[fld.GetNumber()] = fld.GetName()
 		// check reserved ranges
 		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end > fld.GetNumber() })
 		if r < len(rsvd) && rsvd[r].start <= fld.GetNumber() {
-			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in reserved range %d to %d", scope, fld.GetName(), fld.GetNumber(), rsvd[r].start, rsvd[r].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in reserved range %d to %d", scope, fld.GetName(), fld.GetNumber(), rsvd[r].start, rsvd[r].end-1)}); err != nil {
+				return err
+			}
 		}
 		// and check extension ranges
 		e := sort.Search(len(exts), func(index int) bool { return exts[index].end > fld.GetNumber() })
 		if e < len(exts) && exts[e].start <= fld.GetNumber() {
-			return ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in extension range %d to %d", scope, fld.GetName(), fld.GetNumber(), exts[e].start, exts[e].end-1)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: fn.fieldTag().start(), Underlying: fmt.Errorf("%s: field %s is using tag %d which is in extension range %d to %d", scope, fld.GetName(), fld.GetNumber(), exts[e].start, exts[e].end-1)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1701,39 +1335,46 @@ func validateMessage(res *parseResult, isProto3 bool, prefix string, md *dpb.Des
 func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDescriptorProto) error {
 	scope := fmt.Sprintf("enum %s%s", prefix, ed.GetName())
 
+	allowAlias := false
 	if index, err := findOption(res, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
-		return err
+		if err := res.errs.handleError(err); err != nil {
+			return err
+		}
 	} else if index >= 0 {
 		opt := ed.Options.UninterpretedOption[index]
-		ed.Options.UninterpretedOption = removeOption(ed.Options.UninterpretedOption, index)
 		valid := false
 		if opt.IdentifierValue != nil {
 			if opt.GetIdentifierValue() == "true" {
-				ed.Options.AllowAlias = proto.Bool(true)
+				allowAlias = true
 				valid = true
 			} else if opt.GetIdentifierValue() == "false" {
-				ed.Options.AllowAlias = proto.Bool(false)
 				valid = true
 			}
 		}
 		if !valid {
 			optNode := res.getOptionNode(opt)
-			return ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for allow_alias option", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: optNode.getValue().start(), Underlying: fmt.Errorf("%s: expecting bool value for allow_alias option", scope)}); err != nil {
+				return err
+			}
 		}
 	}
 
 	if isProto3 && ed.Value[0].GetNumber() != 0 {
 		evNode := res.getEnumValueNode(ed.Value[0])
-		return ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}
+		if err := res.errs.handleError(ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: proto3 requires that first value in enum have numeric value of 0", scope)}); err != nil {
+			return err
+		}
 	}
 
-	if !ed.Options.GetAllowAlias() {
+	if !allowAlias {
 		// make sure all value numbers are distinct
 		vals := map[int32]string{}
 		for _, evd := range ed.Value {
 			if existing := vals[evd.GetNumber()]; existing != "" {
 				evNode := res.getEnumValueNode(evd)
-				return ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber())}
+				if err := res.errs.handleError(ErrorWithSourcePos{Pos: evNode.getNumber().start(), Underlying: fmt.Errorf("%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber())}); err != nil {
+					return err
+				}
 			}
 			vals[evd.GetNumber()] = evd.GetName()
 		}
@@ -1748,7 +1389,9 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 	sort.Sort(rsvd)
 	for i := 1; i < len(rsvd); i++ {
 		if rsvd[i].start <= rsvd[i-1].end {
-			return ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end, rsvd[i].start, rsvd[i].end)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: rsvd[i].node.start(), Underlying: fmt.Errorf("%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end, rsvd[i].start, rsvd[i].end)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1761,12 +1404,16 @@ func validateEnum(res *parseResult, isProto3 bool, prefix string, ed *dpb.EnumDe
 	for _, ev := range ed.Value {
 		evn := res.getEnumValueNode(ev)
 		if _, ok := rsvdNames[ev.GetName()]; ok {
-			return ErrorWithSourcePos{Pos: evn.getName().start(), Underlying: fmt.Errorf("%s: value %s is using a reserved name", scope, ev.GetName())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: evn.getName().start(), Underlying: fmt.Errorf("%s: value %s is using a reserved name", scope, ev.GetName())}); err != nil {
+				return err
+			}
 		}
 		// check reserved ranges
 		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end >= ev.GetNumber() })
 		if r < len(rsvd) && rsvd[r].start <= ev.GetNumber() {
-			return ErrorWithSourcePos{Pos: evn.getNumber().start(), Underlying: fmt.Errorf("%s: value %s is using number %d which is in reserved range %d to %d", scope, ev.GetName(), ev.GetNumber(), rsvd[r].start, rsvd[r].end)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: evn.getNumber().start(), Underlying: fmt.Errorf("%s: value %s is using number %d which is in reserved range %d to %d", scope, ev.GetName(), ev.GetNumber(), rsvd[r].start, rsvd[r].end)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1780,23 +1427,34 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 	if isProto3 {
 		if fld.GetType() == dpb.FieldDescriptorProto_TYPE_GROUP {
 			n := node.(*groupNode)
-			return ErrorWithSourcePos{Pos: n.groupKeyword.start(), Underlying: fmt.Errorf("%s: groups are not allowed in proto3", scope)}
-		}
-		if fld.Label != nil && fld.GetLabel() != dpb.FieldDescriptorProto_LABEL_REPEATED {
-			return ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: field has label %v, but proto3 should omit labels other than 'repeated'", scope, fld.GetLabel())}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: n.groupKeyword.start(), Underlying: fmt.Errorf("%s: groups are not allowed in proto3", scope)}); err != nil {
+				return err
+			}
+		} else if fld.Label != nil && fld.GetLabel() != dpb.FieldDescriptorProto_LABEL_REPEATED {
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: field has label %v, but proto3 must omit labels other than 'repeated'", scope, fld.GetLabel())}); err != nil {
+				return err
+			}
 		}
 		if index, err := findOption(res, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
-			return err
+			if err := res.errs.handleError(err); err != nil {
+				return err
+			}
 		} else if index >= 0 {
 			optNode := res.getOptionNode(fld.Options.GetUninterpretedOption()[index])
-			return ErrorWithSourcePos{Pos: optNode.getName().start(), Underlying: fmt.Errorf("%s: default values are not allowed in proto3", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: optNode.getName().start(), Underlying: fmt.Errorf("%s: default values are not allowed in proto3", scope)}); err != nil {
+				return err
+			}
 		}
 	} else {
 		if fld.Label == nil && fld.OneofIndex == nil {
-			return ErrorWithSourcePos{Pos: node.fieldName().start(), Underlying: fmt.Errorf("%s: field has no label, but proto2 must indicate 'optional' or 'required'", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: node.fieldName().start(), Underlying: fmt.Errorf("%s: field has no label, but proto2 must indicate 'optional' or 'required'", scope)}); err != nil {
+				return err
+			}
 		}
 		if fld.GetExtendee() != "" && fld.Label != nil && fld.GetLabel() == dpb.FieldDescriptorProto_LABEL_REQUIRED {
-			return ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: extension fields cannot be 'required'", scope)}
+			if err := res.errs.handleError(ErrorWithSourcePos{Pos: node.fieldLabel().start(), Underlying: fmt.Errorf("%s: extension fields cannot be 'required'", scope)}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -1804,6 +1462,7 @@ func validateField(res *parseResult, isProto3 bool, prefix string, fld *dpb.Fiel
 	if fld.Label == nil {
 		fld.Label = dpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
 	}
+
 	return nil
 }
 

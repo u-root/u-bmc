@@ -12,11 +12,9 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var (
-	// errInvalidFamilyVersion is returned when a family's version is greater
-	// than an 8-bit integer.
-	errInvalidFamilyVersion = errors.New("invalid family version attribute")
-)
+// errInvalidFamilyVersion is returned when a family's version is greater
+// than an 8-bit integer.
+var errInvalidFamilyVersion = errors.New("invalid family version attribute")
 
 // getFamily retrieves a generic netlink family with the specified name.
 func (c *Conn) getFamily(name string) (Family, error) {

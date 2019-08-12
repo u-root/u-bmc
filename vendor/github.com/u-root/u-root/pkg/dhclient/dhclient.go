@@ -1,4 +1,4 @@
-// Copyright 2017-2018 the u-root Authors. All rights reserved
+// Copyright 2017-2019 the u-root Authors. All rights reserved
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -9,12 +9,14 @@ package dhclient
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,9 +25,28 @@ import (
 	"github.com/insomniacslk/dhcp/dhcpv6"
 	"github.com/insomniacslk/dhcp/dhcpv6/nclient6"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 const linkUpAttempt = 30 * time.Second
+
+// isIpv6LinkReady returns true iff the interface has a link-local address
+// which is not tentative.
+func isIpv6LinkReady(l netlink.Link) (bool, error) {
+	addrs, err := netlink.AddrList(l, netlink.FAMILY_V6)
+	if err != nil {
+		return false, err
+	}
+	for _, addr := range addrs {
+		if addr.IP.IsLinkLocalUnicast() && (addr.Flags&unix.IFA_F_TENTATIVE == 0) {
+			if addr.Flags&unix.IFA_F_DADFAILED != 0 {
+				log.Printf("DADFAILED for %v, continuing anyhow", addr.IP)
+			}
+			return true, nil
+		}
+	}
+	return false, nil
+}
 
 // IfUp ensures the given network interface is up and returns the link object.
 func IfUp(ifname string) (netlink.Link, error) {
@@ -75,6 +96,11 @@ func Configure6(iface netlink.Link, packet *dhcpv6.Message) error {
 		},
 		PreferedLft: int(l.PreferredLifetime),
 		ValidLft:    int(l.ValidLifetime),
+		// Optimistic DAD (Duplicate Address Detection) means we can
+		// use the address before DAD is complete. The DHCP server's
+		// job was to give us a unique IP so there is little risk of a
+		// collision.
+		Flags: unix.IFA_F_OPTIMISTIC,
 	}
 	if err := netlink.AddrReplace(iface, dst); err != nil {
 		if os.IsExist(err) {
@@ -83,39 +109,92 @@ func Configure6(iface netlink.Link, packet *dhcpv6.Message) error {
 	}
 
 	if ips := p.DNS(); ips != nil {
-		if err := WriteDNSSettings(ips); err != nil {
+		if err := WriteDNSSettings(ips, nil, ""); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// WriteDNSSettings writes the given IPs as nameservers to resolv.conf.
-func WriteDNSSettings(ips []net.IP) error {
+// WriteDNSSettings writes the given nameservers, search list, and domain to resolv.conf.
+func WriteDNSSettings(ns []net.IP, sl []string, domain string) error {
 	rc := &bytes.Buffer{}
-	for _, ip := range ips {
-		rc.WriteString(fmt.Sprintf("nameserver %s\n", ip))
+	if domain != "" {
+		rc.WriteString(fmt.Sprintf("domain %s\n", domain))
+	}
+	if ns != nil {
+		for _, ip := range ns {
+			rc.WriteString(fmt.Sprintf("nameserver %s\n", ip))
+		}
+	}
+	if sl != nil {
+		rc.WriteString("search ")
+		rc.WriteString(strings.Join(sl, " "))
+		rc.WriteString("\n")
 	}
 	return ioutil.WriteFile("/etc/resolv.conf", rc.Bytes(), 0644)
 }
 
+// Lease is a network configuration obtained by DHCP.
 type Lease interface {
 	fmt.Stringer
+
+	// Configure configures the associated interface with the network
+	// configuration.
 	Configure() error
+
+	// Boot is a URL to obtain booting information from that was part of
+	// the network config.
 	Boot() (*url.URL, error)
+
+	// Link is the interface the configuration is for.
 	Link() netlink.Link
 }
 
-func lease4(ctx context.Context, iface netlink.Link, timeout time.Duration, retries int) (Lease, error) {
-	client, err := nclient4.New(iface.Attrs().Name,
-		nclient4.WithTimeout(timeout),
-		nclient4.WithRetry(retries))
+// LogLevel is the amount of information to log.
+type LogLevel uint8
+
+// LogLevel are the levels.
+const (
+	LogInfo    LogLevel = 0
+	LogSummary LogLevel = 1
+	LogDebug   LogLevel = 2
+)
+
+// Config is a DHCP client configuration.
+type Config struct {
+	// Timeout is the timeout for one DHCP request attempt.
+	Timeout time.Duration
+
+	// Retries is how many times to retry DHCP attempts.
+	Retries int
+
+	// LogLevel determines the amount of information printed for each
+	// attempt. The highest log level should print each entire packet sent
+	// and received.
+	LogLevel LogLevel
+}
+
+func lease4(ctx context.Context, iface netlink.Link, c Config) (Lease, error) {
+	mods := []nclient4.ClientOpt{
+		nclient4.WithTimeout(c.Timeout),
+		nclient4.WithRetry(c.Retries),
+	}
+	switch c.LogLevel {
+	case LogSummary:
+		mods = append(mods, nclient4.WithSummaryLogger())
+	case LogDebug:
+		mods = append(mods, nclient4.WithDebugLogger())
+	}
+	client, err := nclient4.New(iface.Attrs().Name, mods...)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Printf("Attempting to get DHCPv4 lease on %s", iface.Attrs().Name)
-	_, p, err := client.Request(ctx, dhcpv4.WithNetboot)
+	_, p, err := client.Request(ctx, dhcpv4.WithNetboot,
+		dhcpv4.WithOption(dhcpv4.OptClassIdentifier("PXE UROOT")),
+		dhcpv4.WithRequestedOptions(dhcpv4.OptionSubnetMask))
 	if err != nil {
 		return nil, err
 	}
@@ -125,10 +204,27 @@ func lease4(ctx context.Context, iface netlink.Link, timeout time.Duration, retr
 	return packet, nil
 }
 
-func lease6(ctx context.Context, iface netlink.Link, timeout time.Duration, retries int) (Lease, error) {
+func lease6(ctx context.Context, iface netlink.Link, c Config) (Lease, error) {
+	// For ipv6, we cannot bind to the port until Duplicate Address
+	// Detection (DAD) is complete which is indicated by the link being no
+	// longer marked as "tentative". This usually takes about a second.
+	for {
+		if ready, err := isIpv6LinkReady(iface); err != nil {
+			return nil, err
+		} else if ready {
+			break
+		}
+		select {
+		case <-time.After(100 * time.Millisecond):
+			continue
+		case <-ctx.Done():
+			return nil, errors.New("timeout after waiting for a non-tentative IPv6 address")
+		}
+	}
+
 	client, err := nclient6.New(iface.Attrs().Name,
-		nclient6.WithTimeout(timeout),
-		nclient6.WithRetry(retries))
+		nclient6.WithTimeout(c.Timeout),
+		nclient6.WithRetry(c.Retries))
 	if err != nil {
 		return nil, err
 	}
@@ -144,13 +240,27 @@ func lease6(ctx context.Context, iface netlink.Link, timeout time.Duration, retr
 	return packet, nil
 }
 
+// Result is the result of a particular DHCP attempt.
 type Result struct {
+	// Interface is the network interface the attempt was sent on.
 	Interface netlink.Link
-	Lease     Lease
-	Err       error
+
+	// Lease is the DHCP configuration returned.
+	//
+	// If Lease is set, Err is nil.
+	Lease Lease
+
+	// Err is an error that occured during the DHCP attempt.
+	Err error
 }
 
-func SendRequests(ctx context.Context, ifs []netlink.Link, timeout time.Duration, retries int, ipv4, ipv6 bool) chan *Result {
+// SendRequests coordinates soliciting DHCP configuration on all ifs.
+//
+// ipv4 and ipv6 determine whether to send DHCPv4 and DHCPv6 requests,
+// respectively.
+//
+// The *Result channel will be closed when all requests have completed.
+func SendRequests(ctx context.Context, ifs []netlink.Link, ipv4, ipv6 bool, c Config) chan *Result {
 	// Yeah, this is a hack, until we can cancel all leases in progress.
 	r := make(chan *Result, 3*len(ifs))
 
@@ -170,7 +280,7 @@ func SendRequests(ctx context.Context, ifs []netlink.Link, timeout time.Duration
 				wg.Add(1)
 				go func(iface netlink.Link) {
 					defer wg.Done()
-					lease, err := lease4(ctx, iface, timeout, retries)
+					lease, err := lease4(ctx, iface, c)
 					r <- &Result{iface, lease, err}
 				}(iface)
 			}
@@ -179,7 +289,7 @@ func SendRequests(ctx context.Context, ifs []netlink.Link, timeout time.Duration
 				wg.Add(1)
 				go func(iface netlink.Link) {
 					defer wg.Done()
-					lease, err := lease6(ctx, iface, timeout, retries)
+					lease, err := lease6(ctx, iface, c)
 					r <- &Result{iface, lease, err}
 				}(iface)
 			}

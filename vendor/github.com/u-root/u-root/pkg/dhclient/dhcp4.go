@@ -5,9 +5,11 @@
 package dhclient
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/vishvananda/netlink"
@@ -19,6 +21,8 @@ type Packet4 struct {
 	P     *dhcpv4.DHCPv4
 }
 
+var _ Lease = &Packet4{}
+
 // NewPacket4 wraps a DHCPv4 packet with some convenience methods.
 func NewPacket4(iface netlink.Link, p *dhcpv4.DHCPv4) *Packet4 {
 	return &Packet4{
@@ -27,8 +31,24 @@ func NewPacket4(iface netlink.Link, p *dhcpv4.DHCPv4) *Packet4 {
 	}
 }
 
+// Link is a netlink link
 func (p *Packet4) Link() netlink.Link {
 	return p.iface
+}
+
+// GatherDNSSettings gets the DNS related infromation from a dhcp packet
+// including, nameservers, domain, and search options
+func (p *Packet4) GatherDNSSettings() (ns []net.IP, sl []string, dom string) {
+	if nameservers := p.P.DNS(); nameservers != nil {
+		ns = nameservers
+	}
+	if searchList := p.P.DomainSearch(); searchList != nil {
+		sl = searchList.Labels
+	}
+	if domain := p.P.DomainName(); domain != "" {
+		dom = domain
+	}
+	return
 }
 
 // Configure configures interface using this packet.
@@ -75,11 +95,11 @@ func (p *Packet4) Configure() error {
 		}
 	}
 
-	if ips := p.P.DNS(); ips != nil {
-		if err := WriteDNSSettings(ips); err != nil {
-			return err
-		}
+	nameServers, searchList, domain := p.GatherDNSSettings()
+	if err := WriteDNSSettings(nameServers, searchList, domain); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -102,14 +122,27 @@ func (p *Packet4) Lease() *net.IPNet {
 	}
 }
 
+var (
+	// ErrNoBootFile represents that no pxe boot file was found.
+	ErrNoBootFile = errors.New("no boot file name present in DHCP message")
+	// ErrNoServerHostName represents that no pxe boot server was found.
+	ErrNoServerHostName = errors.New("no server host name present in DHCP message")
+)
+
 // Boot returns the boot file assigned.
 func (p *Packet4) Boot() (*url.URL, error) {
-	// TODO: This is not 100% right -- if a certain option is set, this
-	// stuff is encoded in options instead of in the packet's BootFile and
-	// ServerName fields.
+	// Look for dhcp option presence first, then legacy BootFileName in header.
+	bootFileName := p.P.BootFileNameOption()
+	bootFileName = strings.TrimRight(bootFileName, "\x00")
+	if bootFileName == "" {
+		if len(p.P.BootFileName) == 0 {
+			return nil, ErrNoBootFile
+		}
+		bootFileName = p.P.BootFileName
+	}
 
 	// While the default is tftp, servers may specify HTTP or FTP URIs.
-	u, err := url.Parse(p.P.BootFileName)
+	u, err := url.Parse(bootFileName)
 	if err != nil {
 		return nil, err
 	}
@@ -117,13 +150,16 @@ func (p *Packet4) Boot() (*url.URL, error) {
 	if len(u.Scheme) == 0 {
 		// Defaults to tftp is not specified.
 		u.Scheme = "tftp"
-		u.Path = p.P.BootFileName
+		u.Path = bootFileName
 		if len(p.P.ServerHostName) == 0 {
 			server := p.P.ServerIdentifier()
-			if server == nil {
-				return nil, err
+			if server != nil {
+				u.Host = server.String()
+			} else if !p.P.ServerIPAddr.Equal(net.IPv4zero) {
+				u.Host = p.P.ServerIPAddr.String()
+			} else {
+				return nil, ErrNoServerHostName
 			}
-			u.Host = server.String()
 		} else {
 			u.Host = p.P.ServerHostName
 		}
