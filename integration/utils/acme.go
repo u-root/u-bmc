@@ -47,11 +47,11 @@ func NewTestCA() *CAServer {
 
 	logger := log.New(os.Stdout, "Pebble ", log.LstdFlags)
 	db := db.NewMemoryStore()
-	ca := ca.New(logger, db)
+	ca := ca.New(logger, db, "", 0)
 
 	// Enable strict mode to test upcoming API breaking changes
 	strictMode := true
-	va := va.New(logger, 80, 443, strictMode)
+	va := va.New(logger, 80, 443, strictMode, "")
 	wfeImpl := wfe.New(logger, db, va, ca, strictMode)
 	muxHandler := wfeImpl.Handler()
 

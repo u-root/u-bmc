@@ -21,12 +21,20 @@ func (d FlashDevice) Cmdline() []string {
 	return []string{"-drive", "file=" + d.Image + ",format=raw,if=mtd"}
 }
 
+func (d FlashDevice) KArgs() []string {
+	return nil
+}
+
 type MemoryDevice struct {
 	MB int
 }
 
 func (d MemoryDevice) Cmdline() []string {
 	return []string{"-m", fmt.Sprintf("%d", d.MB)}
+}
+
+func (d MemoryDevice) KArgs() []string {
+	return nil
 }
 
 type MachineDevice struct {
@@ -37,6 +45,10 @@ func (d MachineDevice) Cmdline() []string {
 	return []string{"-M", d.Board}
 }
 
+func (d MachineDevice) KArgs() []string {
+	return nil
+}
+
 type QemuMonitorDevice struct {
 	Socket string
 }
@@ -45,11 +57,19 @@ func (d QemuMonitorDevice) Cmdline() []string {
 	return []string{"-qmp", "unix:" + d.Socket + ",server,nowait"}
 }
 
+func (d QemuMonitorDevice) KArgs() []string {
+	return nil
+}
+
 type VirtioRngDevice struct {
 }
 
 func (d VirtioRngDevice) Cmdline() []string {
 	return []string{"-device", "virtio-rng-pci"}
+}
+
+func (d VirtioRngDevice) KArgs() []string {
+	return nil
 }
 
 type QOMInteger struct {
