@@ -1,4 +1,4 @@
-From 8e1e26bea9161c4c394665d89318cf3b5854a6ac Mon Sep 17 00:00:00 2001
+From 44d257196561a01bdcd6c2f078c08f8776b40184 Mon Sep 17 00:00:00 2001
 From: Christian Svensson <bluecmd@google.com>
 Date: Sat, 3 Nov 2018 22:50:04 +0100
 Subject: [PATCH 2/4] Disable Global Multicast Filtering
@@ -12,10 +12,10 @@ Signed-off-by: Christian Svensson <bluecmd@google.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index 96a3018ee363..b6afd7fb0b20 100644
+index 29de5e6b1960..b9d6f2871216 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -1040,7 +1040,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
+@@ -1036,7 +1036,7 @@ static void ncsi_configure_channel(struct ncsi_dev_priv *ndp)
  				nd->state = ncsi_dev_state_config_ecnt;
  			else
  				nd->state = ncsi_dev_state_config_ec;
@@ -24,7 +24,7 @@ index 96a3018ee363..b6afd7fb0b20 100644
  			if (ndp->inet6_addr_num > 0 &&
  			    (nc->caps[NCSI_CAP_GENERIC].cap &
  			     NCSI_CAP_GENERIC_MC))
-@@ -1507,7 +1507,7 @@ static int ncsi_inet6addr_event(struct notifier_block *this,
+@@ -1503,7 +1503,7 @@ static int ncsi_inet6addr_event(struct notifier_block *this,
  	switch (event) {
  	case NETDEV_UP:
  		action = (++ndp->inet6_addr_num) == 1;
@@ -34,5 +34,5 @@ index 96a3018ee363..b6afd7fb0b20 100644
  	case NETDEV_DOWN:
  		action = (--ndp->inet6_addr_num == 0);
 -- 
-2.21.0.392.gf8f6787159e-goog
+2.23.0.187.g17f5b7556c-goog
 

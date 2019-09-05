@@ -1,40 +1,29 @@
-From 3f3b0bd5ade387c36c4a010abe06c1c3372c136b Mon Sep 17 00:00:00 2001
+From 740de0213c5af364612c657c556b4b3aa99dc7d5 Mon Sep 17 00:00:00 2001
 From: Christian Svensson <bluecmd@google.com>
-Date: Sat, 10 Nov 2018 18:35:08 +0100
-Subject: [PATCH 3/4] arch: define aspeed SOC IO mapping
+Date: Thu, 5 Sep 2019 13:53:46 -0700
+Subject: [PATCH 4/4] arch: define aspeed SOC IO mapping
 
 Without this IO mapping early printk will simply not work after the
 paging and MMU has been setup.
 
 Signed-off-by: Christian Svensson <bluecmd@google.com>
 ---
- arch/arm/Makefile                 |  1 +
- arch/arm/mach-aspeed/Makefile     |  1 +
+ arch/arm/mach-aspeed/Makefile     |  2 ++
  arch/arm/mach-aspeed/aspeed_soc.c | 47 +++++++++++++++++++++++++++++++
  arch/arm/mach-aspeed/iomap.h      | 17 +++++++++++
- 4 files changed, 66 insertions(+)
- create mode 100644 arch/arm/mach-aspeed/Makefile
+ 3 files changed, 66 insertions(+)
  create mode 100644 arch/arm/mach-aspeed/aspeed_soc.c
  create mode 100644 arch/arm/mach-aspeed/iomap.h
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 9db3c584b2cb..6a6df0f1344a 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -156,6 +156,7 @@ textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- machine-$(CONFIG_ARCH_ACTIONS)		+= actions
- machine-$(CONFIG_ARCH_ALPINE)		+= alpine
- machine-$(CONFIG_ARCH_ARTPEC)		+= artpec
-+machine-$(CONFIG_ARCH_ASPEED)		+= aspeed
- machine-$(CONFIG_ARCH_AT91)		+= at91
- machine-$(CONFIG_ARCH_AXXIA)		+= axxia
- machine-$(CONFIG_ARCH_BCM)		+= bcm
 diff --git a/arch/arm/mach-aspeed/Makefile b/arch/arm/mach-aspeed/Makefile
-new file mode 100644
-index 000000000000..426952d47cc3
---- /dev/null
+index 1951b3317a76..4d6fa9c77136 100644
+--- a/arch/arm/mach-aspeed/Makefile
 +++ b/arch/arm/mach-aspeed/Makefile
-@@ -0,0 +1 @@
+@@ -3,3 +3,5 @@
+ # Copyright IBM Corp.
+ 
+ obj-$(CONFIG_SMP) += platsmp.o
++
 +obj-y := aspeed_soc.o
 diff --git a/arch/arm/mach-aspeed/aspeed_soc.c b/arch/arm/mach-aspeed/aspeed_soc.c
 new file mode 100644
@@ -113,5 +102,5 @@ index 000000000000..7ea5276f3892
 +#define AST_IO_VIRT 0xfe600000
 +#define AST_IO_SIZE 0x00200000
 -- 
-2.21.0.392.gf8f6787159e-goog
+2.23.0.187.g17f5b7556c-goog
 
