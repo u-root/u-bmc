@@ -44,19 +44,6 @@ jobs:
           name: Install ineffassign
           command: go get github.com/gordonklaus/ineffassign
       - run:
-          name: Check vendored dependencies
-          command: |
-            ./dep version
-            ./dep status
-            ./dep ensure -vendor-only
-            git status
-            if [[ -n "$(git status --porcelain vendor)" ]]; then
-              echo 'vendor/ is out-of-date: run `dep ensure -vendor-only` and then check in the changes'
-              echo 'If `dep ensure` results in no changes, make sure you are using the latest relase of dep'
-              git status --porcelain vendor
-              exit 1
-            fi
-      - run:
           name: Create test key
           command: |
             ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
@@ -64,7 +51,9 @@ jobs:
             go generate ./config/
       - run:
           name: vet
-          command: go vet $(go list ./... | grep -v /vendor/)
+          command: |
+            make get
+            go vet $(go list ./... | grep -v /vendor/)
       - run:
           name: gofmt
           command: test -z "$(gofmt -s -l $(go list ./... | grep -v /vendor/ | cut -f 4- -d '/'))"
@@ -87,7 +76,9 @@ jobs:
             go generate ./config/
       - run:
           name: Test all
-          command: make test
+          command: |
+            make get
+            make test
       - run:
           name: Test coverage
           command: make test TESTFLAGS=-cover
@@ -107,7 +98,9 @@ jobs:
             go generate ./config/
       - run:
           name: Race detector
-          command: make test TESTFLAGS=-race
+          command: |
+            make get
+            make test TESTFLAGS=-race
   compile:
     docker:
       - image: circleci/golang:1.12
@@ -125,6 +118,7 @@ jobs:
       - run:
           name: build all commands
           command: |
+            make get
             cd cmd
             go install -a ./...
             cd ../
@@ -173,12 +167,11 @@ jobs:
             rm -rf linux/
             mv linux-dev-5.0/ linux/
             (cd linux/; ../linux-patches/apply.sh)
-            # TODO(bluecmd): https://github.com/u-root/u-root/issues/1024
-            go get github.com/u-root/u-root
       - run:
           name: Build image
           command: |
             go generate ./config/
+            make get
             make
       - store_artifacts:
           path: flash.img

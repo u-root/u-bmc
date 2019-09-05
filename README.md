@@ -70,8 +70,7 @@ Clone:
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
 (cd linux/; ../linux-patches/apply.sh)
-# Until https://github.com/u-root/u-root/issues/1024 is fixed
-go get github.com/u-root/u-root
+make get
 ```
 
 Setup:
@@ -174,19 +173,6 @@ mv /bb.sig /bbin/bb.sig
 gpgv /etc/u-bmc.pub /bbin/bb.sig /bbin/bb
 sync
 shutdown -r
-```
-
-## Updating Dependencies
-
-Latest released version of dep is required. One easy way, but not that secure,
-is to install it using their installation script.
-
-```
-wget https://raw.githubusercontent.com/golang/dep/master/install.sh
-# Verify that it looks sane
-cat install.sh
-sh install.sh
-dep ensure
 ```
 
 # Contributions

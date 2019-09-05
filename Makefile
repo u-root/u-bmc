@@ -243,6 +243,10 @@ test:
 	go test $(TESTFLAGS) \
 		$(shell find */ -name \*.go | grep -v vendor | cut -f -1 -d '/' | sort -u | xargs -n1 -I{} echo ./{}/... | xargs)
 
+get:
+	go get -t $(GETFLAGS) \
+		$(shell find */ -name \*.go | grep -v vendor | cut -f -1 -d '/' | sort -u | xargs -n1 -I{} echo ./{}/... | xargs)
+
 vars:
 	$(foreach var,$(.VARIABLES),$(info $(var)=$($(var))))
 
