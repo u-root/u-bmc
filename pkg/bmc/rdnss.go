@@ -63,7 +63,7 @@ func rdnss(c chan<- *RDNSSOption) {
 	}
 	defer s.Close()
 	for {
-		msgs, err := s.Receive()
+		msgs, _, err := s.Receive()
 		if err != nil {
 			log.Printf("netlink error on rdnss loop: %v", err)
 			return

@@ -40,7 +40,7 @@ func TestACME(t *testing.T) {
 	cert := genCert()
 	logger := Logger(t, "Pebble")
 	db := db.NewMemoryStore()
-	ca := ca.New(logger, db)
+	ca := ca.New(logger, db, "", 0)
 
 	// Responding to challenges is tested in the integration test
 	os.Setenv("PEBBLE_VA_ALWAYS_VALID", "1")
@@ -48,7 +48,7 @@ func TestACME(t *testing.T) {
 
 	// Enable strict mode to test upcoming API breaking changes
 	strictMode := true
-	va := va.New(logger, 80, 443, strictMode)
+	va := va.New(logger, 80, 443, strictMode, "")
 	wfeImpl := wfe.New(logger, db, va, ca, strictMode)
 	muxHandler := wfeImpl.Handler()
 

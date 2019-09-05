@@ -14,12 +14,11 @@ import (
 	"testing"
 	"time"
 
-	urootint "github.com/u-root/u-root/integration"
 	"github.com/u-root/u-root/pkg/golang"
 	"github.com/u-root/u-root/pkg/qemu"
 	"github.com/u-root/u-root/pkg/uroot"
-	"github.com/u-root/u-root/pkg/uroot/builder"
 	"github.com/u-root/u-root/pkg/uroot/initramfs"
+	"github.com/u-root/u-root/pkg/vmtest"
 )
 
 const (
@@ -33,7 +32,7 @@ func init() {
 	qemu.DefaultTimeout = 60 * time.Second
 }
 
-type Options urootint.Options
+type Options vmtest.Options
 
 func BMCTest(t *testing.T, o *Options) (*TestVM, func()) {
 	if _, ok := os.LookupEnv("UBMC_QEMU"); !ok {
@@ -50,12 +49,10 @@ func BMCTest(t *testing.T, o *Options) (*TestVM, func()) {
 	}
 
 	// Env
-	if o.Env == nil {
-		env := golang.Default()
-		env.CgoEnabled = false
-		env.GOARCH = "arm"
-		o.Env = &env
-	}
+	env := golang.Default()
+	env.CgoEnabled = false
+	env.GOARCH = "arm"
+	o.BuildOpts.Env = env
 
 	_ = buildInitramfs(t, tmpDir, o)
 	flash := buildFlash(t, tmpDir, o)
@@ -69,6 +66,9 @@ func BMCTest(t *testing.T, o *Options) (*TestVM, func()) {
 			FlashDevice{flash},
 			QemuMonitorDevice{monsock},
 		},
+	}
+	if o.QEMUOpts.Devices != nil {
+		q.Devices = append(q.Devices, o.QEMUOpts.Devices...)
 	}
 	vm, vmCleanup := qemuTest(t, q, o)
 	cleanup := func() {
@@ -110,11 +110,9 @@ func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 	}
 
 	// Env
-	if o.Env == nil {
-		env := golang.Default()
-		env.CgoEnabled = false
-		o.Env = &env
-	}
+	env := golang.Default()
+	env.CgoEnabled = false
+	o.BuildOpts.Env = env
 
 	i := buildInitramfs(t, tmpDir, o)
 	q := &qemu.Options{
@@ -124,6 +122,9 @@ func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 		Devices: []qemu.Device{
 			VirtioRngDevice{},
 		},
+	}
+	if o.QEMUOpts.Devices != nil {
+		q.Devices = append(q.Devices, o.QEMUOpts.Devices...)
 	}
 	vm, vmCleanup := qemuTest(t, q, o)
 
@@ -143,19 +144,13 @@ func buildInitramfs(t *testing.T, tmpDir string, o *Options) string {
 	}
 
 	// Build u-root
-	opts := uroot.Opts{
-		Env: *o.Env,
-		Commands: []uroot.Commands{
-			{
-				Builder:  builder.BusyBox,
-				Packages: o.Cmds,
-			},
-		},
-		TempDir:     tmpDir,
-		BaseArchive: uroot.DefaultRamfs.Reader(),
-		OutputFile:  w,
-		InitCmd:     "init",
-	}
+	opts := o.BuildOpts
+	opts.Env = o.BuildOpts.Env
+	opts.TempDir = tmpDir
+	opts.BaseArchive = uroot.DefaultRamfs.Reader()
+	opts.OutputFile = w
+	opts.InitCmd = "init"
+
 	if err := uroot.CreateInitramfs(logger, opts); err != nil {
 		t.Fatal(err)
 	}
@@ -173,11 +168,6 @@ func qemuTest(t *testing.T, q *qemu.Options, o *Options) (*qemu.VM, func()) {
 	}
 
 	q.SerialOutput = logFile
-	if q.Devices != nil {
-		q.Devices = append(q.Devices, o.Network)
-	} else {
-		q.Devices = []qemu.Device{o.Network}
-	}
 
 	vm, err := q.Start()
 	if err != nil {

@@ -8,6 +8,8 @@ package integration
 
 import (
 	"testing"
+
+	"github.com/u-root/u-root/pkg/uroot"
 )
 
 func reportTemperature(t *testing.T, vm *TestVM, celcius int) {
@@ -30,9 +32,11 @@ func waitFor(t *testing.T, vm *TestVM, marker string) {
 func TestTempSensor(t *testing.T) {
 	bmc, bmccleanup := BMCTest(t, &Options{
 		Name: "TestTempSensor-BMC",
-		Cmds: []string{
-			"github.com/u-root/u-root/cmds/core/init",
-			"github.com/u-root/u-bmc/integration/testcmd/tempsensor/uinit",
+		BuildOpts: uroot.Opts{
+			Commands: uroot.BusyBoxCmds(
+				"github.com/u-root/u-root/cmds/core/init",
+				"github.com/u-root/u-bmc/integration/testcmd/tempsensor/uinit",
+			),
 		},
 	})
 	defer bmccleanup()

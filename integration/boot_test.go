@@ -8,15 +8,19 @@ package integration
 
 import (
 	"testing"
+
+	"github.com/u-root/u-root/pkg/uroot"
 )
 
 // TestBoot boots an image and then shuts down
 func TestBoot(t *testing.T) {
 	bmc, bmccleanup := BMCTest(t, &Options{
 		Name: "TestBoot-BMC",
-		Cmds: []string{
-			"github.com/u-root/u-root/cmds/core/init",
-			"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
+		BuildOpts: uroot.Opts{
+			Commands: uroot.BusyBoxCmds(
+				"github.com/u-root/u-root/cmds/core/init",
+				"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
+			),
 		},
 	})
 	defer bmccleanup()
@@ -33,9 +37,11 @@ func TestVerifyFail(t *testing.T) {
 	// when calculating the hash for /init (which is symlinked to /bbin/bb).
 	bmc, bmccleanup := BMCTest(t, &Options{
 		Name: "TestVerifyFail-BMC",
-		Cmds: []string{
-			"github.com/u-root/u-root/cmds/core/init",
-			"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
+		BuildOpts: uroot.Opts{
+			Commands: uroot.BusyBoxCmds(
+				"github.com/u-root/u-root/cmds/core/init",
+				"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
+			),
 		},
 		ExtraBuildEnv: []string{"TEST_EXTRA_SIGN=/proc/uptime"},
 	})
