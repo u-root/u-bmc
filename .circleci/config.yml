@@ -161,11 +161,11 @@ jobs:
             # Since linux is huge and we're tracking a branch, submodules
             # take a long time and we cannot use depth. Fetch the latest zip
             # instead
-            wget https://github.com/openbmc/linux/archive/dev-5.0.zip
-            unzip dev-5.0.zip
-            rm dev-5.0.zip
+            wget https://github.com/openbmc/linux/archive/dev-5.2.zip
+            unzip dev-5.2.zip
+            rm dev-5.2.zip
             rm -rf linux/
-            mv linux-dev-5.0/ linux/
+            mv linux-dev-5.2/ linux/
             (cd linux/; ../linux-patches/apply.sh)
       - run:
           name: Build image

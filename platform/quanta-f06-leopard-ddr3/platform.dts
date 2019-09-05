@@ -200,10 +200,6 @@
 	flash = <&spi>;
 };
 
-&mbox {
-	status = "okay";
-};
-
 &rtc {
 	status = "okay";
 };
