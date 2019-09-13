@@ -1,8 +1,8 @@
 diff --git a/hw/arm/aspeed.c b/hw/arm/aspeed.c
-index 465e65f323..82cb981f3d 100644
+index c565569..132863d 100644
 --- a/hw/arm/aspeed.c
 +++ b/hw/arm/aspeed.c
-@@ -247,22 +247,18 @@ static void palmetto_bmc_i2c_init(AspeedBoardState *bmc)
+@@ -343,22 +343,18 @@ static void palmetto_bmc_i2c_init(AspeedBoardState *bmc)
  {
      AspeedSoCState *soc = &bmc->soc;
      DeviceState *dev;
@@ -35,54 +35,44 @@ index 465e65f323..82cb981f3d 100644
  
  static void ast2500_evb_i2c_init(AspeedBoardState *bmc)
 diff --git a/hw/arm/aspeed_soc.c b/hw/arm/aspeed_soc.c
-index 0f6e5be666..1348313037 100644
+index 93a247f..fc297d6 100644
 --- a/hw/arm/aspeed_soc.c
 +++ b/hw/arm/aspeed_soc.c
-@@ -23,6 +23,9 @@
- #include "net/net.h"
- 
- #define ASPEED_SOC_UART_1_BASE      0x00183000
-+#define ASPEED_SOC_UART_2_BASE      0x0018D000
-+#define ASPEED_SOC_UART_3_BASE      0x0018E000
-+#define ASPEED_SOC_UART_4_BASE      0x0018F000
- #define ASPEED_SOC_UART_5_BASE      0x00184000
- #define ASPEED_SOC_VUART_BASE       0x00187000
- #define ASPEED_SOC_IOMEM_SIZE       0x00200000
-@@ -311,12 +314,36 @@ static void aspeed_soc_realize(DeviceState *dev, Error **errp)
- 
-     /* UART1 */
-     if (serial_hd(2)) {
--        qemu_irq uart1 = qdev_get_gpio_in(DEVICE(&s->vic), 9);
-+        qemu_irq uart1 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[0]);
-         serial_mm_init(get_system_memory(),
-                        ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_1_BASE, 2,
+@@ -47,6 +47,9 @@ static const hwaddr aspeed_soc_ast2400_memmap[] = {
+     [ASPEED_ETH1]   = 0x1E660000,
+     [ASPEED_ETH2]   = 0x1E680000,
+     [ASPEED_UART1]  = 0x1E783000,
++    [ASPEED_UART2]  = 0x1E78D000,
++    [ASPEED_UART3]  = 0x1E78E000,
++    [ASPEED_UART4]  = 0x1E78F000,
+     [ASPEED_UART5]  = 0x1E784000,
+     [ASPEED_VUART]  = 0x1E787000,
+     [ASPEED_SDRAM]  = 0x40000000,
+@@ -544,6 +547,27 @@ static void aspeed_soc_realize(DeviceState *dev, Error **errp)
                         uart1, 38400, serial_hd(2), DEVICE_LITTLE_ENDIAN);
      }
  
 +    /* UART2 */
 +    if (serial_hd(3)) {
-+        qemu_irq uart2 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[1]);
-+        serial_mm_init(get_system_memory(),
-+                       ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_2_BASE, 2,
++        qemu_irq uart2 = aspeed_soc_get_irq(s, ASPEED_UART2);
++        serial_mm_init(get_system_memory(), sc->info->memmap[ASPEED_UART2], 2,
 +                       uart2, 38400, serial_hd(3), DEVICE_LITTLE_ENDIAN);
 +    }
 +
 +    /* UART3 */
 +    if (serial_hd(4)) {
-+        qemu_irq uart3 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[2]);
-+        serial_mm_init(get_system_memory(),
-+                       ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_3_BASE, 2,
-+                       uart3, 57600, serial_hd(4), DEVICE_LITTLE_ENDIAN);
++        qemu_irq uart3 = aspeed_soc_get_irq(s, ASPEED_UART3);
++        serial_mm_init(get_system_memory(), sc->info->memmap[ASPEED_UART3], 2,
++                       uart3, 38400, serial_hd(4), DEVICE_LITTLE_ENDIAN);
 +    }
 +
 +    /* UART4 */
 +    if (serial_hd(5)) {
-+        qemu_irq uart4 = qdev_get_gpio_in(DEVICE(&s->vic), uart_irqs[3]);
-+        serial_mm_init(get_system_memory(),
-+                       ASPEED_SOC_IOMEM_BASE + ASPEED_SOC_UART_4_BASE, 2,
++        qemu_irq uart4 = aspeed_soc_get_irq(s, ASPEED_UART4);
++        serial_mm_init(get_system_memory(), sc->info->memmap[ASPEED_UART4], 2,
 +                       uart4, 38400, serial_hd(5), DEVICE_LITTLE_ENDIAN);
 +    }
 +
      /* I2C */
-     object_property_set_bool(OBJECT(&s->i2c),
-                              ASPEED_IS_AST2500(sc->info->silicon_rev),
+     object_property_set_bool(OBJECT(&s->i2c), true, "realized", &err);
+     if (err) {
