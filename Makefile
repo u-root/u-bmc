@@ -23,6 +23,8 @@ ABS_ROOT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))/
 # This is used to include garbage in the signing process to test verification
 # errors in the integration test. It should not be used for any real builds.
 TEST_EXTRA_SIGN ?= /dev/null
+# Flash image size in MiB
+ROM_SIZE ?= 16
 # Since the DTB needs to contains the partitions, and the bootloader contains
 # the DTB, we have to guess the size of the DTB + the bootloader ahead of time.
 # The bootloader for ast2400 is something like 10KiB, and the DTB is 25 KiB.
@@ -88,11 +90,15 @@ boot/kexec:
 		sha256sum -c
 	chmod 755 boot/kexec
 
-flash.img: $(ROOT_DIR)boot/boot.bin ubi.img $(ROOT_DIR)platform/ubmc-flash-layout.dtsi
-	(( cat $<; perl -e 'print chr(0xFF)x1024 while 1' ) \
-		| dd bs=64k \
-			count=$(shell (grep SIZE= $(ROOT_DIR)platform/ubmc-flash-layout.dtsi | cut -f 2 -d =; echo ' / 65536') | xargs | bc) \
-			iflag=fullblock; cat ubi.img) > $@
+u-bmc.img: $(ROOT_DIR)boot/boot.bin ubi.img $(ROOT_DIR)platform/ubmc-flash-layout.dtsi
+	dd if=/dev/zero | tr '\000' '\377' | dd iflag=fullblock bs=64k of=$@ \
+		count=$$(($$(grep SIZE= platform/ubmc-flash-layout.dtsi | cut -d= -f2) / 65536))
+	dd conv=notrunc if=$< of=$@
+	cat ubi.img >>$@
+
+flash.img: u-bmc.img
+	dd if=/dev/zero | tr '\000' '\377' | dd iflag=fullblock bs=1M count=$(ROM_SIZE) of=$@
+	dd conv=notrunc if=$< of=$@
 
 boot/signer/signer: boot/signer/main.go
 	go get ./boot/signer/
@@ -287,8 +293,8 @@ ubi.img: root.ubifs.img $(ROOT_DIR)ubi.cfg
 	ubinize -vv -o ubi.img -m 1 -p64KiB $(ROOT_DIR)ubi.cfg
 
 flash.sim.img: flash.img
-	( cat $^ ; perl -e 'print chr(0xFF)x1024 while 1' ) \
-		| dd bs=1M count=32 iflag=fullblock > $@
+	dd if=/dev/zero | tr '\000' '\377' | dd iflag=fullblock bs=1M count=32 of=$@
+	dd conv=notrunc if=$< of=$@
 
 initramfs.cpio: u-bmc ssh_keys.pub config/config.go $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)platform/$(PLATFORM) $(ROOT_DIR)pkg $(ROOT_DIR)proto -name \*.go -type f)
 	go generate ./config/
