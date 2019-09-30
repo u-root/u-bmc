@@ -49,6 +49,29 @@ u-bmc:
 	go get
 	go build
 
+# Linux tree comes from the OpenBMC branch, not the official kernel.org
+LINUX_VERSION	:= 5.2.14
+LINUX_DIR	:= linux-$(LINUX_VERSION)
+LINUX_TAR	:= linux-$(LINUX_VERSION).tar.gz
+LINUX_URL	:= https://github.com/openbmc/linux/archive/v$(LINUX_VERSION).tar.gz
+LINUX_HASH	:= 4ce6ec6582d83748223ffef48107991aa9524e17302106ca37ff30d257c97b66
+
+$(LINUX_TAR):
+	wget -O "$@" "$(LINUX_URL)"
+
+$(LINUX_DIR)/.valid: $(LINUX_TAR)
+	echo "$(LINUX_HASH)  $<" | sha256sum --check
+	tar xf "$<"
+	touch "$@"
+
+$(LINUX_DIR)/.patched: $(LINUX_DIR)/.valid
+	cd $(LINUX_DIR) ; \
+	for patch in ../linux-patches/*.patch ; do \
+		echo "=> Applying `basename $$patch`" ; \
+		git apply "$$patch" || exit 1 ; \
+	done
+	touch "$@"
+
 boot/boot.bin: boot/zImage.boot boot/loader.cpio.gz boot/platform.dtb.boot boot/boot-config.auto.h $(shell find $(ROOT_DIR)platform/$(SOC)/ -name \*.S -type f) $(ROOT_DIR)platform/$(PLATFORM)/boot/config.h
 	make -C platform/$(SOC)/boot boot.bin PLATFORM=$(PLATFORM) CROSS_COMPILE=$(CROSS_COMPILE)
 	ln -sf ../platform/$(SOC)/boot/boot.bin $@
@@ -84,13 +107,15 @@ platform/ubmc-flash-layout.dtsi: boot/zImage.boot boot/loader.cpio.gz
 
 module/%.ko: $(shell find $(ROOT_DIR)module -name \*.c -type f) boot/zImage.boot
 	$(MAKE) $(MAKE_JOBS) \
-		-C $(LINUX_DIR)/ O=build/boot/zImage.boot/ \
+		-C "$(LINUX_DIR)" \
+		O=build/boot \
 		CROSS_COMPILE=$(CROSS_COMPILE) \
-		ARCH=$(ARCH) M=$(ABS_ROOT_DIR)/module \
+		ARCH=$(ARCH) \
+		M=$(ABS_ROOT_DIR)/module \
 		modules
-	$(LINUX_DIR)/build/boot/zImage.boot/scripts/sign-file sha256 \
-		$(LINUX_DIR)/build/boot/zImage.boot/certs/signing_key.pem \
-		$(LINUX_DIR)/build/boot/zImage.boot/certs/signing_key.x509 \
+	$(LINUX_DIR)/build/boot/scripts/sign-file sha256 \
+		$(LINUX_DIR)/build/boot/certs/signing_key.pem \
+		$(LINUX_DIR)/build/boot/certs/signing_key.x509 \
 		$@
 
 boot/loader.cpio.gz: boot/loader/loader boot/keys/u-bmc.pub module/bootlock.ko boot/kexec
@@ -107,46 +132,48 @@ boot/keys/u-bmc.key:
 	chmod 700 boot/keys/
 	openssl genrsa -out $@ 2048
 
-boot/zImage.%: platform/$(SOC)/linux.config.%
-	$(MAKE) $(MAKE_JOBS) \
-		-C $(LINUX_DIR)/ O=build/$@/ \
-		CROSS_COMPILE=$(CROSS_COMPILE) KCONFIG_CONFIG="$(ABS_ROOT_DIR)$<" \
-		ARCH=$(ARCH) olddefconfig all
-	rm -f $<.old
-	cp $(LINUX_DIR)/build/$@/arch/$(ARCH)/boot/zImage $@
-
-# Linux tree comes from the OpenBMC branch, not the official kernel.org
-LINUX_VERSION=5.2.14
-LINUX_DIR=linux-$(LINUX_VERSION)
-LINUX_TAR=linux-$(LINUX_VERSION).tar.gz
-LINUX_URL=https://github.com/openbmc/linux/archive/v$(LINUX_VERSION).tar.gz
-LINUX_HASH=4ce6ec6582d83748223ffef48107991aa9524e17302106ca37ff30d257c97b66
-
-$(LINUX_TAR):
-	wget -O "$@" "$(LINUX_URL)"
-
-$(LINUX_DIR)/.valid: $(LINUX_TAR)
-	echo "$(LINUX_HASH)  $<" | sha256sum --check
-	tar xf "$<"
-	touch "$@"
-
-$(LINUX_DIR)/.patched: $(LINUX_DIR)/.valid
-	cd $(LINUX_DIR) ; \
-	for patch in ../linux-patches/*.patch ; do \
-		echo "=> Applying `basename $$patch`" ; \
-		git apply "$$patch" ; \
-	done
-	touch "$@"
-
-
-linux-menuconfig-%: platform/$(SOC)/linux.config.%
-	$(MAKE) $(MAKE_JOBS) \
-		-C $(LINUX_DIR) O=build/$@/ \
+# Rebuild the Linux config from the one in the platform directory.
+# If you change $(SOC) it is probably best to blow away the Linux directory
+$(LINUX_DIR)/build/%/.config: platform/$(SOC)/linux.config.% $(LINUX_DIR)/.patched
+	@mkdir -p "$(dir $@)"
+	cp "$<" "$@"
+	$(MAKE) \
+		-C "$(LINUX_DIR)" \
+		O="../$(dir $@)" \
 		CROSS_COMPILE=$(CROSS_COMPILE) \
-		KCONFIG_CONFIG="$(ABS_ROOT_DIR)$<" \
+		ARCH=$(ARCH) \
+		olddefconfig
+
+boot/zImage.%: $(LINUX_DIR)/build/%/.config
+	$(MAKE) $(MAKE_JOBS) \
+		-C "$(LINUX_DIR)" \
+		O="../$(dir $<)" \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		ARCH=$(ARCH) \
+		all
+	cp "$(dir $<)arch/$(ARCH)/boot/zImage" "$@"
+
+
+# Interactively edit a Linux config.  Don't forget to save it afterwards
+linux-menuconfig.%: $(LINUX_DIR)/build/%/.config
+	$(MAKE) $(MAKE_JOBS) \
+		-C "$(LINUX_DIR)" \
+		O="../$(dir $<)" \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
 		ARCH=$(ARCH) \
 		menuconfig
 	rm -f $<.old
+
+# After editing the real .config file, run `make linux-saveconfig.full` to store the
+# default (stripped down) configuration file back into the source tree
+linux-saveconfig.%: $(LINUX_DIR)/build/%/.config
+	$(MAKE) $(MAKE_JOBS) \
+		-C "$(LINUX_DIR)" \
+		O="../$(dir $<)" \
+		CROSS_COMPILE=$(CROSS_COMPILE) \
+		ARCH=$(ARCH) \
+		savedefconfig
+	mv "$(dir $<)defconfig" "platform/$(SOC)/linux.config$(suffix $@)"
 
 integration/bzImage: integration/linux.config
 	$(MAKE) $(MAKE_JOBS) \
