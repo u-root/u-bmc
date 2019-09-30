@@ -27,3 +27,5 @@ module/*.o
 module/modules.*
 module/Module.symvers
 vendor/**/.bb
+*.tar.gz
+linux-*

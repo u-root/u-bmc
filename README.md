@@ -69,7 +69,6 @@ Clone:
 ```
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
-(cd linux/; ../linux-patches/apply.sh)
 make get
 ```
 
