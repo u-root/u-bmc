@@ -157,16 +157,8 @@ jobs:
       - run:
           name: Update submodules
           command: |
-            git submodule init
-            # Since linux is huge and we're tracking a branch, submodules
-            # take a long time and we cannot use depth. Fetch the latest zip
-            # instead
-            wget https://github.com/openbmc/linux/archive/dev-5.2.zip
-            unzip dev-5.2.zip
-            rm dev-5.2.zip
-            rm -rf linux/
-            mv linux-dev-5.2/ linux/
-            (cd linux/; ../linux-patches/apply.sh)
+            # Since linux is huge it would be good to cache the tar file
+            # from somewhere. No submodules necessary anymore.
       - run:
           name: Build image
           command: |
