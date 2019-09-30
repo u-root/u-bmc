@@ -50,18 +50,19 @@ u-bmc:
 	go build
 
 # Linux tree comes from the OpenBMC branch, not the official kernel.org
-LINUX_VERSION	:= 5.2.14
+LINUX_VERSION	:= f9e04c3
 LINUX_DIR	:= linux-$(LINUX_VERSION)
 LINUX_TAR	:= linux-$(LINUX_VERSION).tar.gz
-LINUX_URL	:= https://github.com/openbmc/linux/archive/v$(LINUX_VERSION).tar.gz
-LINUX_HASH	:= 4ce6ec6582d83748223ffef48107991aa9524e17302106ca37ff30d257c97b66
+LINUX_URL	:= https://github.com/openbmc/linux/tarball/$(LINUX_VERSION)
+LINUX_HASH	:= 533e6a400c710eb7d3d0a18a9a46d7deac218af59de21e7b95bdcaef99c90e1d
 
 $(LINUX_TAR):
 	wget -O "$@" "$(LINUX_URL)"
 
 $(LINUX_DIR)/.valid: $(LINUX_TAR)
 	echo "$(LINUX_HASH)  $<" | sha256sum --check
-	tar xf "$<"
+	mkdir -p "$(LINUX_DIR)"
+	tar xf "$<" --strip 1 -C "$(LINUX_DIR)"
 	touch "$@"
 
 $(LINUX_DIR)/.patched: $(LINUX_DIR)/.valid
