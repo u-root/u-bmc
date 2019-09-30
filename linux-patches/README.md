@@ -1,7 +1,8 @@
 # Linux patches
 
 These are patches that are in the process of being upstreamed but needs to
-be patched now to support some critical functionallity.
+be patched now to support some critical functionallity. They will be
+applied automatically when the Linux kernel tar file is extracted.
 
 ## Updating patches
 
