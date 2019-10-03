@@ -50,11 +50,15 @@ u-bmc:
 	go build
 
 # Linux tree comes from the OpenBMC branch, not the official kernel.org
-LINUX_VERSION	:= f9e04c3
+LINUX_VERSION	:= 7e560ad
 LINUX_DIR	:= linux-$(LINUX_VERSION)
 LINUX_TAR	:= linux-$(LINUX_VERSION).tar.gz
 LINUX_URL	:= https://github.com/openbmc/linux/tarball/$(LINUX_VERSION)
-LINUX_HASH	:= 533e6a400c710eb7d3d0a18a9a46d7deac218af59de21e7b95bdcaef99c90e1d
+LINUX_HASH	:= eebddffa96172faee3a47bc0004e95689ac4a97ade195719516e8134ed15a7e7
+
+# Make considers these files as intermediate files and removes them.
+# Tell make they are important.
+.SECONDARY: $(LINUX_DIR)/build/full/.config $(LINUX_DIR)/build/boot/.config
 
 $(LINUX_TAR):
 	wget -O "$@" "$(LINUX_URL)"
