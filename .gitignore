@@ -23,6 +23,7 @@ module/.*.cmd
 module/.tmp_versions
 module/*.ko
 module/*.mod.c
+module/*.mod
 module/*.o
 module/modules.*
 module/Module.symvers
