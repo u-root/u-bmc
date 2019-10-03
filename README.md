@@ -65,14 +65,13 @@ Prerequisites:
 sudo apt install gcc-arm-none-eabi mtd-utils golang-1.12 fakeroot flex bison device-tree-compiler bc libssl-dev libelf-dev qemu-kvm
 ```
 
-Clone:
+Clone source code:
 ```
 go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
-make get
 ```
 
-Setup:
+Setup configuration:
 ```
 # SSH ECDSA public keys does not work for now
 cp ~/.ssh/id_rsa.pub ssh_keys.pub
@@ -81,6 +80,12 @@ cp ~/.ssh/id_rsa.pub ssh_keys.pub
 # using another ACME server like Let's Encrypt (LE) ensure you agree to their terms.
 # For LE, you can find them at https://letsencrypt.org/repository/.
 touch config/i_agree_to_the_acme_terms
+go generate ./config/
+```
+
+Builld image:
+```
+make get
 make
 ```
 
