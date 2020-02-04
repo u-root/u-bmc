@@ -129,13 +129,16 @@ jobs:
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
-      - GO111MODULE: "off"
+      - GO111MODULE: "auto"
     steps:
       - checkout
       - run:
           name: Install dependencies
-          command:
+          command: |
             sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch libelf-dev qemu-kvm
+            go get github.com/prometheus/client_golang/prometheus
+            cd /go/src/github.com/prometheus/client_golang/prometheus
+            go mod vendor
       - run:
           name: Compile qemu
           command: |
