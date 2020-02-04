@@ -52,7 +52,7 @@ func NewTestCA() *CAServer {
 	// Enable strict mode to test upcoming API breaking changes
 	strictMode := true
 	va := va.New(logger, 80, 443, strictMode, "")
-	wfeImpl := wfe.New(logger, db, va, ca, strictMode)
+	wfeImpl := wfe.New(logger, db, va, ca, strictMode, false)
 	muxHandler := wfeImpl.Handler()
 
 	block := &pem.Block{
