@@ -129,7 +129,7 @@ jobs:
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
-      - GO111MODULE: "auto"
+      - GO111MODULE: "off"
     steps:
       - checkout
       - run:
