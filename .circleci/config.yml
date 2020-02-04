@@ -30,7 +30,7 @@ workflows:
 jobs:
   clean-code:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     steps:
       - checkout
@@ -62,7 +62,7 @@ jobs:
           command: ineffassign .
   test:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -84,7 +84,7 @@ jobs:
           command: make test TESTFLAGS=-cover
   race:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 1
@@ -103,7 +103,7 @@ jobs:
             make test TESTFLAGS=-race
   compile:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -129,6 +129,7 @@ jobs:
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
+      - GO111MODULE: "auto"
     steps:
       - checkout
       - run:
@@ -138,7 +139,6 @@ jobs:
       - run:
           name: Compile qemu
           command: |
-            go env -w GO111MODULES=auto
             git clone https://github.com/openbmc/qemu.git --depth 1
             # TOOD(bluecmd): Temporary until these can be upstreamed correctly
             cd qemu
