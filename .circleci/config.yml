@@ -138,6 +138,7 @@ jobs:
       - run:
           name: Compile qemu
           command: |
+            go get github.com/cespare/xxhash/v2
             git clone https://github.com/openbmc/qemu.git --depth 1
             # TOOD(bluecmd): Temporary until these can be upstreamed correctly
             cd qemu
