@@ -141,7 +141,7 @@ jobs:
           name: Fix Dependencies
           command: |
             mkdir /go/src/github.com/cespare/v2
-            cp -R /go/src/github.com/cespare/xxhash /go/src/github.com/cespare/v2
+            cp -R /go/src/github.com/cespare/xxhash/* /go/src/github.com/cespare/v2
             mv /go/src/github.com/cespare/v2 /go/src/github.com/cespare/xxhash
       - run:
           name: Compile qemu
