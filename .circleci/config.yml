@@ -129,13 +129,17 @@ jobs:
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
-      - GO111MODULE: "auto"
+      - GO111MODULE: "off"
     steps:
       - checkout
       - run:
           name: Install dependencies
-          command:
+          command: |
             sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch libelf-dev qemu-kvm
+            go get github.com/cespare/xxhash
+            mkdir -p /go/src/github.com/cespare/v2
+            cp -R /go/src/github.com/cespare/xxhash /go/src/github.com/cespare/v2
+            mv /go/src/github.com/cespare/v2 /go/src/github.com/cespare/xxhash
       - run:
           name: Compile qemu
           command: |
