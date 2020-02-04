@@ -125,7 +125,7 @@ jobs:
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -138,7 +138,7 @@ jobs:
       - run:
           name: Compile qemu
           command: |
-            go get github.com/cespare/xxhash
+            go env -w GO111MODULES=auto
             git clone https://github.com/openbmc/qemu.git --depth 1
             # TOOD(bluecmd): Temporary until these can be upstreamed correctly
             cd qemu
