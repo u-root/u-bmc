@@ -55,21 +55,21 @@ index 93a247f..fc297d6 100644
 +    /* UART2 */
 +    if (serial_hd(3)) {
 +        qemu_irq uart2 = aspeed_soc_get_irq(s, ASPEED_UART2);
-+        serial_mm_init(get_system_memory(), sc->info->memmap[ASPEED_UART2], 2,
++        serial_mm_init(get_system_memory(), sc->memmap[ASPEED_UART2], 2,
 +                       uart2, 38400, serial_hd(3), DEVICE_LITTLE_ENDIAN);
 +    }
 +
 +    /* UART3 */
 +    if (serial_hd(4)) {
 +        qemu_irq uart3 = aspeed_soc_get_irq(s, ASPEED_UART3);
-+        serial_mm_init(get_system_memory(), sc->info->memmap[ASPEED_UART3], 2,
++        serial_mm_init(get_system_memory(), sc->memmap[ASPEED_UART3], 2,
 +                       uart3, 38400, serial_hd(4), DEVICE_LITTLE_ENDIAN);
 +    }
 +
 +    /* UART4 */
 +    if (serial_hd(5)) {
 +        qemu_irq uart4 = aspeed_soc_get_irq(s, ASPEED_UART4);
-+        serial_mm_init(get_system_memory(), sc->info->memmap[ASPEED_UART4], 2,
++        serial_mm_init(get_system_memory(), sc->memmap[ASPEED_UART4], 2,
 +                       uart4, 38400, serial_hd(5), DEVICE_LITTLE_ENDIAN);
 +    }
 +
