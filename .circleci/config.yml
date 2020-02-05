@@ -177,11 +177,14 @@ jobs:
           path: flash.img
           destination: flash.img
       - run:
-          name: Run integration tests
-          command: |
+          name: Prepare integration tests
+          command:
             make integration/bzImage
             export UBMC_QEMU=qemu-system-arm
             export UBMC_NATIVE_QEMU=qemu-system-x86_64
+      - run:
+          name: Run integration tests
+          command: |
             cd integration/
             go test
       - store_artifacts:
