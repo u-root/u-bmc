@@ -178,7 +178,7 @@ jobs:
           destination: flash.img
       - run:
           name: Prepare integration tests
-          command:
+          command: |
             make integration/bzImage
             export UBMC_QEMU=qemu-system-arm
             export UBMC_NATIVE_QEMU=qemu-system-x86_64
