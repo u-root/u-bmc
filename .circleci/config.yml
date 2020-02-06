@@ -30,7 +30,7 @@ workflows:
 jobs:
   clean-code:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     steps:
       - checkout
@@ -62,7 +62,7 @@ jobs:
           command: ineffassign .
   test:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -84,7 +84,7 @@ jobs:
           command: make test TESTFLAGS=-cover
   race:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 1
@@ -103,7 +103,7 @@ jobs:
             make test TESTFLAGS=-race
   compile:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -125,16 +125,24 @@ jobs:
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
+      - GO111MODULE: "off"
     steps:
       - checkout
       - run:
           name: Install dependencies
           command:
             sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch libelf-dev qemu-kvm
+      - run: go get github.com/cespare/xxhash
+      - run:
+          name: Fix Dependencies
+          command: |
+            mkdir /go/src/github.com/cespare/v2
+            cp -R /go/src/github.com/cespare/xxhash/* /go/src/github.com/cespare/v2
+            mv /go/src/github.com/cespare/v2 /go/src/github.com/cespare/xxhash
       - run:
           name: Compile qemu
           command: |
@@ -169,11 +177,14 @@ jobs:
           path: flash.img
           destination: flash.img
       - run:
-          name: Run integration tests
+          name: Prepare integration tests
           command: |
             make integration/bzImage
             export UBMC_QEMU=qemu-system-arm
             export UBMC_NATIVE_QEMU=qemu-system-x86_64
+      - run:
+          name: Run integration tests
+          command: |
             cd integration/
             go test
       - store_artifacts:
