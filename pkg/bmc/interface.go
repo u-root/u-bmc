@@ -178,7 +178,7 @@ func startNetwork(config *pb.Network) (*network, error) {
 		log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
 	}
 
-	_, err := dhclient.IfUp(iface)
+	_, err := dhclient.IfUp(iface, interfaceUpTimeout)
 	if err != nil {
 		return nil, err
 	}
