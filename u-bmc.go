@@ -78,7 +78,7 @@ func Main() error {
 
 	pkgs := append(packages, fmt.Sprintf("github.com/u-root/u-bmc/platform/%s/cmd/*", *platform))
 
-	baseFile := uroot.DefaultRamfs.Reader()
+	baseFile := uroot.DefaultRamfs().Reader()
 
 	opts := uroot.Opts{
 		Env: env,

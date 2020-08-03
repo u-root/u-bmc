@@ -147,7 +147,7 @@ func buildInitramfs(t *testing.T, tmpDir string, o *Options) string {
 	opts := o.BuildOpts
 	opts.Env = o.BuildOpts.Env
 	opts.TempDir = tmpDir
-	opts.BaseArchive = uroot.DefaultRamfs.Reader()
+	opts.BaseArchive = uroot.DefaultRamfs().Reader()
 	opts.OutputFile = w
 	opts.InitCmd = "init"
 
