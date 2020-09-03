@@ -47,7 +47,7 @@ func NewTestCA() *CAServer {
 
 	logger := log.New(os.Stdout, "Pebble ", log.LstdFlags)
 	db := db.NewMemoryStore()
-	ca := ca.New(logger, db, "", 0)
+	ca := ca.New(logger, db, "", 0, 1)
 
 	// Enable strict mode to test upcoming API breaking changes
 	strictMode := true
