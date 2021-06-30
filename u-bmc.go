@@ -71,7 +71,7 @@ func Main() error {
 	defer os.RemoveAll(tempDir)
 
 	logger := log.New(os.Stderr, "", log.LstdFlags)
-	w, err := archiver.OpenWriter(logger, *outputPath, env.GOOS, env.GOARCH)
+	w, err := archiver.OpenWriter(logger, *outputPath)
 	if err != nil {
 		return err
 	}
