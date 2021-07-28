@@ -30,16 +30,14 @@ workflows:
 jobs:
   clean-code:
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.16.6
     working_directory: /go/src/github.com/u-root/u-bmc
     steps:
-      - checkout
       - run:
-          name: Install dep
+          name: Get dependency modules
           command: |
-            wget https://github.com/golang/dep/releases/download/v0.5.1/dep-linux-amd64
-            mv dep-linux-amd64 dep
-            chmod +x dep
+            go mod download
+            go mod verify
       - run:
           name: Install ineffassign
           command: go get github.com/gordonklaus/ineffassign
@@ -50,11 +48,6 @@ jobs:
             touch config/i_agree_to_the_acme_terms
             go generate ./config/
       - run:
-          name: vet
-          command: |
-            make get
-            go vet $(go list ./... | grep -v /vendor/)
-      - run:
           name: gofmt
           command: test -z "$(gofmt -s -l $(go list ./... | grep -v /vendor/ | cut -f 4- -d '/'))"
       - run:
@@ -62,7 +55,7 @@ jobs:
           command: ineffassign .
   test:
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.16.6
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -84,7 +77,7 @@ jobs:
           command: make test TESTFLAGS=-cover
   race:
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.16.6
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 1
@@ -103,7 +96,7 @@ jobs:
             make test TESTFLAGS=-race
   compile:
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.16.6
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
@@ -125,11 +118,10 @@ jobs:
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.16.6
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
-      - GO111MODULE: "off"
     steps:
       - checkout
       - run:
