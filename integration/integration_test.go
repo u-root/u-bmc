@@ -138,7 +138,7 @@ func buildInitramfs(t *testing.T, tmpDir string, o *Options) string {
 	// OutputFile
 	logger := log.New(os.Stderr, "", log.LstdFlags)
 	outputFile := filepath.Join(tmpDir, "initramfs.cpio")
-	w, err := initramfs.CPIO.OpenWriter(logger, outputFile, "", "")
+	w, err := initramfs.CPIO.OpenWriter(logger, outputFile)
 	if err != nil {
 		t.Fatal(err)
 	}

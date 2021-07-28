@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jmhodges/clock"
 	"github.com/letsencrypt/pebble/ca"
 	"github.com/letsencrypt/pebble/db"
 	"github.com/letsencrypt/pebble/va"
@@ -39,10 +40,11 @@ func (h *fakeACMEHandler) HandleDNS01Challenge(string, string) error {
 // TODO(bluecmd): Disabled because it's flaky on CircleCI
 func TestACME(t *testing.T) {
 	t.Skip("TestACME is disabled because flaky CircleCI")
+	clk := clock.New()
 	cert := genCert()
 	logger := Logger(t, "Pebble")
-	db := db.NewMemoryStore()
-	ca := ca.New(logger, db, "", 0)
+	db := db.NewMemoryStore(clk)
+	ca := ca.New(logger, db)
 
 	// Responding to challenges is tested in the integration test
 	os.Setenv("PEBBLE_VA_ALWAYS_VALID", "1")
@@ -50,8 +52,8 @@ func TestACME(t *testing.T) {
 
 	// Enable strict mode to test upcoming API breaking changes
 	strictMode := true
-	va := va.New(logger, 80, 443, strictMode, "")
-	wfeImpl := wfe.New(logger, db, va, ca, strictMode, false)
+	va := va.New(logger, clk, 80, 443, strictMode)
+	wfeImpl := wfe.New(logger, clk, db, va, ca, strictMode)
 	muxHandler := wfeImpl.Handler()
 
 	var tc tls.Config
