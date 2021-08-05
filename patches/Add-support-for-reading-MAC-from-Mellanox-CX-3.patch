@@ -1,9 +1,9 @@
-From 0a1a999aec4ffd3fe1e5283352030aa472c27262 Mon Sep 17 00:00:00 2001
-From: Christian Svensson <bluecmd@google.com>
-Date: Sat, 30 Mar 2019 07:38:52 -0700
-Subject: [PATCH 1/4] Add support for reading MAC from Mellanox CX-3
+From 1e3472e275346cb4318ac912959e816323bac0d5 Mon Sep 17 00:00:00 2001
+From: Marvin Drees <marvin.drees@9elements.com>
+Date: Thu, 5 Aug 2021 15:12:22 +0200
+Subject: [PATCH] Add support for reading MAC from Mellanox CX-3
 
-Signed-off-by: Christian Svensson <bluecmd@google.com>
+- Patch is property of Christian Svensson
 ---
  net/ncsi/internal.h    | 5 ++---
  net/ncsi/ncsi-cmd.c    | 4 ++++
@@ -12,18 +12,24 @@ Signed-off-by: Christian Svensson <bluecmd@google.com>
  4 files changed, 9 insertions(+), 6 deletions(-)
 
 diff --git a/net/ncsi/internal.h b/net/ncsi/internal.h
-index 0b3f0673e1a2..ee2e257f1b66 100644
+index e37102546be6..89b6c0e4304c 100644
 --- a/net/ncsi/internal.h
 +++ b/net/ncsi/internal.h
-@@ -71,13 +71,12 @@ enum {
+@@ -82,19 +82,18 @@ enum {
  #define NCSI_OEM_BCM_CMD_GMA            0x01   /* CMD ID for Get MAC */
  /* Mellanox specific OEM Command */
  #define NCSI_OEM_MLX_CMD_GMA            0x00   /* CMD ID for Get MAC */
 -#define NCSI_OEM_MLX_CMD_GMA_PARAM      0x1b   /* Parameter for GMA  */
+ #define NCSI_OEM_MLX_CMD_SMAF           0x01   /* CMD ID for Set MC Affinity */
+ #define NCSI_OEM_MLX_CMD_SMAF_PARAM     0x07   /* Parameter for SMAF         */
  /* OEM Command payload lengths*/
  #define NCSI_OEM_BCM_CMD_GMA_LEN        12
 -#define NCSI_OEM_MLX_CMD_GMA_LEN        8
 +#define NCSI_OEM_MLX_CMD_GMA_LEN        7
+ #define NCSI_OEM_MLX_CMD_SMAF_LEN        60
+ /* Offset in OEM request */
+ #define MLX_SMAF_MAC_ADDR_OFFSET         8     /* Offset for MAC in SMAF    */
+ #define MLX_SMAF_MED_SUPPORT_OFFSET      14    /* Offset for medium in SMAF */
  /* Mac address offset in OEM response */
  #define BCM_MAC_ADDR_OFFSET             28
 -#define MLX_MAC_ADDR_OFFSET             8
@@ -32,7 +38,7 @@ index 0b3f0673e1a2..ee2e257f1b66 100644
  
  struct ncsi_channel_version {
 diff --git a/net/ncsi/ncsi-cmd.c b/net/ncsi/ncsi-cmd.c
-index 5c3fad8cba57..834cc4b0620b 100644
+index ba9ae482141b..410c2142cfb3 100644
 --- a/net/ncsi/ncsi-cmd.c
 +++ b/net/ncsi/ncsi-cmd.c
 @@ -50,6 +50,10 @@ static void ncsi_cmd_build_header(struct ncsi_pkt_hdr *h,
@@ -47,10 +53,10 @@ index 5c3fad8cba57..834cc4b0620b 100644
  	checksum = ncsi_calculate_checksum((unsigned char *)h,
  					   sizeof(*h) + nca->payload);
 diff --git a/net/ncsi/ncsi-manage.c b/net/ncsi/ncsi-manage.c
-index 755aab66dcab..29de5e6b1960 100644
+index ffff8da707b8..440cccd3e431 100644
 --- a/net/ncsi/ncsi-manage.c
 +++ b/net/ncsi/ncsi-manage.c
-@@ -719,7 +719,6 @@ static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
+@@ -726,7 +726,6 @@ static int ncsi_oem_gma_handler_mlx(struct ncsi_cmd_arg *nca)
  	memset(&u, 0, sizeof(u));
  	u.data_u32[0] = ntohl(NCSI_OEM_MFR_MLX_ID);
  	u.data_u8[5] = NCSI_OEM_MLX_CMD_GMA;
@@ -59,19 +65,19 @@ index 755aab66dcab..29de5e6b1960 100644
  	nca->data = u.data_u8;
  
 diff --git a/net/ncsi/ncsi-rsp.c b/net/ncsi/ncsi-rsp.c
-index 7581bf919885..ab63b1e14ee6 100644
+index 888ccc2d4e34..b6d8aaf2e31d 100644
 --- a/net/ncsi/ncsi-rsp.c
 +++ b/net/ncsi/ncsi-rsp.c
-@@ -624,6 +624,8 @@ static int ncsi_rsp_handler_oem_mlx_gma(struct ncsi_request *nr)
+@@ -627,6 +627,8 @@ static int ncsi_rsp_handler_oem_mlx_gma(struct ncsi_request *nr)
  	saddr.sa_family = ndev->type;
  	ndev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
  	memcpy(saddr.sa_data, &rsp->data[MLX_MAC_ADDR_OFFSET], ETH_ALEN);
 +	/* Management MAC is reply +2 and does never appear to wrap byte boundary */
 +	saddr.sa_data[5] += 2;
- 	ret = ops->ndo_set_mac_address(ndev, &saddr);
- 	if (ret < 0)
- 		netdev_warn(ndev, "NCSI: 'Writing mac address to device failed\n");
-@@ -641,8 +643,7 @@ static int ncsi_rsp_handler_oem_mlx(struct ncsi_request *nr)
+ 	/* Set the flag for GMA command which should only be called once */
+ 	ndp->gma_flag = 1;
+ 
+@@ -647,8 +649,7 @@ static int ncsi_rsp_handler_oem_mlx(struct ncsi_request *nr)
  	rsp = (struct ncsi_rsp_oem_pkt *)skb_network_header(nr->rsp);
  	mlx = (struct ncsi_rsp_oem_mlx_pkt *)(rsp->data);
  
@@ -82,5 +88,5 @@ index 7581bf919885..ab63b1e14ee6 100644
  	return 0;
  }
 -- 
-2.23.0.187.g17f5b7556c-goog
+2.32.0
 

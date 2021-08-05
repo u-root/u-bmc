@@ -1,12 +1,12 @@
-From 740de0213c5af364612c657c556b4b3aa99dc7d5 Mon Sep 17 00:00:00 2001
-From: Christian Svensson <bluecmd@google.com>
-Date: Thu, 5 Sep 2019 13:53:46 -0700
-Subject: [PATCH 4/4] arch: define aspeed SOC IO mapping
+From 17a0c0e4087adc447bf7850a2eaa00ce11c4cd4d Mon Sep 17 00:00:00 2001
+From: Marvin Drees <marvin.drees@9elements.com>
+Date: Thu, 5 Aug 2021 15:43:07 +0200
+Subject: [PATCH] arch: define aspeed SOC IO mapping
 
 Without this IO mapping early printk will simply not work after the
 paging and MMU has been setup.
 
-Signed-off-by: Christian Svensson <bluecmd@google.com>
+- Patch is property of Christian Svensson
 ---
  arch/arm/mach-aspeed/Makefile     |  2 ++
  arch/arm/mach-aspeed/aspeed_soc.c | 47 +++++++++++++++++++++++++++++++
@@ -102,5 +102,5 @@ index 000000000000..7ea5276f3892
 +#define AST_IO_VIRT 0xfe600000
 +#define AST_IO_SIZE 0x00200000
 -- 
-2.23.0.187.g17f5b7556c-goog
+2.32.0
 
