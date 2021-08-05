@@ -1,19 +1,19 @@
-From abd33157600189a70a9d9438757c7f7831dc31ca Mon Sep 17 00:00:00 2001
-From: Christian Svensson <bluecmd@google.com>
-Date: Sun, 31 Mar 2019 14:13:45 -0700
-Subject: [PATCH 3/4] tmp421: Register sensor with thermal system
+From ad48221d4e4aad1ff1fcaf356fb3407caf85ce80 Mon Sep 17 00:00:00 2001
+From: Marvin Drees <marvin.drees@9elements.com>
+Date: Thu, 5 Aug 2021 15:32:02 +0200
+Subject: [PATCH] tmp421: Register sensor with thermal system
 
 hwmon expects the first info channel to be a chip configuration for it
-to consider it for registration with the thermal system. Add that
+to consider it for the registration with the thermal system. Add that
 channel configuration and set the thermal registration bit.
 
-Signed-off-by: Christian Svensson <bluecmd@google.com>
+- Patch is property of Christian Svensson
 ---
  drivers/hwmon/tmp421.c | 12 ++++++++++--
  1 file changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/hwmon/tmp421.c b/drivers/hwmon/tmp421.c
-index a94e35cff3e5..e7ad9a03b265 100644
+index ede66ea6a730..06b7cb56dfb9 100644
 --- a/drivers/hwmon/tmp421.c
 +++ b/drivers/hwmon/tmp421.c
 @@ -89,9 +89,11 @@ MODULE_DEVICE_TABLE(of, tmp421_of_match);
@@ -29,7 +29,7 @@ index a94e35cff3e5..e7ad9a03b265 100644
  	struct hwmon_chip_info chip;
  	char valid;
  	unsigned long last_updated;
-@@ -302,13 +304,19 @@ static int tmp421_probe(struct i2c_client *client,
+@@ -302,13 +304,19 @@ static int tmp421_probe(struct i2c_client *client)
  	if (err)
  		return err;
  
@@ -45,11 +45,11 @@ index a94e35cff3e5..e7ad9a03b265 100644
 +	data->info[0] = &data->chip_info;
 +	data->info[1] = &data->temp_info;
 +
-+	data->chip_info.type = hwmon_chip;
-+	data->chip_info.config = data->chip_config;
++	data->temp_info.type = hwmon_chip;
++	data->temp_info.config = data->chip_config;
  
  	data->temp_info.type = hwmon_temp;
  	data->temp_info.config = data->temp_config;
 -- 
-2.23.0.187.g17f5b7556c-goog
+2.32.0
 
