@@ -129,7 +129,7 @@ jobs:
     working_directory: /go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
-      - GO111MODULE: "off"
+      - GO111MODULE: "on"
     steps:
       - checkout
       - run:
@@ -137,26 +137,8 @@ jobs:
           command: |
             sudo apt-get update
             sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch libelf-dev qemu-kvm
-      - run: go get github.com/cespare/xxhash
-      - run:
-          name: Fix Dependencies
-          command: |
-            mkdir /go/src/github.com/cespare/v2
-            cp -R /go/src/github.com/cespare/xxhash/* /go/src/github.com/cespare/v2
-            mv /go/src/github.com/cespare/v2 /go/src/github.com/cespare/xxhash
-      - run:
-          name: Compile qemu
-          command: |
-            git clone https://github.com/openbmc/qemu.git --depth 1
-            # TOOD(bluecmd): Temporary until these can be upstreamed correctly
-            cd qemu
-            patch -p1 < /go/src/github.com/u-root/u-bmc/qemu-leopard.patch
-            cd ..
-            mkdir qemu/build
-            cd qemu/build
-            ../configure --target-list=arm-softmmu
-            make -j8
-            sudo make install
+            go mod download
+            go mod verify
       - run:
           name: Create test key
           command: |

@@ -73,7 +73,7 @@ $(LINUX_DIR)/.valid: $(LINUX_TAR)
 
 $(LINUX_DIR)/.patched: $(LINUX_DIR)/.valid
 	cd $(LINUX_DIR) ; \
-	for patch in ../linux-patches/*.patch ; do \
+	for patch in ../patches/*.patch ; do \
 		echo "=> Applying `basename $$patch`" ; \
 		git apply "$$patch" || exit 1 ; \
 	done
