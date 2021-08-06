@@ -52,11 +52,11 @@ u-bmc:
 	go build
 
 # Linux tree comes from the OpenBMC branch, not the official kernel.org
-LINUX_VERSION	:= 7e560ad
+LINUX_VERSION	:= 5.10.53
 LINUX_DIR	:= linux-$(LINUX_VERSION)
 LINUX_TAR	:= linux-$(LINUX_VERSION).tar.gz
-LINUX_URL	:= https://github.com/openbmc/linux/tarball/$(LINUX_VERSION)
-LINUX_HASH	:= eebddffa96172faee3a47bc0004e95689ac4a97ade195719516e8134ed15a7e7
+LINUX_URL       := https://github.com/openbmc/linux/archive/refs/tags/v$(LINUX_VERSION).tar.gz
+LINUX_HASH      := 159c8d1a29e7080020ac83497f78458d9c91da9d16144a3d6dd5eb615a62ad1f
 
 # Make considers these files as intermediate files and removes them.
 # Tell make they are important.
@@ -73,7 +73,7 @@ $(LINUX_DIR)/.valid: $(LINUX_TAR)
 
 $(LINUX_DIR)/.patched: $(LINUX_DIR)/.valid
 	cd $(LINUX_DIR) ; \
-	for patch in ../linux-patches/*.patch ; do \
+	for patch in ../patches/*.patch ; do \
 		echo "=> Applying `basename $$patch`" ; \
 		git apply "$$patch" || exit 1 ; \
 	done
