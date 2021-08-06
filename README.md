@@ -83,7 +83,7 @@ touch config/i_agree_to_the_acme_terms
 go generate ./config/
 ```
 
-Builld image:
+Build image:
 ```
 make get
 make

@@ -298,6 +298,8 @@ flash.sim.img: flash.img
 
 initramfs.cpio: u-bmc ssh_keys.pub config/config.go $(shell find $(ROOT_DIR)cmd $(ROOT_DIR)platform/$(PLATFORM) $(ROOT_DIR)pkg $(ROOT_DIR)proto -name \*.go -type f)
 	go generate ./config/
+	rm -r vendor/github.com/u-root/u-root
+	ln -sf ../../../../u-root vendor/github.com/u-root
 	GOARM=5 GOARCH=$(ARCH) ./u-bmc -o "$@.tmp" -p "$(PLATFORM)"
 	mv "$@.tmp" "$@"
 
