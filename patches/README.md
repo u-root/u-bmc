@@ -10,5 +10,5 @@ Use `git am` to apply patches, then use the following command to update
 the patch files:
 
 ```
-git format-patch origin -o ../linux-patches
+git format-patch origin -o /path/to/patches
 ```

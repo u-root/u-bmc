@@ -1,10 +1,10 @@
-// Copyright 2018 the u-root Authors. All rights reserved
+// Copyright 2018-2021 the u-root Authors. All rights reserved
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 .globl kernel_start
 kernel_start:
-	.incbin "boot/zImage.boot"
+	.incbin "../../build/boot/zImage.boot"
 	.align 2
 kernel_end:
 	.globl kernel_size
@@ -13,7 +13,7 @@ kernel_size:
 
 	.globl dtb_start
 dtb_start:
-	.incbin "boot/platform.dtb.boot"
+	.incbin "../../build/boot/platform.dtb.boot"
 	.align 2
 dtb_end:
 	.globl dtb_size
@@ -22,7 +22,7 @@ dtb_size:
 
 	.globl initrd_start
 initrd_start:
-	.incbin "boot/loader.cpio.gz"
+	.incbin "../../build/boot/loader.cpio.gz"
 	.align 2
 initrd_end:
 	.globl initrd_size

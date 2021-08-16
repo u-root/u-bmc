@@ -9,5 +9,5 @@ protocol definitions without having to do a pre-build step in Go.
 
 2. Install `protoc-gen-go` by running `go get -u github.com/golang/protobuf/protoc-gen-go`.
 
-3. Run `make` to update the .pb.go file(s).
+3. Run `task proto:protogen` to update the .pb.go file(s).
 

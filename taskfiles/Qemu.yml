@@ -1,0 +1,37 @@
+version: '3'
+
+tasks:
+  # Run Qemu emulating an x86 host
+  host:
+    deps:
+      - :ovmf:build
+    cmds:
+      - |
+        qemu-system-x86_64 \
+        -bios build/ovmf.rom \
+        -display none \
+        -chardev socket,id=host,path=host.uart \
+        -serial chardev:host \
+        -net none
+
+  # Run Qemu emulation a BMC with u-bmc
+  bmc:
+    cmds:
+      - |
+        qemu-system-arm \
+        -display none \
+        -chardev socket,id=host,path=host.uart,server,nowait \
+        -nic user,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,hostfwd=tcp::9370-:9370 \
+        -drive file=build/flash.img,format=raw,if=mtd \
+        -m 128 \
+        -M palmetto-bmc \
+        -serial mon:stdio \
+        -serial null \
+        -serial null \
+        -serial null \
+        -serial chardev:host \
+        -serial null \
+        -d guest_errors
+# Some useful debug flags:
+# - in_asm, show ASM as it's being fed into QEMU
+# - unimp, show things that the VM tries to do but isn't implemented in QEMU

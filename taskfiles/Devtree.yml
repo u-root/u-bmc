@@ -1,0 +1,113 @@
+version: '3'
+
+tasks:
+  # Generate the final flash layout
+  flash-layout:
+    run: once
+    deps:
+    - :initramfs:loader-cpio
+    - :kernel:linux-build-boot
+    dir: build/boot
+    cmds:
+      - echo "Generating flash layout file..."
+      # Since the DTB needs to contains the partitions, and the bootloader contains
+      # the DTB, we have to guess the size of the DTB + the bootloader ahead of time.
+      # The bootloader for ast2400 is something like 10KiB, and the DTB is 25 KiB.
+      # Here we give the extra space a total of 100 KiB to have some space.
+      - |
+        go run ../../platform/cmd/flash-layout/main.go \
+        -extra 102400 \
+        ../linux/zImage.boot \
+        loader.cpio.gz \
+        > ubmc-flash-layout.dtsi
+      - echo "Done!"
+    status:
+      - test -f ubmc-flash-layout.dtsi
+
+  # Generate a dummy device tree binary
+  dtb-dummy:
+    run: once
+    deps:
+      - flash-layout
+      - :initramfs:loader-cpio
+    dir: build
+    cmds:
+      - echo "Building dummy dtb..."
+      - |
+        go run ../platform/cmd/boot-config/main.go \
+        --ram-start {{.__RAM_START}} \
+        --ram-size {{.__RAM_SIZE}} \
+        --initrd /dev/null \
+        --dtb /dev/null \
+        > boot/boot-config.auto.h
+      - |
+        cpp \
+        -nostdinc \
+        -I {{.__LINUX_DIR}}/arch/{{.__ARCH}}/boot/dts/ \
+        -I {{.__LINUX_DIR}}/include/ \
+        -I ../platform/{{.__TARGET}}/boot/ \
+        -I boot/ \
+        -DBOOTLOADER \
+        -undef \
+        -x assembler-with-cpp \
+        ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.boot.dummy -
+      - echo "Done!"
+    status:
+      - test -f build/boot/boot-config.auto.h
+      - test -f boot/platform.dtb.boot.dummy
+
+  # Generate a LinuxBoot device tree binary
+  dtb-boot:
+    run: once
+    deps:
+      - dtb-dummy
+    dir: build
+    cmds:
+      - echo "Building LinuxBoot dtb..."
+      - |
+        go run ../platform/cmd/boot-config/main.go \
+        --ram-start {{.__RAM_START}} \
+        --ram-size {{.__RAM_SIZE}} \
+        --initrd boot/loader.cpio.gz \
+        --dtb boot/platform.dtb.boot.dummy \
+        > boot/boot-config.auto.h
+      - |
+        cpp \
+        -nostdinc \
+        -I {{.__LINUX_DIR}}/arch/{{.__ARCH}}/boot/dts/ \
+        -I {{.__LINUX_DIR}}/include/ \
+        -I ../platform/{{.__TARGET}}/boot/ \
+        -I boot/ \
+        -DBOOTLOADER \
+        -undef \
+        -x assembler-with-cpp \
+        ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.boot -
+      - echo "Done!"
+    status:
+      - test -f boot/platform.dtb.boot
+
+  # Generate the runtime device tree binary
+  dtb-full:
+    run: once
+    deps:
+      - dtb-boot
+    dir: build
+    cmds:
+      - echo "Building runtime dtb..."
+      - |
+        cpp \
+        -nostdinc \
+        -I {{.__LINUX_DIR}}/arch/{{.__ARCH}}/boot/dts/ \
+        -I {{.__LINUX_DIR}}/include/ \
+        -I ../platform/{{.__TARGET}}/boot/ \
+        -I boot/ \
+        -DBOOTLOADER \
+        -undef \
+        -x assembler-with-cpp \
+        ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.full -
+      - echo "Done!"
+    preconditions:
+      - sh: test $(du boot/platform.dtb.boot.dummy | cut -f 1) -eq $(du boot/platform.dtb.boot | cut -f 1)
+        msg: "DTB changed size! Please file a bug about this."
+    status:
+      - test -f boot/platform.dtb.full
