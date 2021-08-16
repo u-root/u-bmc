@@ -1,0 +1,92 @@
+version: '3'
+
+tasks:
+  # Meta task to generate go files containing configuration values
+  generate:
+    run: once
+    deps:
+      - ssh-keys
+      - version
+      - acme
+      - sim-pebble
+    cmds:
+      - echo "Config generated successfully!"
+
+  # Generate list of allowed ssh public keys
+  ssh-keys:
+    run: once
+    dir: config
+    cmds:
+      - touch ssh_keys.pub
+      - cat ssh_keys.pub | ./ssh_keys.sh > ssh_keys.go
+    status:
+      - test -f ssh_keys.go
+
+  # Generate version file
+  version:
+    run: once
+    dir: config
+    cmds:
+      - ./version.sh > version.go
+    status:
+      - test -f version.go
+
+  # Generate acme file
+  acme:
+    run: once
+    dir: config
+    cmds:
+      - cp ./acme.go.tmpl acme.go
+    #preconditions:
+    #  - sh: test -f ../i_agree_to_the_acme_terms
+    #    msg: You need to agree to the ACME terms to use the simulator
+    status:
+      - test ! -f ../i_agree_to_the_acme_terms # Make non-blocking using 'status' #TODO use precondition and split up
+      - test -f acme.go
+
+  # Create pebble key
+  sim-key:
+    run: once
+    dir: config
+    cmds:
+      - |
+        openssl ecparam \
+        -name secp256r1 \
+        -genkey \
+        -noout \
+        -out sim-pebble.key
+    status:
+      - test -f sim-pebble.key
+
+  # Create pebble certificate
+  sim-crt:
+    run: once
+    deps:
+      - sim-key
+    dir: config
+    cmds:
+      - |
+        openssl req \
+        -new \
+        -x509 \
+        -key sim-pebble.key \
+        -out sim-pebble.crt \
+        -subj /CN=sim-pebble \
+        -reqexts SAN \
+        -extensions SAN \
+        -config ./sim-pebble.cnf \
+        -sha256 \
+        -days 36500
+    status:
+      - test -f sim-pebble.crt
+
+  # Generate pebble configuration
+  sim-pebble:
+    run: once
+    deps:
+      - sim-crt
+    dir: config
+    cmds:
+      - ./sim_pebble.sh > sim_pebble.go
+    status:
+      - test -f sim_pebble.go

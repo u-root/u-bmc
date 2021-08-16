@@ -1,0 +1,151 @@
+version: '3'
+
+# Set to false to see all commands being run
+silent: true
+
+# See https://taskfile.dev/#/usage?id=output-syntax
+output: prefixed
+
+# Set our target variable by reading TARGET
+# Not great but at least works reliably
+env:
+  __TARGET:
+    sh: grep -v '#' TARGET
+
+vars:
+  CPUS:
+    sh: echo $(($(grep -c processor /proc/cpuinfo) / 2))
+
+dotenv: ['platform/{{.__TARGET}}/config.env', 'kernel.env']
+
+# Include all nested Taskfiles here
+includes:
+  core: taskfiles/Core.yml
+  proto: taskfiles/Proto.yml
+  config: taskfiles/Config.yml
+  image: taskfiles/Image.yml
+  initramfs: taskfiles/Initramfs.yml
+  devtree: taskfiles/Devtree.yml
+  kernel: taskfiles/Linux.yml
+  kmod: taskfiles/Module.yml
+  tests: taskfiles/Tests.yml
+  ovmf: taskfiles/Ovmf.yml
+  docs: taskfiles/Docs.yml
+  qemu: taskfiles/Qemu.yml
+
+# Declaration of all available tasks.
+# This file only contains tasks that are meant
+# to be called directly by the user.
+# To check the Taskfile boilerplate look into
+# the folder taskfiles.
+tasks:
+  # Build a u-bmc image for the selected target in TARGET
+  build:
+    desc: Build a u-bmc image for a selected platform
+    cmds:
+      - echo "Building u-bmc image for $__TARGET"
+      - mkdir -p build
+      - go mod vendor # Only needed for u-root
+      - task: image:flash-img
+      - echo "Your image is at build/flash.img"
+      
+  # Remove compiled files
+  clean:
+    desc: Cleans up compiled files
+    cmds:
+      - echo "Wiping build artifacts..."
+      - rm -rf build/boot
+      - rm -rf build/kmod
+      - rm -rf build/linux/zImage.*
+      - rm -rf build/root
+      - rm -rf build/img
+      - rm -f build/initramfs.cpio
+      - rm -f build/u-bmc
+      - rm -f build/flash.img
+      - echo "Done!"
+
+  # Removes the whole build folder
+  distclean:
+    desc: Cleans up compiled and downloaded files
+    cmds:
+      - echo "Wiping the whole build directory and config files!"
+      - rm -rf build/
+      - rm -f config/acme.go
+      - rm -f config/version.go
+      - rm -f config/sim_pebble.go
+      - rm -f config/sim-pebble.crt
+      - rm -f config/sim-pebble.key
+      - rm -f config/ssh_keys.go
+      - rm -f config/ssh_keys.pub
+      - rm -f i_agree_to_the_acme_terms
+      - rm -f TARGET
+      - echo "Done!"
+
+  # Invoke protogen
+  protogen:
+    desc: Regenerate gRPC definitons using protobuf-gen-go
+    cmds:
+      - echo "Regenerating gRPC definitions"
+      - task: proto:protogen
+      - echo "Done!"
+
+  # Run pebble
+  pebble:
+    desc: Runs LetsEncrypt Pebble to simulate a CA
+    deps:
+      - config:generate
+    cmds:
+      - echo "Starting pebble server..."
+      - |
+        go run github.com/letsencrypt/pebble/cmd/pebble \
+        -dnsserver 127.0.0.1:6053 \
+        -config config/sim-pebble.json
+      - echo "Stopped pebble server"
+
+  # Invoke all tests
+  test:
+    desc: Run all tests
+    cmds:
+      - echo "Running all unit tests..."
+      - task: tests:all
+      - echo "Done!"
+
+  # Invoke coverage tests
+  coverage:
+    desc: Run all tests with coverage
+    cmds:
+      - echo "Running tests with coverage..."
+      - task: tests:coverage
+      - echo "Done!"
+
+  # Invoke race detector
+  race:
+    desc: Run race condition tests
+    cmds:
+      - echo "Running race condition detector..."
+      - task: tests:race
+      - echo "Done!"
+
+  # Invoke integration tests
+  integration:
+    desc: Run integration tests
+    cmds:
+      - echo "Running integration tests..."
+      - task: tests:integration
+      - echo "Done!"
+
+  # Compile OVMF and run qemu-x86
+  virtual-host:
+    desc: Launch Qemu with OVMF to simulate a host for the BMC
+    cmds:
+      - echo "Launching Qemu to simulate a host..."
+      - task: qemu:host
+      - echo "Stopped virtual host"
+
+  # Run BMC qemu
+  sim:
+    desc: Run the u-bmc simulator
+    cmds:
+      - echo "Running u-bmc simulator in Qemu..."
+      - task: qemu:bmc
+      - echo "Finished the u-bmc simulator"

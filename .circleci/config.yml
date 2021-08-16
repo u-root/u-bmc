@@ -27,150 +27,142 @@ workflows:
     jobs:
       - compile
       - image
+#TODO: Utilize CircleCI caching for at least the kernel tarball
 jobs:
   clean-code:
     docker:
-      - image: cimg/go:1.16.5
-    working_directory: ~/go/src/github.com/u-root/u-bmc
-    steps:
-      - checkout
-      - run:
-          name: Install dep
-          command: |
-            wget https://github.com/golang/dep/releases/download/v0.5.1/dep-linux-amd64
-            mv dep-linux-amd64 dep
-            chmod +x dep
-      - run:
-          name: Install ineffassign
-          command: go get github.com/gordonklaus/ineffassign
-      - run:
-          name: Create test key
-          command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            touch config/i_agree_to_the_acme_terms
-            go generate ./config/
-      - run:
-          name: vet
-          command: |
-            make get
-            go vet $(go list ./... | grep -v /vendor/)
-      - run:
-          name: gofmt
-          command: test -z "$(gofmt -s -l $(go list ./... | grep -v /vendor/ | cut -f 4- -d '/'))"
-      - run:
-          name: ineffassign
-          command: ineffassign .
-  test:
-    docker:
-      - image: cimg/go:1.16.5
+      - image: cimg/go:1.16.7
     working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
     steps:
       - checkout
       - run:
+          name: Install ineffassign
+          command: go get github.com/gordonklaus/ineffassign
+      - run:
+          name: Install Task
+          command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      - run:
           name: Create test key
           command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            touch config/i_agree_to_the_acme_terms
-            go generate ./config/
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
+            touch i_agree_to_the_acme_terms
+            echo quanta-f06-leopard-ddr3 > TARGET
+            task config:generate
+      - run:
+          name: vendor
+          command: go mod vendor
+      - run:
+          name: vet
+          command: go vet $(go list ./... | grep -v vendor/)
+      - run:
+          name: gofmt
+          command: test -z "$(gofmt -s -l $(go list ./... | grep -v vendor/ | cut -f 4- -d '/'))"
+      - run:
+          name: ineffassign
+          command: ineffassign .
+  test:
+    docker:
+      - image: cimg/go:1.16.7
+    working_directory: ~/go/src/github.com/u-root/u-bmc
+    environment:
+      - CGO_ENABLED: 0
+    steps:
+      - checkout
+      - run:
+          name: Install Task
+          command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      - run:
+          name: Create test key
+          command: |
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
+            touch i_agree_to_the_acme_terms
+            echo quanta-f06-leopard-ddr3 > TARGET
+            task config:generate
       - run:
           name: Test all
-          command: |
-            make get
-            make test
+          command: task test
       - run:
           name: Test coverage
-          command: make test TESTFLAGS=-cover
+          command: task coverage
   race:
     docker:
-      - image: cimg/go:1.16.5
+      - image: cimg/go:1.16.7
     working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 1
     steps:
       - checkout
       - run:
+          name: Install Task
+          command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      - run:
           name: Create test key
           command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            touch config/i_agree_to_the_acme_terms
-            go generate ./config/
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
+            touch i_agree_to_the_acme_terms
+            echo quanta-f06-leopard-ddr3 > TARGET
+            task config:generate
       - run:
           name: Race detector
-          command: |
-            make get
-            make test TESTFLAGS=-race
+          command: task race
   compile:
     docker:
-      - image: cimg/go:1.16.5
+      - image: cimg/go:1.16.7
     working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
     steps:
       - checkout
       - run:
+          name: Install Task
+          command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      - run:
           name: Create test key
           command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            touch config/i_agree_to_the_acme_terms
-            go generate ./config/
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
+            touch i_agree_to_the_acme_terms
+            echo quanta-f06-leopard-ddr3 > TARGET
+            task config:generate
       - run:
           name: build all commands
           command: |
-            make get
             cd cmd
             go install -a ./...
             cd ../
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
     docker:
-      - image: cimg/go:1.16.5
+      - image: cimg/go:1.16.7
     working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
-      - GO111MODULE: "on"
     steps:
       - checkout
       - run:
           name: Install dependencies
+          # Workaround for u-root only needed until proper modules support is in place
           command: |
             sudo apt-get update
             sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch libelf-dev qemu-kvm
-            go mod download
-            go mod verify
             GO111MODULE=off go get github.com/u-root/u-root
+            sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
       - run:
           name: Create test key
           command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f ./ssh_keys
-            touch config/i_agree_to_the_acme_terms
-      # TODO(bluecmd): This step should probably be cached somehow
-      - run:
-          name: Update submodules
-          command: |
-            # Since linux is huge it would be good to cache the tar file
-            # from somewhere. No submodules necessary anymore.
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
+            touch i_agree_to_the_acme_terms
+            echo quanta-f06-leopard-ddr3 > TARGET
       - run:
           name: Build image
-          command: |
-            go generate ./config/
-            make get
-            make
+          command: task build
       - store_artifacts:
-          path: flash.img
+          path: build/flash.img
           destination: flash.img
       - run:
-          name: Prepare integration tests
-          command: |
-            make integration/bzImage
-            export UBMC_QEMU=qemu-system-arm
-            export UBMC_NATIVE_QEMU=qemu-system-x86_64
-      - run:
           name: Run integration tests
-          command: |
-            cd integration/
-            go test
+          command: task integration
       - store_artifacts:
           path: integration/serial
       - run:

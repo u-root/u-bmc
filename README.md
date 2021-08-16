@@ -11,8 +11,8 @@ Card](https://goreportcard.com/badge/github.com/u-root/u-bmc)](https://goreportc
 u-bmc uses u-root to create a Linux OS distribution that is fully open-source.
 
 u-bmc borrows and contributes to [OpenBMC](https://github.com/openbmc/openbmc) which has
-similar high-level goals. The main difference is that u-bmc chooses to challenge the industry status quo.
-E.g. where OpenBMC uses IPMI, u-bmc uses gRPC.
+similar high-level goals. The main difference is that u-bmc chooses to challenge the industry status quo,
+e.g. where OpenBMC uses IPMI, u-bmc uses gRPC.
 
 # Demo
 
@@ -26,7 +26,7 @@ u-bmc sets out to improve this by offering an alternative built on modern techno
 # Support
 
 u-bmc is still in experimental stage and is currently only supporting
-BMCs based on ASPEED AST2400. Other BMC SOCs are planned, and if you want
+BMCs based on ASPEED AST2400 and AST2500. Other BMC SOCs are planned, and if you want
 to contribute let us know.
 
 Currently the supported boards are:
@@ -34,6 +34,7 @@ Currently the supported boards are:
 - Aspeed AST2500 Evaluation Board
 
 Planned boards are:
+- ASRock Rack PAUL
 - Nuvoton Poleg BMC NPCM7XX Evaluation Board
 - Open Compute Project: Quanta F20 Yosemite
 - Tyan Tempest CX S7106
@@ -61,8 +62,31 @@ To give you some sense of what we want to create:
 # Usage
 
 Prerequisites:
+
+u-bmc uses the Taskfile build system, install it using their [official installation guide](https://taskfile.dev/#/installation).
+
+Packages needed:
+- gcc-arm-none-eabi
+- mtd-utils
+- go
+- make
+- fakeroot
+- flex
+- bison
+- device-tree-compiler
+- bc
+- libssl-dev
+- libelf-dev
+- qemu-kvm
+
+Get them via e.g.:
 ```
-sudo apt install gcc-arm-none-eabi mtd-utils golang-1.12 fakeroot flex bison device-tree-compiler bc libssl-dev libelf-dev qemu-kvm
+sudo apt install gcc-arm-none-eabi mtd-utils golang fakeroot flex bison device-tree-compiler bc libssl-dev libelf-dev qemu-kvm
+```
+
+Until u-root has proper go modules support install it with:
+```
+GO111MODULES=off go get github.com/u-root/u-root
 ```
 
 Clone source code:
@@ -74,23 +98,26 @@ cd ~/go/src/github.com/u-root/u-bmc
 Setup configuration:
 ```
 # SSH ECDSA public keys does not work for now
-cp ~/.ssh/id_rsa.pub ssh_keys.pub
+cp ~/.ssh/id_rsa.pub config/ssh_keys.pub
 # Agree to the terms of the configured ACME server
 # By default it's just a toy ACME server so this is fine, but if you're
 # using another ACME server like Let's Encrypt (LE) ensure you agree to their terms.
 # For LE, you can find them at https://letsencrypt.org/repository/.
-touch config/i_agree_to_the_acme_terms
-go generate ./config/
+touch i_agree_to_the_acme_terms
+task config:generate
 ```
 
-Builld image:
+Build image:
 ```
-make get
-make
+cp config/TARGET.tmpl TARGET
+```
+then uncomment the desired target platform in TARGET and run
+```
+task build
 ```
 
 Since u-bmc uses signed binaries it is important that you back up the
-contents of boot/keys/ after building as u-bmc will only accept updates
+contents of build/boot/keys/ after building as u-bmc will only accept updates
 signed with these keys.
 
 # Hacking
@@ -105,12 +132,12 @@ Trying out u-bmc is easiest using the simulator. To launch it, run:
 
 ```
 # Launch a local ACME server
-make pebble &
+task pebble &
 # Launch u-bmc simulator
-make sim
+task sim
 # (Optional, run in another terminal) Launch a local emulated BIOS to produce some data on the UART
 # Needs to have u-bmc simulator above running for it to attach correctly.
-make run-ovmf
+task virtual-host
 ```
 
 When simulating the following TCP/IP ports are set up:
@@ -138,16 +165,9 @@ If you restart pebble you need to update root.crt.
 
 ## Testing
 
-The easiest way to run all unit tests is to run `make test`.
+The easiest way to run all unit tests is to run `task test`.
 
-To run the integration tests:
-```
-make integration/bzImage
-export UBMC_QEMU=qemu-system-arm
-export UBMC_NATIVE_QEMU=kvm
-cd integration
-go test
-```
+To run the integration tests: `task test`.
 
 If you're using a supported platform and want to try it on your hardware you
 can use socflash\_x64 provided by ASPEED like this:

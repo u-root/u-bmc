@@ -1,0 +1,96 @@
+version: '3'
+
+tasks:
+  # Fetch the source tarball
+  linux-fetch:
+    run: once
+    dir: build/linux
+    cmds:
+      - echo "Downloading kernel sources..."
+      - curl -L {{.__LINUX_URL}} --output {{.__LINUX_VERSION}}.tar.gz
+      - echo "Done!"
+    status:
+      - test -f {{.__LINUX_VERSION}}.tar.gz
+
+  # Unpack the tarball for the runtime kernel
+  linux-unpack-full:
+    run: once
+    deps:
+      - linux-fetch
+      - linux-unpack-boot # Needed to not clash with unpacking the tarball in parallel
+    dir: build/linux
+    cmds:
+      - echo "Unpacking kernel source..."
+      - tar -xzf {{.__LINUX_VERSION}}.tar.gz
+      - mv linux-{{.__LINUX_VERSION}} linux-{{.__LINUX_VERSION}}-full
+      - echo "Done!"
+    preconditions:
+      - sh: echo "{{.__LINUX_HASH}} {{.__LINUX_VERSION}}.tar.gz" | sha256sum --check
+        msg: "Kernel checksums don't match!"
+    status:
+      - test -d linux-{{.__LINUX_VERSION}}-full
+
+  # Unpack the tarball for the LinuxBoot kernel
+  linux-unpack-boot:
+    run: once
+    deps:
+      - linux-fetch
+    dir: build/linux
+    cmds:
+      - echo "Unpacking kernel source..."
+      - tar -xzf {{.__LINUX_VERSION}}.tar.gz
+      - mv linux-{{.__LINUX_VERSION}} linux-{{.__LINUX_VERSION}}-boot
+      - echo "Done!"
+    preconditions:
+      - sh: echo "{{.__LINUX_HASH}} {{.__LINUX_VERSION}}.tar.gz" | sha256sum --check
+        msg: "Kernel checksums don't match!"
+    status:
+      - test -d linux-{{.__LINUX_VERSION}}-boot
+
+  # Apply out-of-tree patches to the source
+  linux-patch:
+    run: once
+    deps:
+      - linux-unpack-full
+    dir: build/{{.__LINUX_DIR}}
+    cmds:
+      - echo "Patching kernel source..."
+      - |
+        for patch in ../../../patches/*.patch;
+        do
+          echo "=> Applying $patch";
+          git apply "$patch" || exit 1;
+        done
+        touch .patched
+      - echo "Done!"
+    status:
+      - test -f .patched
+
+  # Build the Linux runtime kernel
+  linux-build-full:
+    run: once
+    deps:
+      - linux-patch
+      - linux-build-boot # Needed to not clash with building two kernels in parallel
+    dir: build/{{.__LINUX_DIR}}
+    cmds:
+      - echo "Building runtime kernel for {{.__TARGET}}..."
+      - cp ../../../platform/{{.__TARGET}}/linux.config.full arch/{{.__ARCH}}/configs/ubmc_{{.__TARGET}}_full_defconfig
+      - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent ubmc_{{.__TARGET}}_full_defconfig
+      - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent
+      - cp arch/{{.__ARCH}}/boot/zImage ../zImage.full
+      - echo "Done!"
+
+  # Build the LinuxBoot kernel
+  linux-build-boot:
+    run: once
+    deps:
+      - linux-unpack-boot
+    dir: build/linux/linux-{{.__LINUX_VERSION}}-boot
+    cmds:
+      - echo "Building LinuxBoot kernel for {{.__TARGET}}..."
+      - cp ../../../platform/{{.__TARGET}}/linux.config.boot arch/{{.__ARCH}}/configs/ubmc_{{.__TARGET}}_boot_defconfig
+      - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent ubmc_{{.__TARGET}}_boot_defconfig
+      - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent
+      - cp arch/{{.__ARCH}}/boot/zImage ../zImage.boot
+      - echo "Done!"
