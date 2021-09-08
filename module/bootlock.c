@@ -24,6 +24,7 @@
 #define COMMON_OP_RDSR 0x05
 
 static struct spi_nor *nor;
+static struct spi_nor_controller_ops *ctrl;
 static void __iomem* aspeed_fmc_base;
 static void __iomem* aspeed_nor_base;
 
@@ -114,7 +115,7 @@ static ssize_t lock_show(struct kobject *kobj, struct kobj_attribute *attr,
 	uint32_t addr;
 
 	mutex_lock(&nor->lock);
-	nor->prepare(nor, SPI_NOR_OPS_LOCK);
+	ctrl->prepare(nor);
 	aspeed_user_control(1);
 
 	if (!device_supported()) {
@@ -140,7 +141,7 @@ static ssize_t lock_show(struct kobject *kobj, struct kobj_attribute *attr,
 
 read_err:
 	aspeed_user_control(0);
-	nor->unprepare(nor, SPI_NOR_OPS_LOCK);
+	ctrl->unprepare(nor);
 	mutex_unlock(&nor->lock);
 	if (ret < 0) {
 		return ret;
@@ -157,7 +158,7 @@ static ssize_t lock_store(struct kobject *kobj, struct kobj_attribute *attr,
 	uint32_t addr;
 
 	mutex_lock(&nor->lock);
-	nor->prepare(nor, SPI_NOR_OPS_LOCK);
+	ctrl->prepare(nor);
 	aspeed_user_control(1);
 
 	if (!device_supported()) {
@@ -176,7 +177,7 @@ static ssize_t lock_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 lock_err:
 	aspeed_user_control(0);
-	nor->unprepare(nor, SPI_NOR_OPS_LOCK);
+	ctrl->unprepare(nor);
 	mutex_unlock(&nor->lock);
 	return ret < 0 ? ret : count;
 }

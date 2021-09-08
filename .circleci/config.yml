@@ -30,14 +30,14 @@ workflows:
 jobs:
   clean-code:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/u-root/u-bmc
+      - image: cimg/go:1.16.5
+    working_directory: ~/go/src/github.com/u-root/u-bmc
     steps:
       - checkout
       - run:
           name: Install dep
           command: |
-            wget https://github.com/golang/dep/releases/download/v0.5.1/dep-linux-amd64
+            wget https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-amd64
             mv dep-linux-amd64 dep
             chmod +x dep
       - run:
@@ -62,8 +62,8 @@ jobs:
           command: ineffassign .
   test:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/u-root/u-bmc
+      - image: cimg/go:1.16.5
+    working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
     steps:
@@ -84,8 +84,8 @@ jobs:
           command: make test TESTFLAGS=-cover
   race:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/u-root/u-bmc
+      - image: cimg/go:1.16.5
+    working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 1
     steps:
@@ -103,8 +103,8 @@ jobs:
             make test TESTFLAGS=-race
   compile:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/u-root/u-bmc
+      - image: cimg/go:1.16.5
+    working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
     steps:
@@ -125,11 +125,10 @@ jobs:
             go install -a ./platform/quanta-f06-leopard-ddr3/cmd/uinit
   image:
     docker:
-      - image: circleci/golang:1.13
-    working_directory: /go/src/github.com/u-root/u-bmc
+      - image: cimg/go:1.16.5
+    working_directory: ~/go/src/github.com/u-root/u-bmc
     environment:
       - CGO_ENABLED: 0
-      - GO111MODULE: "on"
     steps:
       - checkout
       - run:
@@ -137,8 +136,8 @@ jobs:
           command: |
             sudo apt-get update
             sudo apt-get install gcc-arm-none-eabi mtd-utils fakeroot flex bison device-tree-compiler bc libssl-dev zlib1g-dev libglib2.0-dev libpixman-1-dev unzip cpio patch libelf-dev qemu-kvm
-            go mod download
-            go mod verify
+            go mod vendor
+            GO111MODULE=off go get github.com/u-root/u-root
       - run:
           name: Create test key
           command: |
