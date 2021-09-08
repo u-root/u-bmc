@@ -125,7 +125,7 @@ func TestStreamConsoleTransmit(t *testing.T) {
 	go func() {
 		err := sc.Send(&pb.ConsoleData{Data: []byte(expected)})
 		if err != nil {
-			t.Fatalf("sc.Send: %v", err)
+			t.Errorf("sc.Send: %v", err) // should be Fatalf but vet complains
 		}
 	}()
 
