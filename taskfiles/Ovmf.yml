@@ -1,0 +1,44 @@
+version: '3'
+
+tasks:
+  build:
+    cmds:
+      - task: edk2-clone
+      - task: edk2-submodules
+      - task: edk2-basetools
+      - task: ovmf-build
+
+  edk2-clone:
+    run: once
+    dir: build
+    cmds:
+      - echo "Cloning EDK II sources..."
+      - git clone https://github.com/tianocore/edk2.git
+      - echo "Done!"
+    status:
+      - test -d edk2
+  
+  edk2-submodules:
+    run: once
+    dir: build/edk2
+    cmds:
+      - echo "Updating sources and submodules..."
+      - git pull
+      - git submodule update --init
+      - echo "Done!"
+
+  edk2-basetools:
+    run: once
+    dir: build/edk2
+    cmds:
+      - echo "Building EDK II BaseTools..."
+      - make --silent -C BaseTools
+      - echo "Done!"
+
+  ovmf-build:
+    run: once
+    dir: build/edk2/OvmfPkg
+    cmds:
+      - echo "Building OVMF image..."
+      - ./build.sh
+      - echo "Done!"

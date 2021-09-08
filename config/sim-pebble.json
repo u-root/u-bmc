@@ -1,8 +1,8 @@
 {
   "pebble": {
     "listenAddress": ":14000",
-    "certificate": "config/sim-pebble.crt",
-    "privateKey": "config/sim-pebble.key",
+    "certificate": "build/config/sim-pebble.crt",
+    "privateKey": "build/config/sim-pebble.key",
     "httpPort": 8080,
     "tlsPort": 6443
   }

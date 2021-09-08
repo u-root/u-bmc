@@ -1,0 +1,26 @@
+version: '3'
+
+tasks:
+  # Call go test on all files
+  all:
+    cmds:
+      - rm -rf vendor/
+      - go test ./...
+
+  # Call go test with coverage on all files
+  coverage:
+    cmds:
+      - rm -rf vendor/
+      - go test -cover ./...
+
+  # Run go test
+  integration:
+    dir: integration
+    cmds:
+      - go test
+
+  # Call go test with race condition detection
+  race:
+    cmds:
+      - rm -rf vendor
+      - go test -race ./...
