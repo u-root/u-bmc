@@ -1,4 +1,5 @@
 # u-bmc
+![image](assets/u-bmc_logo.svg)
 
 [![Build
 Status](https://circleci.com/gh/u-root/u-bmc.svg?style=shield)](https://circleci.com/gh/u-root/u-bmc)
@@ -38,6 +39,7 @@ Planned boards are:
 - Nuvoton Poleg BMC NPCM7XX Evaluation Board
 - Open Compute Project: Quanta F20 Yosemite
 - Tyan Tempest CX S7106
+
 
 Do you want to become a contributor of a board? Let us know!
 
@@ -103,15 +105,19 @@ cp ~/.ssh/id_rsa.pub config/ssh_keys.pub
 # By default it's just a toy ACME server so this is fine, but if you're
 # using another ACME server like Let's Encrypt (LE) ensure you agree to their terms.
 # For LE, you can find them at https://letsencrypt.org/repository/.
+```
 touch i_agree_to_the_acme_terms
+```
+# Copy target template and pick target platform by uncomment line. Only one target allowed.
+```
+cp TARGET.tmpl TARGET
+```
+
+# Generate config
 task config:generate
 ```
 
 Build image:
-```
-cp config/TARGET.tmpl TARGET
-```
-then uncomment the desired target platform in TARGET and run
 ```
 task build
 ```
@@ -121,6 +127,8 @@ contents of build/boot/keys/ after building as u-bmc will only accept updates
 signed with these keys.
 
 # Hacking
+
+## Simulator/QEMU is WIP and does not work at the moment!
 
 To run the simulator and the integration test you need a special
 Qemu from https://github.com/openbmc/qemu. Using the upstream Qemu will
