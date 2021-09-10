@@ -20,6 +20,7 @@ dotenv: ['platform/{{.__TARGET}}/config.env', 'kernel.env']
 
 # Include all nested Taskfiles here
 includes:
+  platform: taskfiles/Platform.yml
   core: taskfiles/Core.yml
   proto: taskfiles/Proto.yml
   config: taskfiles/Config.yml
@@ -46,8 +47,8 @@ tasks:
       - echo "Building u-bmc image for $__TARGET"
       - mkdir -p build
       - go mod vendor # Only needed for u-root
-      - task: image:flash-img
-      - echo "Your image is at build/flash.img"
+      - task: platform:build-{{.__TARGET}}
+      - echo "Done!"
       
   # Remove compiled files
   clean:
