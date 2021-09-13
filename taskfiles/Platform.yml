@@ -7,12 +7,12 @@ tasks:
 
   build-aspeed-ast2500evb:
     deps:
-      - :img:flash-img
+      - :image:flash-img
     cmds:
       - echo "Your image is at build/flash.img"
 
   build-quanta-f06-leopard-ddr3:
     deps:
-      - :img:flash-img
+      - :image:flash-img
     cmds:
       - echo "Your image is at build/flash.img"
