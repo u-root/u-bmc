@@ -6,13 +6,11 @@ tasks:
       - echo "Please select a platform to build for!"
 
   build-aspeed-ast2500evb:
-    deps:
-      - :image:flash-img
     cmds:
+      - task: :image:flash-img
       - echo "Your image is at build/flash.img"
 
   build-quanta-f06-leopard-ddr3:
-    deps:
-      - :image:flash-img
     cmds:
+      - task: :image:flash-img
       - echo "Your image is at build/flash.img"
