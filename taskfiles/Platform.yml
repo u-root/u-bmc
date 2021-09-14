@@ -1,0 +1,16 @@
+version: '3'
+
+tasks:
+  build-:
+    cmds:
+      - echo "Please select a platform to build for!"
+
+  build-aspeed-ast2500evb:
+    cmds:
+      - task: :image:flash-img
+      - echo "Your image is at build/flash.img"
+
+  build-quanta-f06-leopard-ddr3:
+    cmds:
+      - task: :image:flash-img
+      - echo "Your image is at build/flash.img"
