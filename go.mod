@@ -1,6 +1,6 @@
 module github.com/u-root/u-bmc
 
-go 1.16
+go 1.17
 
 require (
 	github.com/beevik/ntp v0.3.0
@@ -8,7 +8,6 @@ require (
 	github.com/fullstorydev/grpcurl v1.8.1
 	github.com/golang/protobuf v1.5.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
-	github.com/insomniacslk/dhcp v0.0.0-20210827173440-b95caade3eac // indirect
 	github.com/jhump/protoreflect v1.8.2
 	github.com/jmhodges/clock v0.0.0-20160418191101-880ee4c33548
 	github.com/jpillora/backoff v1.0.0
@@ -26,4 +25,26 @@ require (
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 	google.golang.org/grpc v1.39.0
+)
+
+require (
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.1.1 // indirect
+	github.com/google/go-cmp v0.5.6 // indirect
+	github.com/google/goterm v0.0.0-20200907032337-555d40f16ae2 // indirect
+	github.com/josharian/native v0.0.0-20200817173448-b6b71def0850 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/mdlayher/socket v0.0.0-20210307095302-262dc9984e00 // indirect
+	github.com/prometheus/client_model v0.2.0 // indirect
+	github.com/prometheus/common v0.26.0 // indirect
+	github.com/prometheus/procfs v0.6.0 // indirect
+	github.com/u-root/uio v0.0.0-20210528151154-e40b768296a7 // indirect
+	github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
+	golang.org/x/mod v0.4.2 // indirect
+	golang.org/x/text v0.3.6 // indirect
+	golang.org/x/tools v0.0.0-20200904185747-39188db58858 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
+	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
+	google.golang.org/protobuf v1.26.0 // indirect
+	gopkg.in/square/go-jose.v2 v2.1.9 // indirect
 )
