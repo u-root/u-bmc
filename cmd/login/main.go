@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	shell = flag.String("shell", "/bbin/elvish", "Shell to login to")
+	shell = flag.String("shell", "/bin/elvish", "Shell to login to")
 )
 
 func main() {
@@ -40,7 +40,7 @@ func main() {
 
 `)
 
-	envv := []string{"TZ=UTC", "HOME=/root", "USER=root", "PATH=/bbin:/bin"}
-	err = unix.Exec(*shell, []string{*shell}, envv)
+	env := []string{"TZ=UTC", "HOME=/root", "USER=root", "PATH=/bin"}
+	err = unix.Exec(*shell, []string{*shell}, env)
 	log.Fatalf("Failed to exec: %v", err)
 }
