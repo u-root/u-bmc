@@ -6,7 +6,7 @@ package platform
 
 import (
 	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/platform/qemu-virt-a15/pkg/gpio"
+	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/gpio"
 )
 
 type platform struct {
