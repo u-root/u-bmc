@@ -1,4 +1,4 @@
-// Copyright 2016-2018 the u-root Authors. All rights reserved
+// Copyright 2016-2021 the u-root Authors. All rights reserved
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
@@ -11,6 +11,7 @@ package main
 import (
 	"context"
 	"crypto"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -32,16 +33,30 @@ const (
 	// for now.
 	kernelPath = "/mnt/boot/zImage"
 	dtbPath    = "/mnt/boot/platform.dtb"
+	initPath   = "/mnt/bin/init"
 )
 
 var (
-	verify = []string{"/mnt/init", kernelPath, dtbPath}
+	mtd    = flag.Bool("mtd", false, "Mount and load u-bmc from MTD flash")
+	blk    = flag.Bool("blk", false, "Mount and load u-bmc from block device")
+	ast    = flag.Bool("ast", false, "ASPEED ast specific option")
+	dev    = flag.String("dev", "", "Path to root block device")
+	verify = []string{initPath, kernelPath, dtbPath}
 )
 
 func main() {
-	if err := loadModule("/bootlock.ko"); err != nil {
-		log.Fatalf("loadModule(/bootlock.ko): %v", err)
+	flag.Parse()
+	if *mtd && *blk {
+		log.Fatal("Please choose either mtd or blk, not both!")
 	}
+
+	if *ast {
+		err := loadModule("/bootlock.ko")
+		if err != nil {
+			log.Fatalf("loadModule(/bootlock.ko): %v", err)
+		}
+	}
+
 	keyf, err := os.Open(pubKeyPath)
 	if err != nil {
 		log.Fatalf("Open(%s): %v", pubKeyPath, err)
@@ -51,14 +66,35 @@ func main() {
 		log.Fatalf("readPublicSigningKey(%s): %v", pubKeyPath, err)
 	}
 
-	err = unix.Mkdir("/mnt/", 0755)
-	if err != nil {
-		log.Fatalf("Mkdir(/mnt/): %v", err)
+	dirs := []string{"/mnt", "/ro", "/tmp/upper", "/tmp/work", "/proc", "/sys"}
+	for _, dir := range dirs {
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			log.Fatalf("Mkdir(%s): %v", dir, err)
+		}
 	}
-	err = unix.Mount("ubi0:root", "/mnt", "ubifs", unix.MS_RDONLY, "")
-	if err != nil {
-		log.Fatalf("Mount(ubi0:root): %v", err)
+
+	if *mtd {
+		err = unix.Mount("ubi0:root", "/mnt", "ubifs", unix.MS_RDONLY, "")
+		if err != nil {
+			log.Fatalf("Mount(ubi0:root): %v", err)
+		}
 	}
+	if *blk {
+		err = unix.Mount(*dev, "/ro", "erofs", unix.MS_RDONLY, "")
+		if err != nil {
+			log.Fatalf("Mount(%s): %v", *dev, err)
+		}
+		err = unix.Mount("tmpfs", "/tmp", "tmpfs", 0, "")
+		if err != nil {
+			log.Fatalf("Mount(tmpfs): %v", err)
+		}
+		err = unix.Mount("overlayfs", "/mnt", "overlay", 0, "lowerdir=/ro,upperdir=/tmp/upper,workdir=/tmp/work")
+		if err != nil {
+			log.Fatalf("Mount(overlayfs): %v", err)
+		}
+	}
+
 	for _, path := range verify {
 		f, err := openAndVerify(path, key)
 		if err != nil {
@@ -68,12 +104,10 @@ func main() {
 	}
 	log.Printf("Integrity check OK")
 
-	// Load the real kernel
-	// TODO(bluecmd): Use u-root kexec package when it supports ARM
-	// https://github.com/u-root/u-root/issues/401
-	_ = unix.Mknod("/dev/null", unix.S_IFCHR|0600, 0x0103)
-	_ = unix.Mkdir("/proc", 0755)
-	_ = unix.Mkdir("/sys", 0755)
+	err = unix.Mknod("/dev/null", unix.S_IFCHR|0600, 0x0103)
+	if err != nil {
+		log.Fatalf("Mknod(/dev/null): %v", err)
+	}
 	err = unix.Mount("proc", "/proc", "proc", 0, "")
 	if err != nil {
 		log.Fatalf("Mount(proc): %v", err)
@@ -83,6 +117,9 @@ func main() {
 		log.Fatalf("Mount(sysfs): %v", err)
 	}
 
+	// Load the runtime kernel
+	// TODO(bluecmd): Use u-root kexec package when it supports ARM
+	// https://github.com/u-root/u-root/issues/401
 	cmd := exec.Command("/kexec", "-d", "-l", kernelPath, "--dtb", dtbPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
