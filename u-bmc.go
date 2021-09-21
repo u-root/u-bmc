@@ -65,7 +65,7 @@ func Main() error {
 	opts := bb.Opts{
 		Env:          env,
 		CommandPaths: commands,
-		BinaryPath:   pwd + "/rroot/bin/bb",
+		BinaryPath:   pwd + "/rootfs/bin/bb",
 		GoBuildOpts: &golang.BuildOpts{
 			NoStrip:        false,
 			NoTrimPath:     false,
@@ -82,20 +82,20 @@ func Main() error {
 
 	// Create symlinks for the bb binary and all commands
 	for _, cmd := range commands {
-		err := os.Symlink("bb", "rroot/bin/"+filepath.Base(cmd))
+		err := os.Symlink("bb", "rootfs/bin/"+filepath.Base(cmd))
 		if err != nil {
 			return err
 		}
 	}
-	err = os.Symlink("elvish", "rroot/bin/sh")
+	err = os.Symlink("elvish", "rootfs/bin/sh")
 	if err != nil {
 		return err
 	}
 
 	// Create default directory structure
-	directories := []string{"dev", "proc", "sys", "usr/lib", "var/log", "tmp", "etc"}
+	directories := []string{"dev", "proc", "sys", "usr/lib", "var/log", "tmp", "etc", "boot", "config"}
 	for _, dir := range directories {
-		err := os.MkdirAll("rroot/"+dir, 0755)
+		err := os.MkdirAll("rootfs/"+dir, 0755)
 		if err != nil {
 			return err
 		}

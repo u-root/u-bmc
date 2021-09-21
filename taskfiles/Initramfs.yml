@@ -1,40 +1,16 @@
 version: '3'
 
 tasks:
-  # Assemble the main initramfs by invoking the u-bmc binary
-  build:
-    run: once
-    deps:
-      - :core:u-bmc-build
-      - :core:signer
-      - :config:generate
-    dir: build
-    cmds:
-      - echo "Assembling runtime initramfs..."
-      # Dirty workaround until u-root has proper go modules support
-      - rm -r ../vendor/github.com/u-root/u-root
-      - ln -sf ../../../../u-root ../vendor/github.com/u-root/
-      - GOARM={{.__GOARM}} GOARCH={{.__ARCH}} ./u-bmc -o initramfs.cpio -p {{.__TARGET}}
-      - echo "Done!"
-    status:
-      - test -f initramfs.cpio
-
   # Assemble the LinuxBoot initramfs
   loader-cpio:
-    run: once
-    deps: 
-      - :core:loader
-      - :core:signer
-      - :core:kexec
-      - :kmod:build
     dir: build
     cmds:
       - echo "Assembling LinuxBoot initramfs..."
+      - mkdir -p kmod && touch kmod/bootlock.ko # Needed because not all targets have modules
       - sh -c "cd boot/loader/; echo loader | cpio --format newc --create --file ../loader.cpio"
       - sh -c "cd boot/keys/; echo u-bmc.pub | cpio --format newc --create --append --file ../loader.cpio"
       - sh -c "cd kmod/; echo *.ko | cpio --format newc --create --append --file ../boot/loader.cpio"
       - sh -c "cd boot/; echo kexec | cpio --format newc --create --append --file loader.cpio"
-      - gzip boot/loader.cpio
       - echo "Done!"
     status:
-      - test -f loader.cpio.gz
+      - test -f loader.cpio

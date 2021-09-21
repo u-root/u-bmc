@@ -3,7 +3,6 @@ version: '3'
 tasks:
   # Meta task to generate go files containing configuration values
   generate:
-    run: once
     deps:
       - ssh-keys
       - version
@@ -14,7 +13,6 @@ tasks:
 
   # Generate list of allowed ssh public keys
   ssh-keys:
-    run: once
     dir: config
     cmds:
       - touch ssh_keys.pub
@@ -24,7 +22,6 @@ tasks:
 
   # Generate version file
   version:
-    run: once
     dir: config
     cmds:
       - ./version.sh > version.go
@@ -33,7 +30,6 @@ tasks:
 
   # Generate acme file
   acme:
-    run: once
     dir: config
     cmds:
       - cp ./acme.go.tmpl acme.go
@@ -46,7 +42,6 @@ tasks:
 
   # Create pebble key
   sim-key:
-    run: once
     dir: config
     cmds:
       - |
@@ -60,7 +55,6 @@ tasks:
 
   # Create pebble certificate
   sim-crt:
-    run: once
     deps:
       - sim-key
     dir: config
@@ -82,7 +76,6 @@ tasks:
 
   # Generate pebble configuration
   sim-pebble:
-    run: once
     deps:
       - sim-crt
     dir: config

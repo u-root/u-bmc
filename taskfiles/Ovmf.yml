@@ -9,7 +9,6 @@ tasks:
       - task: ovmf-build
 
   edk2-clone:
-    run: once
     dir: build
     cmds:
       - echo "Cloning EDK II sources..."
@@ -19,7 +18,6 @@ tasks:
       - test -d edk2
   
   edk2-submodules:
-    run: once
     dir: build/edk2
     cmds:
       - echo "Updating sources and submodules..."
@@ -28,7 +26,6 @@ tasks:
       - echo "Done!"
 
   edk2-basetools:
-    run: once
     dir: build/edk2
     cmds:
       - echo "Building EDK II BaseTools..."
@@ -36,9 +33,9 @@ tasks:
       - echo "Done!"
 
   ovmf-build:
-    run: once
     dir: build/edk2/OvmfPkg
     cmds:
       - echo "Building OVMF image..."
       - ./build.sh
+      - cp ../Build/OvmfX64/DEBUG_GCC5/FV/OVMF.fd ../../ovmf.rom
       - echo "Done!"

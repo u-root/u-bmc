@@ -46,7 +46,6 @@ tasks:
     cmds:
       - echo "Building u-bmc image for $__TARGET"
       - mkdir -p build
-      - go mod vendor # Only needed for u-root
       - task: platform:build-{{.__TARGET}}
       - echo "Done!"
       
@@ -66,7 +65,7 @@ tasks:
       - echo "Done!"
 
   # Removes the whole build folder
-  distclean:
+  purge:
     desc: Cleans up compiled and downloaded files
     cmds:
       - echo "Wiping the whole build directory and config files!"
@@ -148,5 +147,5 @@ tasks:
     desc: Run the u-bmc simulator
     cmds:
       - echo "Running u-bmc simulator in Qemu..."
-      - task: qemu:bmc
+      - task: qemu:bmc-{{.CLI_ARGS}}
       - echo "Finished the u-bmc simulator"

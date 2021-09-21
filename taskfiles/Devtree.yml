@@ -3,10 +3,6 @@ version: '3'
 tasks:
   # Generate the final flash layout
   flash-layout:
-    run: once
-    deps:
-    - :initramfs:loader-cpio
-    - :kernel:linux-build-boot
     dir: build/boot
     cmds:
       - echo "Generating flash layout file..."
@@ -26,10 +22,8 @@ tasks:
 
   # Generate a dummy device tree binary
   dtb-dummy:
-    run: once
     deps:
       - flash-layout
-      - :initramfs:loader-cpio
     dir: build
     cmds:
       - echo "Building dummy dtb..."
@@ -43,8 +37,8 @@ tasks:
       - |
         cpp \
         -nostdinc \
-        -I {{.__LINUX_DIR}}/arch/{{.__ARCH}}/boot/dts/ \
-        -I {{.__LINUX_DIR}}/include/ \
+        -I {{.__LINUX_DIR}}-full/arch/{{.__ARCH}}/boot/dts/ \
+        -I {{.__LINUX_DIR}}-full/include/ \
         -I ../platform/{{.__TARGET}}/boot/ \
         -I boot/ \
         -DBOOTLOADER \
@@ -58,7 +52,6 @@ tasks:
 
   # Generate a LinuxBoot device tree binary
   dtb-boot:
-    run: once
     deps:
       - dtb-dummy
     dir: build
@@ -74,8 +67,8 @@ tasks:
       - |
         cpp \
         -nostdinc \
-        -I {{.__LINUX_DIR}}/arch/{{.__ARCH}}/boot/dts/ \
-        -I {{.__LINUX_DIR}}/include/ \
+        -I {{.__LINUX_DIR}}-full/arch/{{.__ARCH}}/boot/dts/ \
+        -I {{.__LINUX_DIR}}-full/include/ \
         -I ../platform/{{.__TARGET}}/boot/ \
         -I boot/ \
         -DBOOTLOADER \
@@ -88,7 +81,6 @@ tasks:
 
   # Generate the runtime device tree binary
   dtb-full:
-    run: once
     deps:
       - dtb-boot
     dir: build
@@ -97,8 +89,8 @@ tasks:
       - |
         cpp \
         -nostdinc \
-        -I {{.__LINUX_DIR}}/arch/{{.__ARCH}}/boot/dts/ \
-        -I {{.__LINUX_DIR}}/include/ \
+        -I {{.__LINUX_DIR}}-full/arch/{{.__ARCH}}/boot/dts/ \
+        -I {{.__LINUX_DIR}}-full/include/ \
         -I ../platform/{{.__TARGET}}/boot/ \
         -I boot/ \
         -DBOOTLOADER \

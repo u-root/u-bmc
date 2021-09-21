@@ -3,8 +3,6 @@ version: '3'
 tasks:
   # Build out-of-tree kernel modules
   build:
-    run: once
-    deps: [":kernel:linux-build-full"]
     dir: build
     cmds:
       - echo "Building out-of-tree kernel modules..."
@@ -14,15 +12,15 @@ tasks:
         make \
         --silent \
         -j {{.CPUS}} \
-        -C {{.__LINUX_DIR}} \
+        -C {{.__LINUX_DIR}}-full \
         CROSS_COMPILE={{.__TOOLCHAIN}} \
         ARCH={{.__ARCH}} \
         M={{.PWD}}/kmod
         O=kmod
       - |
-        {{.__LINUX_DIR}}/scripts/sign-file sha256 \
-        {{.__LINUX_DIR}}/certs/signing_key.pem \
-        {{.__LINUX_DIR}}/certs/signing_key.x509 \
+        {{.__LINUX_DIR}}-full/scripts/sign-file sha256 \
+        {{.__LINUX_DIR}}-full/certs/signing_key.pem \
+        {{.__LINUX_DIR}}-full/certs/signing_key.x509 \
         kmod/*.ko
       - echo "Done!"
     vars:
