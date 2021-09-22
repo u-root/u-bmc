@@ -79,7 +79,7 @@ CONFIG_KEXEC_SIG=y
 # CONFIG_ARCH_RANDOM is not set
 # CONFIG_ARM64_SVE is not set
 # CONFIG_RELOCATABLE is not set
-CONFIG_CMDLINE="earlyprintk=1 console=ttyAMA0"
+CONFIG_CMDLINE="earlyprintk=1 console=ttyAMA0 rdinit=/loader -- -blk -dev /dev/vda"
 # CONFIG_SUSPEND is not set
 # CONFIG_DMIID is not set
 # CONFIG_EFI_ARMSTUB_DTB_LOADER is not set

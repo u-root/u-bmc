@@ -28,9 +28,8 @@ import (
 )
 
 const (
+	UUID       = "26ab0401-3f49-4fc2-a172-c8aa02aceaf3"
 	pubKeyPath = "/u-bmc.pub"
-	// TODO(bluecmd): We cannot chroot into /mnt since we have to run /kexec
-	// for now.
 	kernelPath = "/mnt/boot/zImage"
 	dtbPath    = "/mnt/boot/platform.dtb"
 	initPath   = "/mnt/bin/init"
@@ -40,7 +39,6 @@ var (
 	mtd    = flag.Bool("mtd", false, "Mount and load u-bmc from MTD flash")
 	blk    = flag.Bool("blk", false, "Mount and load u-bmc from block device")
 	ast    = flag.Bool("ast", false, "ASPEED ast specific option")
-	dev    = flag.String("dev", "", "Path to root block device")
 	verify = []string{initPath, kernelPath, dtbPath}
 )
 
@@ -66,14 +64,6 @@ func main() {
 		log.Fatalf("readPublicSigningKey(%s): %v", pubKeyPath, err)
 	}
 
-	dirs := []string{"/mnt", "/ro", "/tmp/upper", "/tmp/work", "/proc", "/sys"}
-	for _, dir := range dirs {
-		err = os.MkdirAll(dir, 0755)
-		if err != nil {
-			log.Fatalf("Mkdir(%s): %v", dir, err)
-		}
-	}
-
 	if *mtd {
 		err = unix.Mount("ubi0:root", "/mnt", "ubifs", unix.MS_RDONLY, "")
 		if err != nil {
@@ -81,17 +71,9 @@ func main() {
 		}
 	}
 	if *blk {
-		err = unix.Mount(*dev, "/ro", "erofs", unix.MS_RDONLY, "")
+		err = unix.Mount("UUID="+UUID, "/ro", "erofs", unix.MS_RDONLY, "")
 		if err != nil {
-			log.Fatalf("Mount(%s): %v", *dev, err)
-		}
-		err = unix.Mount("tmpfs", "/tmp", "tmpfs", 0, "")
-		if err != nil {
-			log.Fatalf("Mount(tmpfs): %v", err)
-		}
-		err = unix.Mount("overlayfs", "/mnt", "overlay", 0, "lowerdir=/ro,upperdir=/tmp/upper,workdir=/tmp/work")
-		if err != nil {
-			log.Fatalf("Mount(overlayfs): %v", err)
+			log.Fatalf("Mount(%s): %v", "UUID="+UUID, err)
 		}
 	}
 
@@ -104,27 +86,20 @@ func main() {
 	}
 	log.Printf("Integrity check OK")
 
-	err = unix.Mknod("/dev/null", unix.S_IFCHR|0600, 0x0103)
-	if err != nil {
-		log.Fatalf("Mknod(/dev/null): %v", err)
-	}
-	err = unix.Mount("proc", "/proc", "proc", 0, "")
-	if err != nil {
-		log.Fatalf("Mount(proc): %v", err)
-	}
-	err = unix.Mount("sysfs", "/sys", "sysfs", 0, "")
-	if err != nil {
-		log.Fatalf("Mount(sysfs): %v", err)
-	}
-
 	// Load the runtime kernel
 	// TODO(bluecmd): Use u-root kexec package when it supports ARM
 	// https://github.com/u-root/u-root/issues/401
 	cmd := exec.Command("/kexec", "-d", "-l", kernelPath, "--dtb", dtbPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	err = cmd.Run()
+	if err != nil {
 		log.Fatalf("cmd.Run(kexec -d -l %s --dtb %s): %v", kernelPath, dtbPath, err)
+	}
+
+	err = unix.Unmount("/mnt", 0)
+	if err != nil {
+		log.Fatalf("Unmount(/mnt): %v", err)
 	}
 
 	cmd = exec.Command("/kexec", "-e")
