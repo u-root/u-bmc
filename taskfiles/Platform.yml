@@ -74,7 +74,6 @@ tasks:
       - task: :core:signer
       - task: :core:loader
       - task: :kernel:linux-build-full
-      - task: :core:kexec #TODO this is only working on 32bit
       - task: :initramfs:loader-cpio
       - task: :kernel:linux-build-boot
       - task: :image:rootfs

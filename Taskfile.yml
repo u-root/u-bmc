@@ -58,10 +58,9 @@ tasks:
       - rm -rf build/kmod
       - rm -rf build/linux/zImage.*
       - rm -rf build/root
-      - rm -rf build/img
-      - rm -f build/initramfs.cpio
+      - rm -rf build/*img
+      - rm -rf build/rootfs
       - rm -f build/u-bmc
-      - rm -f build/flash.img
       - echo "Done!"
 
   # Removes the whole build folder
@@ -143,8 +142,8 @@ tasks:
       - echo "Stopped virtual host"
 
   # Run BMC qemu
-  sim:
-    desc: Run the u-bmc simulator
+  virtual-bmc:
+    desc: Launch Qemu to simulate a BMC
     cmds:
       - echo "Running u-bmc simulator in Qemu..."
       - task: qemu:bmc-{{.CLI_ARGS}}

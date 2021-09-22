@@ -3,14 +3,18 @@ version: '3'
 tasks:
   # Assemble the LinuxBoot initramfs
   loader-cpio:
-    dir: build
+    dir: build/boot
     cmds:
       - echo "Assembling LinuxBoot initramfs..."
-      - mkdir -p kmod && touch kmod/bootlock.ko # Needed because not all targets have modules
-      - sh -c "cd boot/loader/; echo loader | cpio --format newc --create --file ../loader.cpio"
-      - sh -c "cd boot/keys/; echo u-bmc.pub | cpio --format newc --create --append --file ../loader.cpio"
-      - sh -c "cd kmod/; echo *.ko | cpio --format newc --create --append --file ../boot/loader.cpio"
-      - sh -c "cd boot/; echo kexec | cpio --format newc --create --append --file loader.cpio"
+      - mkdir -p dev # Needed for targets using block devices
+      - cp ../../kexec ./ # Just for testing
+      - mkdir -p ../kmod && touch ../kmod/stub.ko # Needed because not all targets have modules
+      - echo dev | {{.CPIO}} loader.cpio
+      - echo loader | {{.CPIO}} loader.cpio --append
+      - cd ./keys && echo u-bmc.pub | {{.CPIO}} ../loader.cpio --append
+      - cd ../kmod && echo *.ko | {{.CPIO}} ../boot/loader.cpio --append
       - echo "Done!"
+    vars:
+      CPIO: "cpio --reproducible --owner 0:0 --format newc --create --file"
     status:
       - test -f loader.cpio

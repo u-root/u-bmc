@@ -30,8 +30,8 @@ import (
 )
 
 var (
-	privateKeyPath  = "../../boot/keys/u-bmc.key"
-	publicKeyPath   = "../../boot/keys/u-bmc.pub"
+	privateKeyPath  = "./keys/u-bmc.key"
+	publicKeyPath   = "./keys/u-bmc.pub"
 	keyLifetimeSecs = uint32(86400 * 365 * 100)
 )
 

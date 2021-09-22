@@ -7,6 +7,8 @@ tasks:
       - echo "Building u-bmc executable..."
       - go build -o build/u-bmc
       - echo "Done!"
+    status:
+      - test -f build/u-bmc
 
   # Generate a private key
   u-bmc-key:
@@ -23,22 +25,22 @@ tasks:
   signer:
     deps:
       - u-bmc-key
-    dir: build/boot/signer
+    dir: build/boot
     cmds:
       - echo "Building signer and generating public key..."
-      - cd ../../../boot/signer && go build -o ../../build/boot/signer/
+      - cd ../../boot/signer && go build -o ../../build/boot/
       - echo | ./signer > /dev/null
       - echo "Done!"
     status:
       - test -f signer
-      - test -f ../keys/u-bmc.pub
+      - test -f keys/u-bmc.pub
 
   # Build the LinuxBoot bootloader
   loader:
-    dir: build/boot/loader
+    dir: build/boot
     cmds:
       - echo "Building LinuxBoot loader..."
-      - cd ../../../boot/loader && GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../build/boot/loader/
+      - cd ../../boot/loader && GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../build/boot/
       - echo "Done!"
     status:
       - test -f loader
