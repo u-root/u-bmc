@@ -19,10 +19,12 @@ tasks:
       - task: :core:u-bmc-build
       - task: :core:signer
       - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
       - task: :kernel:linux-build-full
       - task: :kmod:build
-      - task: :core:kexec
-      - task: :initramfs:loader-cpio
+      - task: :initramfs:bootldr-cpio
       - task: :kernel:linux-build-boot
       - task: :devtree:dtb-full
       - task: :core:aspeed-boot-bin
@@ -38,10 +40,12 @@ tasks:
       - task: :core:u-bmc-build
       - task: :core:signer
       - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
       - task: :kernel:linux-build-full
       - task: :kmod:build
-      - task: :core:kexec
-      - task: :initramfs:loader-cpio
+      - task: :initramfs:bootldr-cpio
       - task: :kernel:linux-build-boot
       - task: :devtree:dtb-full
       - task: :core:aspeed-boot-bin
@@ -57,9 +61,11 @@ tasks:
       - task: :core:u-bmc-build
       - task: :core:signer
       - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
       - task: :kernel:linux-build-full
-      - task: :core:kexec
-      - task: :initramfs:loader-cpio
+      - task: :initramfs:bootldr-cpio
       - task: :kernel:linux-build-boot
       - task: :image:rootfs
       - task: :image:erofs-root
@@ -73,8 +79,11 @@ tasks:
       - task: :core:u-bmc-build
       - task: :core:signer
       - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
       - task: :kernel:linux-build-full
-      - task: :initramfs:loader-cpio
+      - task: :initramfs:bootldr-cpio
       - task: :kernel:linux-build-boot
       - task: :image:rootfs
       - task: :image:erofs-root

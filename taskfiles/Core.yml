@@ -36,6 +36,7 @@ tasks:
       - test -f keys/u-bmc.pub
 
   # Build the LinuxBoot bootloader
+  #TODO If size is critically important we could add upx here
   loader:
     dir: build/boot
     cmds:
@@ -44,6 +45,16 @@ tasks:
       - echo "Done!"
     status:
       - test -f loader
+
+  # Build the initramfs packer
+  cpio:
+    dir: build/boot
+    cmds:
+      - echo "Building initramfs packer..."
+      - cd ../../boot/cpio && go build -o ../../build/boot/
+      - echo "Done!"
+    status:
+      - test -f cpio
 
   # Build the ASPEED boot firmware
   aspeed-boot-bin:
@@ -72,13 +83,3 @@ tasks:
     status:
       - test {{.__SOC}} != ast2400
       - test {{.__SOC}} != ast2500
-
-  # Download bluecmd's arm kexec binary #TODO Do we need this anymore? arm has kexec_load and arm64 even kexec_file_load by now
-  kexec:
-    dir: build/boot
-    cmds:
-      - echo "Downloading kexec binary..." 
-      - curl --silent -O https://github.com/bluecmd/tools/raw/master/arm/kexec
-      - echo "Done!"
-    status:
-      - test -f kexec
