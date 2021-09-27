@@ -177,8 +177,9 @@ func startNetwork(config *pb.Network) (*network, error) {
 		log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
 	}
 
-	// TODO use insomniacslk/dhcp instead of u-root
-	// _, err := dhclient.IfUp(iface, interfaceUpTimeout)
+	// TODO use insomniacslk/dhcp instead of external dhclient
+	// dhclient := exec.Command("dhclient")
+	// err := dhclient.Run()
 	// if err != nil {
 	// 	return nil, err
 	// }

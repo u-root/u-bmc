@@ -13,7 +13,7 @@ CONFIG_RCU_BOOST=y
 CONFIG_IKCONFIG=y
 CONFIG_IKCONFIG_PROC=y
 CONFIG_BLK_DEV_INITRD=y
-CONFIG_INITRAMFS_SOURCE="../../boot/loader.cpio"
+CONFIG_INITRAMFS_SOURCE="../../boot/bootldr.cpio"
 # CONFIG_RD_BZIP2 is not set
 # CONFIG_RD_LZMA is not set
 # CONFIG_RD_XZ is not set
@@ -79,7 +79,7 @@ CONFIG_KEXEC_SIG=y
 # CONFIG_ARCH_RANDOM is not set
 # CONFIG_ARM64_SVE is not set
 # CONFIG_RELOCATABLE is not set
-CONFIG_CMDLINE="earlyprintk=1 console=ttyAMA0 rdinit=/loader -- -blk -dev /dev/vda"
+CONFIG_CMDLINE="earlyprintk=1 nr_cpus=1 rdinit=/loader -- -kexec -blk"
 # CONFIG_SUSPEND is not set
 # CONFIG_DMIID is not set
 # CONFIG_EFI_ARMSTUB_DTB_LOADER is not set

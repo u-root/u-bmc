@@ -2,13 +2,19 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 //
-// loader mounts the root file system on /mnt/ and then
-// validates the signature of /init against a build-in public key.
-// If everything checks out /init is exec'd after a chroot.
+// loader can operate in two modes: kexec and switch
+// In kexec mode it mounts the rootfs to /ro and
+// validates the files in there against its keys.
+// If everything matches it uses kexec to load and
+// execute the previously validated kernel.
+// In switch mode it just sets up the rootfs mount
+// and spans an overlayfs on top. After that it uses
+// switch_root to move the mount points and run init.
 
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"flag"
@@ -16,26 +22,30 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"time"
 
 	"github.com/machinebox/progress"
+	"github.com/u-root/u-root/pkg/boot"
+	"github.com/u-root/u-root/pkg/boot/kexec"
 	"github.com/u-root/u-root/pkg/kmodule"
+	uroot "github.com/u-root/u-root/pkg/mount"
+	"github.com/u-root/u-root/pkg/uio"
 	"golang.org/x/crypto/openpgp/errors"
 	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/sys/unix"
 )
 
 const (
-	UUID       = "26ab0401-3f49-4fc2-a172-c8aa02aceaf3"
 	pubKeyPath = "/u-bmc.pub"
-	kernelPath = "/mnt/boot/zImage"
-	dtbPath    = "/mnt/boot/platform.dtb"
-	initPath   = "/mnt/bin/init"
+	kernelPath = "/ro/boot/zImage"
+	dtbPath    = "/ro/boot/platform.dtb"
+	initPath   = "/ro/bin/init"
 )
 
 var (
+	kload  = flag.Bool("kexec", false, "Mount rootfs and call kexec")
+	swroot = flag.Bool("switch", false, "Mount rootfs and call switch_root")
 	mtd    = flag.Bool("mtd", false, "Mount and load u-bmc from MTD flash")
 	blk    = flag.Bool("blk", false, "Mount and load u-bmc from block device")
 	ast    = flag.Bool("ast", false, "ASPEED ast specific option")
@@ -45,16 +55,50 @@ var (
 func main() {
 	flag.Parse()
 	if *mtd && *blk {
-		log.Fatal("Please choose either mtd or blk, not both!")
+		log.Fatal("mtd and blk are mutually exclusive!")
 	}
-
+	if !*mtd && !*blk {
+		log.Fatal("please choose either mtd or blk!")
+	}
+	if *kload && *swroot {
+		log.Fatal("kexec and switch are mutually exclusive!")
+	}
+	if !*kload && !*swroot {
+		log.Fatal("please choose either kexec or switch!")
+	}
 	if *ast {
 		err := loadModule("/bootlock.ko")
 		if err != nil {
 			log.Fatalf("loadModule(/bootlock.ko): %v", err)
 		}
 	}
+	if *kload {
+		loadAndExec()
+	}
+	if *swroot {
+		mountAndSwitchRoot()
+	}
+}
 
+// mountAndSwitchRoot mounts the rootfs and overlay then runs switch_root
+func mountAndSwitchRoot() {
+	createBasicHirarchy()
+	if *mtd {
+		mountMtd()
+	}
+	if *blk {
+		mountBlk()
+	}
+	mountOverlay()
+
+	err := uroot.SwitchRoot("/mnt", "/bin/init")
+	if err != nil {
+		log.Fatalf("SwitchRoot: %v", err)
+	}
+}
+
+// loadAndExec validates boot files and runs them via kexec
+func loadAndExec() {
 	keyf, err := os.Open(pubKeyPath)
 	if err != nil {
 		log.Fatalf("Open(%s): %v", pubKeyPath, err)
@@ -64,17 +108,12 @@ func main() {
 		log.Fatalf("readPublicSigningKey(%s): %v", pubKeyPath, err)
 	}
 
+	createBasicHirarchy()
 	if *mtd {
-		err = unix.Mount("ubi0:root", "/mnt", "ubifs", unix.MS_RDONLY, "")
-		if err != nil {
-			log.Fatalf("Mount(ubi0:root): %v", err)
-		}
+		mountMtd()
 	}
 	if *blk {
-		err = unix.Mount("UUID="+UUID, "/ro", "erofs", unix.MS_RDONLY, "")
-		if err != nil {
-			log.Fatalf("Mount(%s): %v", "UUID="+UUID, err)
-		}
+		mountBlk()
 	}
 
 	for _, path := range verify {
@@ -86,28 +125,126 @@ func main() {
 	}
 	log.Printf("Integrity check OK")
 
-	// Load the runtime kernel
-	// TODO(bluecmd): Use u-root kexec package when it supports ARM
-	// https://github.com/u-root/u-root/issues/401
-	cmd := exec.Command("/kexec", "-d", "-l", kernelPath, "--dtb", dtbPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
+	// Try kexec_file_load first
+	kernel, err := os.Open(kernelPath)
 	if err != nil {
-		log.Fatalf("cmd.Run(kexec -d -l %s --dtb %s): %v", kernelPath, dtbPath, err)
+		log.Fatalf("Open(%s): %v", kernelPath, err)
+	}
+	err = kexec.FileLoad(kernel, nil, "")
+	if err != nil {
+		log.Fatalf("KexecFileLoad: %v", err)
+	}
+	kernel.Close()
+	log.Print("Looks like kexec_file_load didn't work, let's try kexec_load")
+
+	// If kexec_file_load fails try kexec_load second
+	image := &boot.LinuxImage{
+		Kernel: uio.NewLazyFile(kernelPath),
+	}
+	err = image.Load(true)
+	if err != nil {
+		log.Fatalf("Load(%s): %v", kernelPath, err)
+	}
+	err = kexec.Reboot()
+	if err != nil {
+		log.Fatalf("Reboot: %v", err)
+	}
+}
+
+// createBasicHirarchy creates some basic directories and mounts if they don't exist yet
+func createBasicHirarchy() {
+	// Create base directories
+	dirs := []string{"/mnt", "/ro", "/tmp", "/proc", "/sys", "/dev"}
+	for _, dir := range dirs {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			log.Fatalf("Mkdir(%s): %v", dir, err)
+		}
 	}
 
-	err = unix.Unmount("/mnt", 0)
-	if err != nil {
-		log.Fatalf("Unmount(/mnt): %v", err)
+	// Mount base directories
+	mnts := []string{"sysfs", "proc", "devtmpfs", "tmpfs"}
+	for _, mnt := range mnts {
+		mount(mnt)
 	}
 
-	cmd = exec.Command("/kexec", "-e")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	err = cmd.Run()
-	// This is only reached if kexec somehow failed
-	log.Fatalf("cmd.Run(kexec -e): %v", err)
+	// Set up remaining parts for /dev
+	err := os.MkdirAll("/dev/pts", 0755)
+	if err != nil {
+		log.Fatalf("Mkdir(/dev/pts): %v", err)
+	}
+	mount("devpts")
+	// err = os.Symlink("/dev/pts/ptmx", "/dev/ptmx")
+	// if err != nil {
+	// 	log.Fatalf("Symlink(/dev/ptmx): %v", err)
+	// }
+
+}
+
+// mountMtd mounts u-bmc on MTD flash
+func mountMtd() {
+	err := unix.Mount("ubi0:root", "/ro", "ubifs", unix.MS_RDONLY, "")
+	if err != nil {
+		log.Fatalf("Mount(ubi0:root): %v", err)
+	}
+}
+
+// mountBlk mounts u-bmc on a block device
+func mountBlk() {
+	var offset int64 = 1072 // This is the offset at which erofs stores the UUID
+	var data = make([]byte, 16)
+	var uuid = []byte{0x26, 0xab, 0x04, 0x01, 0x3f, 0x49, 0x4f, 0xc2, 0xa1, 0x72, 0xc8, 0xaa, 0x02, 0xac, 0xea, 0xf3}
+
+	devs, _ := filepath.Glob("/sys/class/block/*")
+	for _, dev := range devs {
+		dev = "/dev/" + filepath.Base(dev)
+		bd, err := os.Open(dev)
+		if err != nil {
+			log.Fatalf("Open(%s): %v", dev, err)
+		}
+		_, err = bd.ReadAt(data, offset)
+		bd.Close()
+		if err == nil && bytes.Equal(data, uuid) {
+			err = unix.Mount(dev, "/ro", "erofs", unix.MS_RDONLY, "")
+			if err != nil {
+				log.Fatalf("Mount(%s): %v", dev, err)
+			}
+		}
+	}
+}
+
+// mountOverlay mounts the overlayfs on top of the ro root
+func mountOverlay() {
+	tmpdirs := []string{"/tmp/upper", "/tmp/work"}
+	for _, dir := range tmpdirs {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			log.Fatalf("Mkdir(%s): %v", dir, err)
+		}
+	}
+	mount("overlayfs")
+}
+
+// Abstraction for unix.Mount
+func mount(fs string) {
+	var err error
+	switch fs {
+	case "proc":
+		err = unix.Mount(fs, "/proc", fs, 0, "")
+	case "sysfs":
+		err = unix.Mount(fs, "/sys", fs, 0, "")
+	case "devtmpfs":
+		err = unix.Mount(fs, "/dev", fs, 0, "")
+	case "devpts":
+		err = unix.Mount(fs, "/dev/pts", fs, 0, "newinstance,ptmxmode=666,gid=5,mode=620")
+	case "tmpfs":
+		err = unix.Mount(fs, "/tmp", fs, 0, "")
+	case "overlayfs":
+		err = unix.Mount(fs, "/mnt", "overlay", 0, "lowerdir=/ro,upperdir=/tmp/upper,workdir=/tmp/work")
+	}
+	if err != nil {
+		log.Fatalf("Mount(%s): %v", fs, err)
+	}
 }
 
 func openAndVerify(path string, key *packet.PublicKey) (*os.File, error) {
