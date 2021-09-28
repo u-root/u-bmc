@@ -131,9 +131,23 @@ jobs:
           name: Install dependencies
           command: |
             sudo apt update
-            sudo apt install gcc-aarch64-linux-gnu erofs-utils fakeroot flex bison bc patch libssl-dev zlib1g-dev libelf-dev qemu-kvm
+            sudo apt install gcc-aarch64-linux-gnu fakeroot flex bison bc patch libssl-dev zlib1g-dev libelf-dev qemu-kvm
             GO111MODULE=off go get github.com/u-root/u-root
             sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      # Because the included version is too old and lacks the -U flag...
+      - run:
+          name: Compile erofs-utils
+          command: |
+            sudo apt install libtool liblz4-dev uuid-dev
+            cd ~/
+            curl -O https://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs-utils.git/snapshot/erofs-utils-1.3.tar.gz
+            tar -xzf erofs-utils-1.3.tar.gz
+            cd erofs-utils-1.3
+            ./autogen.sh
+            ./configure
+            make
+            sudo make install
+            sudo ln -sf /usr/local/bin/mkfs.erofs /usr/bin/mkfs.erofs
       - run:
           name: Create test key
           command: |
@@ -144,8 +158,11 @@ jobs:
           name: Build image
           command: task build
       - store_artifacts:
-          path: build/flash.img
-          destination: flash.img
+          path: build/img/rootfs.img
+          destination: rootfs.img
+      - store_artifacts:
+          path: build/linux/zImage.boot
+          destination: zImage.boot
       - run:
           name: Run integration tests
           command: task integration
