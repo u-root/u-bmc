@@ -14,11 +14,13 @@ tasks:
         go run ../../platform/cmd/flash-layout/main.go \
         -extra 102400 \
         ../linux/zImage.boot \
-        loader.cpio.gz \
         > ubmc-flash-layout.dtsi
       - echo "Done!"
-    status:
-      - test -f ubmc-flash-layout.dtsi
+    sources:
+      - ../../platform/cmd/flash-layout/main.go
+      - ../linux/zImage.boot
+    generates:
+      - ubmc-flash-layout.dtsi
 
   # Generate a dummy device tree binary
   dtb-dummy:
@@ -31,7 +33,6 @@ tasks:
         go run ../platform/cmd/boot-config/main.go \
         --ram-start {{.__RAM_START}} \
         --ram-size {{.__RAM_SIZE}} \
-        --initrd /dev/null \
         --dtb /dev/null \
         > boot/boot-config.auto.h
       - |
@@ -46,9 +47,12 @@ tasks:
         -x assembler-with-cpp \
         ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.boot.dummy -
       - echo "Done!"
-    status:
-      - test -f build/boot/boot-config.auto.h
-      - test -f boot/platform.dtb.boot.dummy
+    sources:
+      - ../platform/cmd/boot-config/*.go
+      - ../platform/{{.__TARGET}}/platform.dts
+    generates:
+      - boot/boot-config.auto.h
+      - boot/platform.dtb.boot.dummy
 
   # Generate a LinuxBoot device tree binary
   dtb-boot:
@@ -61,7 +65,6 @@ tasks:
         go run ../platform/cmd/boot-config/main.go \
         --ram-start {{.__RAM_START}} \
         --ram-size {{.__RAM_SIZE}} \
-        --initrd boot/loader.cpio.gz \
         --dtb boot/platform.dtb.boot.dummy \
         > boot/boot-config.auto.h
       - |
@@ -76,8 +79,13 @@ tasks:
         -x assembler-with-cpp \
         ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.boot -
       - echo "Done!"
-    status:
-      - test -f boot/platform.dtb.boot
+    sources:
+      - ../platform/cmd/boot-config/*.go
+      - ../platform/{{.__TARGET}}/platform.dts
+      - boot/platform.dtb.boot.dummy
+    generates:
+      - boot/boot-config.auto.h
+      - boot/platform.dtb.boot
 
   # Generate the runtime device tree binary
   dtb-full:
@@ -98,8 +106,10 @@ tasks:
         -x assembler-with-cpp \
         ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.full -
       - echo "Done!"
+    sources:
+      - boot/boot-config.auto.h
+    generates:
+      - boot/platform.dtb.full
     preconditions:
       - sh: test $(du boot/platform.dtb.boot.dummy | cut -f 1) -eq $(du boot/platform.dtb.boot | cut -f 1)
         msg: "DTB changed size! Please file a bug about this."
-    status:
-      - test -f boot/platform.dtb.full

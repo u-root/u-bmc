@@ -58,8 +58,10 @@ tasks:
         done
         touch .patched
       - echo "Done!"
-    status:
-      - test -f .patched
+    sources:
+      - ../../../patches/*.patch
+    generates:
+      - .patched
 
   # Build the Linux runtime kernel
   linux-build-full:
@@ -73,6 +75,11 @@ tasks:
       - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent
       - cp arch/{{.__ARCH}}/boot/Image ../zImage.full # Because arm64 can't create zImages we do this for now
       - echo "Done!"
+    sources:
+      - ../../../platform/{{.__TARGET}}/linux.config.full
+      - ./**
+    generates:
+      - ../zImage.full
 
   # Build the LinuxBoot kernel
   linux-build-boot:
@@ -86,3 +93,8 @@ tasks:
       - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent
       - cp arch/{{.__ARCH}}/boot/Image ../zImage.boot # Same as above
       - echo "Done!"
+    sources:
+      - ../../../platform/{{.__TARGET}}/linux.config.boot
+      - ./**
+    generates:
+      - ../zImage.boot
