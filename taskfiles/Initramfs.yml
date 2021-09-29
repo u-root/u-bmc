@@ -8,8 +8,13 @@ tasks:
       - echo "Assembling LinuxBoot initramfs..."
       - ./cpio -out bootldr.cpio loader keys/u-bmc.pub ../kmod/*.ko
       - echo "Done!"
-    status:
-      - test -f bootldr.cpio
+    sources:
+      - cpio
+      - loader
+      - keys/u-bmc.pub
+      - ../kmod/*.ko
+    generates:
+      - bootldr.cpio
 
   # Assemble the mount helper initramfs
   runtime-cpio:
@@ -18,8 +23,11 @@ tasks:
       - echo "Assembling runtime initramfs..."
       - ./cpio -out runtime.cpio loader
       - echo "Done!"
-    status:
-      - test -f runtime.cpio
+    sources:
+      - cpio
+      - loader
+    generates:
+      - runtime.cpio
 
   # Helper task to create some auxiliary files
   cpio-files:
@@ -28,5 +36,5 @@ tasks:
       # Needed because not all targets have modules
       - mkdir -p ../kmod
       - touch ../kmod/stub.ko
-    status:
-      - test -f ../kmod/stub.ko
+    generates:
+      - ../kmod/stub.ko

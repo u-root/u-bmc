@@ -7,8 +7,11 @@ tasks:
       - echo "Building u-bmc executable..."
       - go build -o build/u-bmc
       - echo "Done!"
-    status:
-      - test -f build/u-bmc
+    sources:
+      - u-bmc.go
+      - go.mod
+    generates:
+      - build/u-bmc
 
   # Generate a private key
   u-bmc-key:
@@ -31,20 +34,24 @@ tasks:
       - cd ../../boot/signer && go build -o ../../build/boot/
       - echo | ./signer > /dev/null
       - echo "Done!"
-    status:
-      - test -f signer
-      - test -f keys/u-bmc.pub
+    sources:
+      - ../../boot/signer/*.go
+    generates:
+      - signer
+      - keys/u-bmc.pub
 
   # Build the LinuxBoot bootloader
-  #TODO If size is critically important we could add upx here
+  #TODO(MDr164) If size is critically important we could add upx here
   loader:
     dir: build/boot
     cmds:
       - echo "Building LinuxBoot loader..."
       - cd ../../boot/loader && GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../build/boot/
       - echo "Done!"
-    status:
-      - test -f loader
+    sources:
+      - ../../boot/loader/*.go
+    generates:
+      - loader
 
   # Build the initramfs packer
   cpio:
@@ -53,8 +60,10 @@ tasks:
       - echo "Building initramfs packer..."
       - cd ../../boot/cpio && go build -o ../../build/boot/
       - echo "Done!"
-    status:
-      - test -f cpio
+    sources:
+      - ../../boot/cpio/*.go
+    generates:
+      - cpio
 
   # Build the ASPEED boot firmware
   aspeed-boot-bin:
@@ -80,6 +89,10 @@ tasks:
       - |
         {{.__TOOLCHAIN}}objcopy --only-section=.text -O binary boot.elf boot.bin
       - echo "Done!"
-    status:
-      - test {{.__SOC}} != ast2400
-      - test {{.__SOC}} != ast2500
+    sources:
+      - ../../soc/ast2400/*
+      - ../../soc/ast2500/*
+    generates:
+      - data.o
+      - boot.elf
+      - boot.bin

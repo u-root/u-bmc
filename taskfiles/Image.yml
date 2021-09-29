@@ -15,8 +15,10 @@ tasks:
         of=flash.img
       - dd conv=notrunc if=img/{{.__SOC}}.img of=flash.img
       - echo "Done!"
-    status:
-      - test -f flash.img
+    sources:
+      - img/{{.__SOC}}.img
+    generates:
+      - flash.img
 
   # Create an image based off of the UBI image
   aspeed-img:
@@ -35,8 +37,12 @@ tasks:
       - dd conv=notrunc if=../boot/boot.bin of={{.__SOC}}.img
       - cat ubi.img >> {{.__SOC}}.img
       - echo "Done!"
-    status:
-      - test -f {{.__SOC}}.img
+    sources:
+      - ../boot/ubmc-flash-layout.dtsi
+      - ../boot/boot.bin
+      - ubi.img
+    generates:
+      - ./{{.__SOC}}.img
 
   # Assemble the rootfs folder and its content
   rootfs:
@@ -59,19 +65,25 @@ tasks:
       - cp boot/platform.dtb.full rootfs/boot/platform-{{.GIT_VERSION}}.dtb
       - cat boot/platform.dtb.full | boot/signer > rootfs/boot/platform-{{.GIT_VERSION}}.dtb.gpg
         # Link files with git revision names to generic names
-      - ln -s zImage-{{.GIT_VERSION}} rootfs/boot/zImage
-      - ln -s zImage-{{.GIT_VERSION}}.gpg rootfs/boot/zImage.gpg
-      - ln -s platform-{{.GIT_VERSION}}.dtb rootfs/boot/platform.dtb
-      - ln -s platform-{{.GIT_VERSION}}.dtb.gpg rootfs/boot/platform.dtb.gpg
+      - ln -sf zImage-{{.GIT_VERSION}} rootfs/boot/zImage
+      - ln -sf zImage-{{.GIT_VERSION}}.gpg rootfs/boot/zImage.gpg
+      - ln -sf platform-{{.GIT_VERSION}}.dtb rootfs/boot/platform.dtb
+      - ln -sf platform-{{.GIT_VERSION}}.dtb.gpg rootfs/boot/platform.dtb.gpg
       - cat rootfs/bin/bb | boot/signer > rootfs/bin/bb.gpg
       - cp boot/keys/u-bmc.pub rootfs/etc/
-      - ln -s bb.gpg rootfs/bin/init.gpg
+      - ln -sf bb.gpg rootfs/bin/init.gpg
       - cp ../proto/system.textpb.default rootfs/config/system.textpb
     vars:
       GIT_VERSION:
         sh: git describe --tags --long --always
-    status:
-      - test -f rootfs/bin/bb
+    sources:
+      - u-bmc
+      - linux/zImage*
+      - boot/platform.dtb*
+      - boot/signer
+      - boot/keys/*
+    generates:
+      - rootfs/bin/bb
 
   # Create an UBIFS image
   ubifs-root:
@@ -90,8 +102,10 @@ tasks:
         -c 2047 \
         -o img/rootfs.img"
       - echo "Done!"
-    status:
-      - test -f img/rootfs.img
+    sources:
+      - rootfs/
+    generates:
+      - img/rootfs.img
 
   # Generate UBI image by reading ubi.cfg
   ubi-img:
@@ -102,7 +116,10 @@ tasks:
       - echo "Creating ubi.img..."
       - ubinize -o ubi.img -m 1 -p 64KiB ../../ubi.cfg
       - echo "Done!"
-    status:
+    sources:
+      - ../../ubi.cfg
+      - rootfs.img
+    generates:
       - test -f ubi.img
 
   # Create an EROFS image
@@ -119,5 +136,7 @@ tasks:
         img/rootfs.img \
         rootfs
       - echo "Done!"
-    status:
-      - test -f img/rootfs.img      
+    sources:
+      - rootfs/
+    generates:
+      - img/rootfs.img      

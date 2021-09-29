@@ -82,11 +82,13 @@ func Main() error {
 
 	// Create symlinks for the bb binary and all commands
 	for _, cmd := range commands {
+		os.RemoveAll("rootfs/bin/" + filepath.Base(cmd))
 		err := os.Symlink("bb", "rootfs/bin/"+filepath.Base(cmd))
 		if err != nil {
 			return err
 		}
 	}
+	os.RemoveAll("rootfs/bin/sh")
 	err = os.Symlink("elvish", "rootfs/bin/sh")
 	if err != nil {
 		return err
