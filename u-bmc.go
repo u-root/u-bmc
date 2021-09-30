@@ -6,7 +6,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,7 +16,86 @@ import (
 
 // Flags for the gobusybox builder
 var (
-	platform = flag.String("plat", "", "Platform to target.")
+	// Using this explicit list we can easier restrict which commands
+	// end up in our busybox binary
+	urootWhitelist = []string{
+		"backoff",
+		"basename",
+		"bind",
+		"blkid",
+		"cat",
+		"chmod",
+		"cmp",
+		"comm",
+		"cp",
+		"date",
+		"dd",
+		"df",
+		"dirname",
+		"dmesg",
+		"echo",
+		"elvish", //TODO(MDr164) maybe use upstream instead?
+		"false",
+		"find",
+		"free",
+		"grep",
+		"hexdump",
+		"hostname",
+		"hwclock",
+		"id",
+		"init", //TODO(MDr164) write own slimmed down u-bmc init
+		"io",
+		"ip",
+		"kill",
+		"ln",
+		"losetup",
+		"ls",
+		"lsmod",
+		"man",
+		"md5sum", //TODO(MDr164) should be obsolete
+		"mkdir",
+		"mkfifo",
+		"mknod",
+		"mktemp",
+		"more",
+		"mount",
+		"mv",
+		"netcat",
+		"pci",
+		"printenv",
+		"ps",
+		"pwd",
+		"readlink",
+		"rm",
+		"scp",
+		"seq",
+		"shasum",
+		"shutdown",
+		"sleep",
+		"sort",
+		"sshd", //TODO(MDr164) replace with in-process sshd
+		"strace",
+		"strings",
+		"stty",
+		"sync",
+		"tail",
+		"tar",
+		"tee",
+		"time",
+		"tr",
+		"true",
+		"truncate",
+		"ts",
+		"umount",
+		"unshare", //TODO(MDr164) probably not needed
+		"uptime",
+		"watchdog",
+		"watchdogd",
+		"wc",
+		"wget",
+		"which",
+		"yes",
+	}
 )
 
 func main() {
@@ -40,22 +118,23 @@ func Main() error {
 	}
 
 	// Resolve paths to all individual go commands for the busybox
+	urootcmds := urootAbsEach(urootWhitelist)
 	bmccmds, err := filepath.Glob("../cmd/*")
 	if err != nil {
 		return err
 	}
-	urootcmds, err := filepath.Glob("../../u-root/cmds/core/*")
-	if err != nil {
-		return err
-	}
-	platcmds, err := filepath.Glob(fmt.Sprintf("../platform/%s/cmd/*", *platform))
-	if err != nil {
-		return err
+	var extracmds []string
+	for _, arg := range flag.Args() {
+		path, _ := filepath.Glob(arg)
+		extracmds = append(extracmds, path...)
+		if err != nil {
+			return err
+		}
 	}
 	var commands []string
 	commands = append(commands, bmccmds...)
 	commands = append(commands, urootcmds...)
-	commands = append(commands, platcmds...)
+	commands = append(commands, extracmds...)
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -104,4 +183,12 @@ func Main() error {
 	}
 
 	return nil
+}
+
+func urootAbsEach(in []string) []string {
+	out := make([]string, len(in))
+	for i, s := range in {
+		out[i], _ = filepath.Abs("../../u-root/cmds/core/" + s)
+	}
+	return out
 }
