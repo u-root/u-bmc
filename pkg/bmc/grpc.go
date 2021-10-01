@@ -12,7 +12,7 @@ import (
 	"io"
 	"net"
 
-	"github.com/grpc-ecosystem/go-grpc-prometheus"
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/u-root/u-bmc/config"
 	pb "github.com/u-root/u-bmc/proto"
@@ -92,6 +92,9 @@ func (m *mgmtServer) GetFans(ctx context.Context, _ *pb.GetFansRequest) (*pb.Get
 }
 
 func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer, done <-chan struct{}) error {
+	if m.uart == nil {
+		return nil
+	}
 	r := m.uart.NewReader(done)
 	for d := range r {
 		err := stream.Send(&pb.ConsoleData{Data: d})
@@ -103,6 +106,9 @@ func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer, d
 }
 
 func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServer) error {
+	if m.uart == nil {
+		return nil
+	}
 	done := make(chan struct{})
 	go m.streamIn(stream, done)
 	w := m.uart.NewWriter()

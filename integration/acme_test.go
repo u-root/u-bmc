@@ -8,24 +8,15 @@ package integration
 
 import (
 	"testing"
-
-	"github.com/u-root/u-root/pkg/uroot"
 )
 
 func TestACME(t *testing.T) {
-	bmc, bmccleanup := BMCTest(t, &Options{
-		Name: "TestACME-BMC",
-		BuildOpts: uroot.Opts{
-			Commands: uroot.BusyBoxCmds(
-				"github.com/u-root/u-root/cmds/core/init",
-				"github.com/u-root/u-bmc/integration/testcmd/acme/uinit",
-			),
-		},
-	})
+	bmc, bmccleanup := BMCTest(t, 64, "../integration/testcmd/acme/*")
 	defer bmccleanup()
 
 	// If the system has booted that means the certificate was acquired
-	if err := bmc.Expect("SYSTEM_BOOTED"); err != nil {
-		t.Fatal(`expected "SYSTEM_BOOTED", got error: `, err)
+	err := bmc.ConsoleExpect("SYSTEM_BOOTED")
+	if err != nil {
+		t.Fatalf("expected 'SYSTEM_BOOTED', got error: %v", err)
 	}
 }

@@ -142,6 +142,9 @@ func (u *uartSystem) uartReceiver() {
 }
 
 func startUart(f string, baud int) (*uartSystem, error) {
+	if f == "" {
+		return nil, nil
+	}
 	c := &serial.Config{Name: f, Baud: baud}
 	s, err := serial.OpenPort(c)
 	if err != nil {

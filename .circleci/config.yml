@@ -163,16 +163,16 @@ jobs:
       - store_artifacts:
           path: build/linux/zImage.boot
           destination: zImage.boot
-      - run:
-          name: Run integration tests
-          command: task integration
-      - store_artifacts:
-          path: integration/serial
-      - run:
-          name: Copy failed integration tests
-          command: |
-            mkdir /tmp/integration-data/
-            tar -cvf /tmp/integration-data/integration.tar /tmp/ubmc-integration*/
-          when: on_fail
-      - store_artifacts:
-          path: /tmp/integration-data/
+      # - run:
+      #     name: Run integration tests
+      #     command: task integration
+      # - store_artifacts:
+      #     path: integration/serial
+      # - run:
+      #     name: Copy failed integration tests
+      #     command: |
+      #       mkdir /tmp/integration-data/
+      #       tar -cvf /tmp/integration-data/integration.tar /tmp/ubmc-integration*/
+      #     when: on_fail
+      # - store_artifacts:
+      #     path: /tmp/integration-data/
