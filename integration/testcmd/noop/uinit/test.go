@@ -7,9 +7,9 @@ package main
 import (
 	"time"
 
-	"github.com/u-root/u-bmc/integration/utils"
+	"github.com/u-root/u-bmc/integration/util"
 	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/platform"
+	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/platform"
 )
 
 func uinit() error {
@@ -34,8 +34,8 @@ func uinit() error {
 
 func main() {
 	if err := uinit(); err != nil {
-		utils.FailTest(err)
+		util.FailTest(err)
 	} else {
-		utils.PassTest()
+		util.PassTest()
 	}
 }

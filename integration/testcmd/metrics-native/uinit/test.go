@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/u-root/u-bmc/integration/utils"
+	"github.com/u-root/u-bmc/integration/util"
 )
 
 func testMetrics(u string) error {
@@ -32,23 +32,23 @@ func testMetrics(u string) error {
 	}
 
 	if !strings.Contains(buf.String(), "ubmc_system_version") {
-		return fmt.Errorf("Could not find metric ubmc_system_version among the metrics")
+		return fmt.Errorf("could not find metric ubmc_system_version among the metrics")
 	}
 
 	return nil
 }
 
 func uinit() error {
-	if err := utils.AddIP("10.0.2.1/24", "eth0"); err != nil {
-		return fmt.Errorf("Error adding IPv4 interface: %v", err)
+	if err := util.AddIP("10.0.2.1/24", "eth0"); err != nil {
+		return fmt.Errorf("error adding IPv4 interface: %v", err)
 	}
-	if err := utils.SetLinkUp("eth0"); err != nil {
-		return fmt.Errorf("Error setting link up on interface: %v", err)
+	if err := util.SetLinkUp("eth0"); err != nil {
+		return fmt.Errorf("error setting link up on interface: %v", err)
 	}
 
 	for _, i := range []int{100, 500, 5000, 15000, -1} {
 		if i == -1 {
-			return fmt.Errorf("Timed out fetching metrics")
+			return fmt.Errorf("timed out fetching metrics")
 		}
 
 		time.Sleep(time.Duration(i) * time.Millisecond)
@@ -68,8 +68,8 @@ func uinit() error {
 
 func main() {
 	if err := uinit(); err != nil {
-		utils.FailTest(err)
+		util.FailTest(err)
 	} else {
-		utils.PassTest()
+		util.PassTest()
 	}
 }

@@ -7,26 +7,18 @@
 package integration
 
 import (
+	"os"
 	"testing"
-
-	"github.com/u-root/u-root/pkg/uroot"
 )
 
 // TestBoot boots an image and then shuts down
 func TestBoot(t *testing.T) {
-	bmc, bmccleanup := BMCTest(t, &Options{
-		Name: "TestBoot-BMC",
-		BuildOpts: uroot.Opts{
-			Commands: uroot.BusyBoxCmds(
-				"github.com/u-root/u-root/cmds/core/init",
-				"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
-			),
-		},
-	})
+	bmc, bmccleanup := BMCTest(t, 64, "../integration/testcmd/boot/*")
 	defer bmccleanup()
 
-	if err := bmc.Expect("TEST_OK"); err != nil {
-		t.Fatal(`expected "TEST_OK", got error: `, err)
+	err := bmc.ConsoleExpect("TEST_OK")
+	if err != nil {
+		t.Fatalf("expected 'TEST_OK', got error: %v", err)
 	}
 }
 
@@ -34,24 +26,21 @@ func TestBoot(t *testing.T) {
 // and expects the machines to stop and shut down
 func TestVerifyFail(t *testing.T) {
 	// Corrupt the signature by adding the contents of "/proc/uptime" at the end
-	// when calculating the hash for /init (which is symlinked to /bbin/bb).
-	bmc, bmccleanup := BMCTest(t, &Options{
-		Name: "TestVerifyFail-BMC",
-		BuildOpts: uroot.Opts{
-			Commands: uroot.BusyBoxCmds(
-				"github.com/u-root/u-root/cmds/core/init",
-				"github.com/u-root/u-bmc/integration/testcmd/boot/uinit",
-			),
-		},
-		ExtraBuildEnv: []string{"TEST_EXTRA_SIGN=/proc/uptime"},
-	})
+	// when calculating the hash for /init (which is symlinked to /bin/bb).
+	err := os.Setenv("__SIGN_EXTRA", "/proc/uptime")
+	if err != nil {
+		t.Fatalf("could not set ENV __SIGN_EXTRA: %v", err)
+	}
+	bmc, bmccleanup := BMCTest(t, 64, "../integration/testcmd/boot/*")
 	defer bmccleanup()
 
-	if err := bmc.Expect("invalid signature: hash tag doesn't match"); err != nil {
-		t.Fatal(`expected "invalid signature: hash tag doesn't match", got error: `, err)
+	err = bmc.ConsoleExpect("invalid signature: hash tag doesn't match")
+	if err != nil {
+		t.Fatalf("expected 'invalid signature: hash tag doesnt match', got error: %v", err)
 	}
 	// Make sure the system rebooted in response to the error
-	if err := bmc.Expect("Starting kernel ..."); err != nil {
-		t.Fatal(`expected reboot signature "Starting kernel ...", got error: `, err)
+	err = bmc.ConsoleExpect("Starting kernel ...")
+	if err != nil {
+		t.Fatalf("expected reboot signature 'Starting kernel ...', got error: %v", err)
 	}
 }

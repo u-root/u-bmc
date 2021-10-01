@@ -135,6 +135,7 @@ func Main() error {
 	commands = append(commands, bmccmds...)
 	commands = append(commands, urootcmds...)
 	commands = append(commands, extracmds...)
+	commands = removeDuplicate(commands)
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -189,6 +190,24 @@ func urootAbsEach(in []string) []string {
 	out := make([]string, len(in))
 	for i, s := range in {
 		out[i], _ = filepath.Abs("../../u-root/cmds/core/" + s)
+	}
+	return out
+}
+
+func removeDuplicate(in []string) []string {
+	base := make(map[string]int)
+	for i, s := range in {
+		base[filepath.Base(s)] = i
+	}
+	unique := make([]string, len(in))
+	for _, i := range base {
+		unique[i] = in[i]
+	}
+	var out []string
+	for _, s := range unique {
+		if s != "" {
+			out = append(out, s)
+		}
 	}
 	return out
 }

@@ -10,7 +10,7 @@ import (
 
 	"github.com/u-root/u-bmc/pkg/aspeed"
 	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/platform"
+	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/platform"
 	"golang.org/x/sys/unix"
 )
 
