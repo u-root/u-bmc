@@ -14,6 +14,10 @@ u-bmc borrows and contributes to [OpenBMC](https://github.com/openbmc/openbmc) w
 similar high-level goals. The main difference is that u-bmc chooses to challenge the industry status quo,
 e.g. where OpenBMC uses IPMI, u-bmc uses gRPC.
 
+# Attention
+
+This project is currently undergoing some heavy maintenance. Don't use in production yet!
+
 # Demo
 
 [![asciicast](https://asciinema.org/a/202889.png)](https://asciinema.org/a/202889)
@@ -66,10 +70,11 @@ Prerequisites:
 u-bmc uses the Taskfile build system, install it using their [official installation guide](https://taskfile.dev/#/installation).
 
 Packages needed:
-- gcc-arm-none-eabi
-- mtd-utils
 - go
-- make
+- gcc-arm-none-eabi (for arm32)
+- gcc-aarch64-linux-gnu (for arm64)
+- mtd-utils (for targets using flash)
+- erofs-utils (for targets using block devices)
 - fakeroot
 - flex
 - bison
@@ -84,14 +89,14 @@ Get them via e.g.:
 sudo apt install gcc-arm-none-eabi mtd-utils golang fakeroot flex bison device-tree-compiler bc libssl-dev libelf-dev qemu-kvm
 ```
 
-Until u-root has proper go modules support install it with:
+We also need u-root in our GOPATH so install it with:
 ```
-GO111MODULES=off go get github.com/u-root/u-root
+GO111MODULE=off go get github.com/u-root/u-root
 ```
 
 Clone source code:
 ```
-go get github.com/u-root/u-bmc
+GO111MODULE=off go get github.com/u-root/u-bmc
 cd ~/go/src/github.com/u-root/u-bmc
 ```
 
@@ -128,13 +133,16 @@ not work predictably.
 
 ## Simulator
 
-Trying out u-bmc is easiest using the simulator. To launch it, run:
+Trying out u-bmc is easiest using the simulator.
+First select a Qemu target in the TARGET file then to launch it, run:
 
 ```
-# Launch a local ACME server
-task pebble &
-# Launch u-bmc simulator
-task sim
+# Build Qemu target
+task build
+# Launch a local ACME server in one terminal
+task pebble
+# Launch the u-bmc simulator in another terminal
+task virtual-bmc -- 64bit
 # (Optional, run in another terminal) Launch a local emulated BIOS to produce some data on the UART
 # Needs to have u-bmc simulator above running for it to attach correctly.
 task virtual-host
@@ -182,19 +190,19 @@ If you want to quickly upload a new build of u-bmc without updating the kernel,
 you can use SCP like this:
 
 ```
-scp root/bbin/bb my-ubmc:/bb
-scp root/bbin/bb.sig my-ubmc:/bb.sig
+scp build/rootfs/bin/bb my-ubmc:/bb
+scp build/rootfs/bin/bb.sig my-ubmc:/bb.sig
 ssh my-ubmc
 # Verify that bb is sane by executing /bb
 /bb
 # Should return:
 # <timestmap> You need to specify which command to invoke.
-# Exception: /bbin/bb exited with 1
-# [tty], line 1: /bbin/bb
-mv /bb /bbin/bb
-mv /bb.sig /bbin/bb.sig
+# Exception: /bin/bb exited with 1
+# [tty], line 1: /bin/bb
+mv /bb /bin/bb
+mv /bb.sig /bin/bb.sig
 # Verify the signature before rebooting
-gpgv /etc/u-bmc.pub /bbin/bb.sig /bbin/bb
+gpgv /etc/u-bmc.pub /bin/bb.sig /bin/bb
 sync
 shutdown -r
 ```

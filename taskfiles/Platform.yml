@@ -1,16 +1,91 @@
 version: '3'
 
+# Platform tasks invoke other tasks in order.
+# This is necessary to allow a modular buildsystem
+# where one can pick the tasks wanted for a platform.
+# We sacrifice some parallelism but because u-bmc doesn't
+# take long to build anyways that's a tradeoff worth taking.
+
 tasks:
+  # In case no platform was selected notify the user
   build-:
     cmds:
       - echo "Please select a platform to build for!"
 
+  # Build for the ast2500 evaluation board
   build-aspeed-ast2500evb:
     cmds:
+      - task: :config:generate
+      - task: :core:u-bmc-build
+      - task: :core:signer
+      - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
+      - task: :kernel:linux-build-full
+      - task: :kmod:build
+      - task: :initramfs:bootldr-cpio
+      - task: :kernel:linux-build-boot
+      - task: :devtree:dtb-full
+      - task: :core:aspeed-boot-bin
+      - task: :image:rootfs
+      - task: :image:aspeed-img
       - task: :image:flash-img
-      - echo "Your image is at build/flash.img"
+      - echo "Your flash image is at build/flash.img"
 
+  # Build for the Quanta F06 Leopard
   build-quanta-f06-leopard-ddr3:
     cmds:
+      - task: :config:generate
+      - task: :core:u-bmc-build
+      - task: :core:signer
+      - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
+      - task: :kernel:linux-build-full
+      - task: :kmod:build
+      - task: :initramfs:bootldr-cpio
+      - task: :kernel:linux-build-boot
+      - task: :devtree:dtb-full
+      - task: :core:aspeed-boot-bin
+      - task: :image:rootfs
+      - task: :image:aspeed-img
       - task: :image:flash-img
-      - echo "Your image is at build/flash.img"
+      - echo "Your flash image is at build/flash.img"
+
+  # Build for the generic Qemu virt machine (32bit)
+  build-qemu-virt-a15:
+    cmds:
+      - task: :config:generate
+      - task: :core:u-bmc-build
+      - task: :core:signer
+      - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
+      - task: :kernel:linux-build-full
+      - task: :initramfs:bootldr-cpio
+      - task: :kernel:linux-build-boot
+      - task: :image:rootfs
+      - task: :image:erofs-root
+      - echo "The LinuxBoot kernel is at build/linux/zImage.boot"
+      - echo "The virtual disk image is at build/img/rootfs.img"
+
+  # Build for the generic Qemu virt machine (64bit)
+  build-qemu-virt-a72:
+    cmds:
+      - task: :config:generate
+      - task: :core:u-bmc-build
+      - task: :core:signer
+      - task: :core:loader
+      - task: :core:cpio
+      - task: :initramfs:cpio-files
+      - task: :initramfs:runtime-cpio
+      - task: :kernel:linux-build-full
+      - task: :initramfs:bootldr-cpio
+      - task: :kernel:linux-build-boot
+      - task: :image:rootfs
+      - task: :image:erofs-root
+      - echo "The LinuxBoot kernel is at build/linux/zImage.boot"
+      - echo "The virtual disk image is at build/img/root.img"

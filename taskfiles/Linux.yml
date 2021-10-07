@@ -3,21 +3,18 @@ version: '3'
 tasks:
   # Fetch the source tarball
   linux-fetch:
-    run: once
     dir: build/linux
     cmds:
       - echo "Downloading kernel sources..."
-      - curl -L {{.__LINUX_URL}} --output {{.__LINUX_VERSION}}.tar.gz
+      - curl --silent -L {{.__LINUX_URL}} --output {{.__LINUX_VERSION}}.tar.gz
       - echo "Done!"
     status:
       - test -f {{.__LINUX_VERSION}}.tar.gz
 
   # Unpack the tarball for the runtime kernel
   linux-unpack-full:
-    run: once
     deps:
       - linux-fetch
-      - linux-unpack-boot # Needed to not clash with unpacking the tarball in parallel
     dir: build/linux
     cmds:
       - echo "Unpacking kernel source..."
@@ -32,7 +29,6 @@ tasks:
 
   # Unpack the tarball for the LinuxBoot kernel
   linux-unpack-boot:
-    run: once
     deps:
       - linux-fetch
     dir: build/linux
@@ -49,10 +45,9 @@ tasks:
 
   # Apply out-of-tree patches to the source
   linux-patch:
-    run: once
     deps:
       - linux-unpack-full
-    dir: build/{{.__LINUX_DIR}}
+    dir: build/{{.__LINUX_DIR}}-full
     cmds:
       - echo "Patching kernel source..."
       - |
@@ -68,29 +63,26 @@ tasks:
 
   # Build the Linux runtime kernel
   linux-build-full:
-    run: once
     deps:
       - linux-patch
-      - linux-build-boot # Needed to not clash with building two kernels in parallel
-    dir: build/{{.__LINUX_DIR}}
+    dir: build/{{.__LINUX_DIR}}-full
     cmds:
       - echo "Building runtime kernel for {{.__TARGET}}..."
       - cp ../../../platform/{{.__TARGET}}/linux.config.full arch/{{.__ARCH}}/configs/ubmc_{{.__TARGET}}_full_defconfig
       - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent ubmc_{{.__TARGET}}_full_defconfig
       - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent
-      - cp arch/{{.__ARCH}}/boot/zImage ../zImage.full
+      - cp arch/{{.__ARCH}}/boot/Image ../zImage.full # Because arm64 can't create zImages we do this for now
       - echo "Done!"
 
   # Build the LinuxBoot kernel
   linux-build-boot:
-    run: once
     deps:
       - linux-unpack-boot
-    dir: build/linux/linux-{{.__LINUX_VERSION}}-boot
+    dir: build/{{.__LINUX_DIR}}-boot
     cmds:
       - echo "Building LinuxBoot kernel for {{.__TARGET}}..."
       - cp ../../../platform/{{.__TARGET}}/linux.config.boot arch/{{.__ARCH}}/configs/ubmc_{{.__TARGET}}_boot_defconfig
       - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent ubmc_{{.__TARGET}}_boot_defconfig
       - CROSS_COMPILE={{.__TOOLCHAIN}} ARCH={{.__ARCH}} make -j{{.CPUS}} --silent
-      - cp arch/{{.__ARCH}}/boot/zImage ../zImage.boot
+      - cp arch/{{.__ARCH}}/boot/Image ../zImage.boot # Same as above
       - echo "Done!"

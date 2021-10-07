@@ -46,7 +46,6 @@ tasks:
     cmds:
       - echo "Building u-bmc image for $__TARGET"
       - mkdir -p build
-      - go mod vendor # Only needed for u-root
       - task: platform:build-{{.__TARGET}}
       - echo "Done!"
       
@@ -59,14 +58,13 @@ tasks:
       - rm -rf build/kmod
       - rm -rf build/linux/zImage.*
       - rm -rf build/root
-      - rm -rf build/img
-      - rm -f build/initramfs.cpio
+      - rm -rf build/*img
+      - rm -rf build/rootfs
       - rm -f build/u-bmc
-      - rm -f build/flash.img
       - echo "Done!"
 
   # Removes the whole build folder
-  distclean:
+  purge:
     desc: Cleans up compiled and downloaded files
     cmds:
       - echo "Wiping the whole build directory and config files!"
@@ -144,9 +142,9 @@ tasks:
       - echo "Stopped virtual host"
 
   # Run BMC qemu
-  sim:
-    desc: Run the u-bmc simulator
+  virtual-bmc:
+    desc: Launch Qemu to simulate a BMC
     cmds:
       - echo "Running u-bmc simulator in Qemu..."
-      - task: qemu:bmc
+      - task: qemu:bmc-{{.CLI_ARGS}}
       - echo "Finished the u-bmc simulator"

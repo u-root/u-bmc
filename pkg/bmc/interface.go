@@ -12,7 +12,6 @@ import (
 	"time"
 
 	pb "github.com/u-root/u-bmc/proto"
-	"github.com/u-root/u-root/pkg/dhclient"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -178,10 +177,12 @@ func startNetwork(config *pb.Network) (*network, error) {
 		log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
 	}
 
-	_, err := dhclient.IfUp(iface, interfaceUpTimeout)
-	if err != nil {
-		return nil, err
-	}
+	// TODO use insomniacslk/dhcp instead of external dhclient
+	// dhclient := exec.Command("dhclient")
+	// err := dhclient.Run()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	// If the MAC address changes on the interface the interface needs to be
 	// taken down and up again in order for all IPv6 addresses and things to be

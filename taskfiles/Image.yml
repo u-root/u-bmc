@@ -3,9 +3,6 @@ version: '3'
 tasks:
   # Create a flashable image
   flash-img:
-    run: once
-    deps:
-      - u-bmc-img
     dir: build
     cmds:
       - echo "Creating flashable image..."
@@ -16,91 +13,88 @@ tasks:
         bs=1M \
         count={{.__ROM_SIZE}} \
         of=flash.img
-      - dd conv=notrunc if=img/u-bmc.img of=flash.img
+      - dd conv=notrunc if=img/{{.__SOC}}.img of=flash.img
       - echo "Done!"
     status:
       - test -f flash.img
 
   # Create an image based off of the UBI image
-  u-bmc-img:
-    run: once
+  aspeed-img:
+    dir: build/img
     deps:
       - ubi-img
-      - :devtree:flash-layout
-    dir: build/img
     cmds:
-      - echo "Creating u-bmc.img..."
+      - echo "Creating {{.__SOC}}.img..."
       - |
         dd if=/dev/zero | \
         tr '\000' '\377' | \
         dd iflag=fullblock \
         bs=64k \
         count=$(echo $(($(grep SIZE= ../boot/ubmc-flash-layout.dtsi | cut -d= -f2) / 65536))) \
-        of=u-bmc.img
-      - dd conv=notrunc if=ubi.img of=u-bmc.img
+        of={{.__SOC}}.img
+      - dd conv=notrunc if=../boot/boot.bin of={{.__SOC}}.img
+      - cat ubi.img >> {{.__SOC}}.img
       - echo "Done!"
     status:
-      - test -f u-bmc.img
+      - test -f {{.__SOC}}.img
 
-  # Create the underlying rootfs
-  ubifs-root:
-    run: once
-    deps:
-      - :core:signer
-      - :initramfs:build
-      - :devtree:dtb-full
-      - :kernel:linux-build-full
+  # Assemble the rootfs folder and its content
+  rootfs:
     dir: build
     cmds:
       - echo "Creating rootfs..."
-        # Create root folder
-      - mkdir -p root/root root/etc root/boot img
+        # Create rootfs with gobusybox
+      - GOARM={{.__GOARM}} GOARCH={{.__ARCH}} ./u-bmc -plat {{.__TARGET}}
         # Set nameserver #TODO Move to u-bmc system startup
-      - echo "nameserver 2606:4700:4700::1111" >> root/etc/resolv.conf
-      - echo "nameserver 2606:4700:4700::1001" >> root/etc/resolv.conf
-      - echo "nameserver 1.1.1.1" >> root/etc/resolv.conf
-      - echo "nameserver 1.0.0.1" >> root/etc/resolv.conf
-      - echo "::1 localhost" >> root/etc/hosts
-      - echo "127.0.0.1 localhost" >> root/etc/hosts
+      - echo "nameserver 2606:4700:4700::1111" >> rootfs/etc/resolv.conf
+      - echo "nameserver 2606:4700:4700::1001" >> rootfs/etc/resolv.conf
+      - echo "nameserver 1.1.1.1" >> rootfs/etc/resolv.conf
+      - echo "nameserver 1.0.0.1" >> rootfs/etc/resolv.conf
+      - echo "::1 localhost" >> rootfs/etc/hosts
+      - echo "127.0.0.1 localhost" >> rootfs/etc/hosts
         # Copy over runtime kernel, devicetree and their signatures 
-      - cp linux/zImage.full root/boot/zImage-"{{.GIT_VERSION}}"
-      - cat linux/zImage.full | boot/signer/signer >> root/boot/zImage-{{.GIT_VERSION}}.dtb.gpg
-      - cp boot/platform.dtb.full root/boot/platform-{{.GIT_VERSION}}.dtb
-      - cat boot/platform.dtb.full | boot/signer/signer > root/boot/platform-{{.GIT_VERSION}}.dtb.gpg
+      - cp linux/zImage.full rootfs/boot/zImage-"{{.GIT_VERSION}}"
+      - cat linux/zImage.full | boot/signer >> rootfs/boot/zImage-{{.GIT_VERSION}}.gpg
+      - touch boot/platform.dtb.full # Needed for Qemu as it generates the dtb dynamically
+      - cp boot/platform.dtb.full rootfs/boot/platform-{{.GIT_VERSION}}.dtb
+      - cat boot/platform.dtb.full | boot/signer > rootfs/boot/platform-{{.GIT_VERSION}}.dtb.gpg
         # Link files with git revision names to generic names
-      - ln -s zImage-{{.GIT_VERSION}} root/boot/zImage
-      - ln -s zImage-{{.GIT_VERSION}}.gpg root/boot/zImage.gpg
-      - ln -s platform-{{.GIT_VERSION}}.dtb root/boot/platform.dtb
-      - ln -s platform-{{.GIT_VERSION}}.dtb.gpg root/boot/platform.dtb.gpg
-      - cp boot/keys/u-bmc.pub root/etc/
-      - ln -s bbin/bb.gpg root/init.gpg
-      - mkdir root/config
-      - cp ../proto/system.textpb.default root/config/system.textpb
-        # Rewrite the symlink to a non-absolute to allow non-chrooted following.
-        # This is a workaround for the fact that the loader cannot chroot currently.
-      - ln -sf bbin/bb root/init
-      - |
-        fakeroot sh -c "\
-        (cd root; cpio -id < ../initramfs.cpio) && \
-        cat root/bbin/bb | boot/signer/signer > root/bbin/bb.gpg && \
-        mkfs.ubifs \
-        -x zlib \
-        -r root \
-        -R 0 \
-        -m 1 \
-        -e 65408 \
-        -c 2047 \
-        -o img/ubifs-root.img"
-      - echo "Done!"
+      - ln -s zImage-{{.GIT_VERSION}} rootfs/boot/zImage
+      - ln -s zImage-{{.GIT_VERSION}}.gpg rootfs/boot/zImage.gpg
+      - ln -s platform-{{.GIT_VERSION}}.dtb rootfs/boot/platform.dtb
+      - ln -s platform-{{.GIT_VERSION}}.dtb.gpg rootfs/boot/platform.dtb.gpg
+      - cat rootfs/bin/bb | boot/signer > rootfs/bin/bb.gpg
+      - cp boot/keys/u-bmc.pub rootfs/etc/
+      - ln -s bb.gpg rootfs/bin/init.gpg
+      - cp ../proto/system.textpb.default rootfs/config/system.textpb
     vars:
       GIT_VERSION:
         sh: git describe --tags --long --always
     status:
-      - test -f img/ubifs-root.img
+      - test -f rootfs/bin/bb
+
+  # Create an UBIFS image
+  ubifs-root:
+    dir: build
+    cmds:
+      - echo "Creating ubifs image..."
+      - mkdir -p img
+      - |
+        fakeroot sh -c "\
+        mkfs.ubifs \
+        -x zlib \
+        -r rootfs \
+        -R 0 \
+        -m 1 \
+        -e 65408 \
+        -c 2047 \
+        -o img/rootfs.img"
+      - echo "Done!"
+    status:
+      - test -f img/rootfs.img
 
   # Generate UBI image by reading ubi.cfg
-  ubi-img: 
-    run: once
+  ubi-img:
     deps:
       - ubifs-root
     dir: build/img
@@ -110,3 +104,20 @@ tasks:
       - echo "Done!"
     status:
       - test -f ubi.img
+
+  # Create an EROFS image
+  erofs-root:
+    dir: build
+    cmds:
+      - echo "Creating erofs image..."
+      - mkdir -p img
+      - |
+        mkfs.erofs \
+        -z lz4hc \
+        -U 26ab0401-3f49-4fc2-a172-c8aa02aceaf3 \
+        --all-root \
+        img/rootfs.img \
+        rootfs
+      - echo "Done!"
+    status:
+      - test -f img/rootfs.img      

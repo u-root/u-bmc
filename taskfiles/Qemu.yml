@@ -1,37 +1,63 @@
 version: '3'
 
 tasks:
-  # Run Qemu emulating an x86 host
+  # Run Qemu emulating an 64bit x86 host
   host:
     deps:
       - :ovmf:build
+    dir: build
     cmds:
       - |
         qemu-system-x86_64 \
-        -bios build/ovmf.rom \
+        -machine q35 \
+        -bios ovmf.rom \
         -display none \
         -chardev socket,id=host,path=host.uart \
         -serial chardev:host \
-        -net none
+        -nic none
 
-  # Run Qemu emulation a BMC with u-bmc
-  bmc:
+  # Notify the user to choose either bmc target
+  bmc-:
+    cmds:
+      - echo "Please choose either '-- 32bit' or '-- 64bit'"
+
+  # Run Qemu emulating a 64bit ARM machine with u-bmc
+  bmc-64bit:
+    dir: build
+    cmds:
+      - |
+        qemu-system-aarch64 \
+        -machine virt \
+        -cpu cortex-a72 \
+        -smp 2 \
+        -m 1G \
+        -kernel linux/zImage.boot \
+        -display none \
+        -chardev socket,id=host,path=host.uart,server=on,wait=off \
+        -nic user,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,hostfwd=tcp::9370-:9370,model=virtio \
+        -drive file=img/rootfs.img,format=raw,if=virtio \
+        -device virtio-rng \
+        -device virtio-serial \
+        -device virtserialport,chardev=host \
+        -serial stdio \
+        -d guest_errors
+
+  # Run Qemu emulating a 32bit ARM machine with u-bmc
+  bmc-32bit:
+    dir: build
     cmds:
       - |
         qemu-system-arm \
+        -machine virt \
+        -cpu cortex-a15 \
+        -m 1G \
+        -kernel linux/zImage.boot \
         -display none \
-        -chardev socket,id=host,path=host.uart,server,nowait \
-        -nic user,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,hostfwd=tcp::9370-:9370 \
-        -drive file=build/flash.img,format=raw,if=mtd \
-        -m 128 \
-        -M palmetto-bmc \
-        -serial mon:stdio \
-        -serial null \
-        -serial null \
-        -serial null \
-        -serial chardev:host \
-        -serial null \
+        -chardev socket,id=host,path=host.uart,server=on,wait=off \
+        -nic user,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,hostfwd=tcp::9370-:9370,model=virtio \
+        -drive file=img/rootfs.img,format=raw,if=virtio \
+        -device virtio-rng \
+        -device virtio-serial \
+        -device virtserialport,chardev=host \
+        -serial stdio \
         -d guest_errors
-# Some useful debug flags:
-# - in_asm, show ASM as it's being fed into QEMU
-# - unimp, show things that the VM tries to do but isn't implemented in QEMU

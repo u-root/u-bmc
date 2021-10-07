@@ -3,7 +3,6 @@ version: '3'
 tasks:
   # Update gRPC protocol definitions
   protogen:
-    run: once
     dir: proto
     cmds:
       - protoc --go_out=plugins=grpc:. bmc.proto

@@ -3,15 +3,15 @@ version: '3'
 tasks:
   # Build the main go project file
   u-bmc-build:
-    run: once
     cmds:
       - echo "Building u-bmc executable..."
       - go build -o build/u-bmc
       - echo "Done!"
+    status:
+      - test -f build/u-bmc
 
   # Generate a private key
   u-bmc-key:
-    run: once
     dir: build/boot/keys
     cmds:
       - echo "Generating private key..."
@@ -23,37 +23,41 @@ tasks:
 
   # Build the signer and let it generate a public key
   signer:
-    run: once
     deps:
       - u-bmc-key
-    dir: build/boot/signer
+    dir: build/boot
     cmds:
       - echo "Building signer and generating public key..."
-      - go build -o signer ../../../boot/signer
+      - cd ../../boot/signer && go build -o ../../build/boot/
       - echo | ./signer > /dev/null
       - echo "Done!"
     status:
       - test -f signer
-      - test -f ../keys/u-bmc.pub
+      - test -f keys/u-bmc.pub
 
   # Build the LinuxBoot bootloader
+  #TODO If size is critically important we could add upx here
   loader:
-    run: once
-    dir: build/boot/loader
+    dir: build/boot
     cmds:
       - echo "Building LinuxBoot loader..."
-      - GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o loader ../../../boot/loader/
+      - cd ../../boot/loader && GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../build/boot/
       - echo "Done!"
     status:
       - test -f loader
 
+  # Build the initramfs packer
+  cpio:
+    dir: build/boot
+    cmds:
+      - echo "Building initramfs packer..."
+      - cd ../../boot/cpio && go build -o ../../build/boot/
+      - echo "Done!"
+    status:
+      - test -f cpio
+
   # Build the ASPEED boot firmware
   aspeed-boot-bin:
-    run: once
-    deps:
-      - :initramfs:loader-cpio
-      - :devtree:dtb-boot
-      - :kernel:linux-build-boot
     dir: build/boot
     cmds:
       - echo "Building ASPEED boot firmware for {{.__SOC}}"
@@ -79,14 +83,3 @@ tasks:
     status:
       - test {{.__SOC}} != ast2400
       - test {{.__SOC}} != ast2500
-
-  # Download bluecmd's arm kexec binary #TODO Do we need this anymore? arm has kexec_load and arm64 even kexec_file_load by now
-  kexec:
-    run: once
-    dir: build/boot
-    cmds:
-      - echo "Downloading kexec binary..." 
-      - curl -O https://github.com/bluecmd/tools/raw/master/arm/kexec
-      - echo "Done!"
-    status:
-      - test -f kexec
