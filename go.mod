@@ -6,6 +6,7 @@ require (
 	github.com/anatol/vmtest v0.0.0-20210922030747-b951d158b7cc
 	github.com/beevik/ntp v0.3.0
 	github.com/cleroux/rtc v0.1.1
+	github.com/cloudflare/roughtime v0.0.0-20210217223727-1fe56bcbcfd4
 	github.com/fullstorydev/grpcurl v1.8.1
 	github.com/golang/protobuf v1.5.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
