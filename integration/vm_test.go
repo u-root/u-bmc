@@ -29,7 +29,7 @@ type QOMInteger struct {
 
 type TestVM struct {
 	cleanup func()
-	vmtest.Qemu
+	*vmtest.Qemu
 }
 
 func cmdline(args ...[]string) (cmdline []string) {
@@ -64,7 +64,7 @@ func NewTestVM(t *testing.T, bit int, timeout time.Duration, cleanup func()) (*T
 			nic,
 			rng,
 		),
-		Verbose: true,
+		Verbose: testing.Verbose(),
 		Timeout: timeout,
 	}
 	vm, err := vmtest.NewQemu(&opts)
@@ -72,10 +72,10 @@ func NewTestVM(t *testing.T, bit int, timeout time.Duration, cleanup func()) (*T
 		return nil, err
 	}
 
-	return &TestVM{cleanup, *vm}, nil
+	return &TestVM{cleanup, vm}, nil
 }
 
-func (v TestVM) Close() {
+func (v *TestVM) Close() {
 	v.Qemu.Kill()
 	v.cleanup()
 }
