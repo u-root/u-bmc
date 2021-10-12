@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/beevik/ntp"
-	"github.com/u-root/u-bmc/pkg/roughtime"
-	"github.com/u-root/u-bmc/pkg/roughtime/upstream/config"
+	"github.com/cloudflare/roughtime"
+	"github.com/cloudflare/roughtime/config"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	KEY_TYPE_ED25519  = "ed25519"
-	roughtimeAttempts = 3
-	roughtimeTimeout  = 15 * time.Second
+	KEY_TYPE_ED25519   = "ed25519"
+	ROUGHTIME_ATTEMPTS = 3
+	ROUGHTIME_TIMEOUT  = 15 * time.Second
 )
 
 type RoughtimeServer struct {
@@ -49,7 +49,7 @@ func getOneRoughtime(rs []RoughtimeServer) *roughtime.Roughtime {
 				{Protocol: r.Protocol, Address: r.Address},
 			}}
 		g.Go(func() error {
-			res, err := roughtime.Get(srv, roughtimeAttempts, roughtimeTimeout, nil)
+			res, err := roughtime.Get(srv, ROUGHTIME_ATTEMPTS, ROUGHTIME_TIMEOUT, nil)
 			if err != nil {
 				log.Printf("Failed to get roughtime from %s (skipping): %v", r.Address, err)
 				return err
@@ -79,11 +79,9 @@ func AcquireTime(rs []RoughtimeServer, ntps []NtpServer) (*time.Time, error) {
 	start := time.Now()
 	rt := getOneRoughtime(rs)
 	if rt == nil {
-		return nil, fmt.Errorf("No roughtime servers available")
+		return nil, fmt.Errorf("no roughtime servers available")
 	}
-	unixSecs := rt.Midpoint / 1000 / 1000
-	unixNsecs := rt.Midpoint % (1000 * 1000)
-	midpoint := time.Unix(int64(unixSecs), int64(unixNsecs))
+	midpoint := rt.Midpoint.Unix()
 	radius := time.Duration(rt.Radius) * time.Microsecond
 	log.Printf("Acquired roughtime at %s (+/- %s)", midpoint.String(), radius.String())
 
@@ -95,7 +93,7 @@ func AcquireTime(rs []RoughtimeServer, ntps []NtpServer) (*time.Time, error) {
 			log.Printf("Failed to contact NTP server %s (skipping): %v", n, err)
 			continue
 		}
-		diff := time.Now().Sub(start)
+		diff := time.Since(start)
 		// Rewind timestamp to when the roughtime data was supposed to be valid
 		ct := t.Add(diff * -1)
 		if ct.After(latest) {

@@ -9,10 +9,10 @@ import (
 	"encoding/base64"
 	"log"
 	"net"
-	"time"
 
+	"github.com/cloudflare/roughtime/mjd"
+	"github.com/cloudflare/roughtime/protocol"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
-	"github.com/u-root/u-bmc/pkg/roughtime/upstream/protocol"
 	"golang.org/x/crypto/ed25519"
 )
 
@@ -33,7 +33,9 @@ func NewTestRoughtimeServer() *RoughtimeServer {
 		log.Fatalf("Failed to generate online key: %v", err)
 	}
 
-	cert, err := protocol.CreateCertificate(0, ^uint64(0), onlinePublicKey, rootPrivateKey)
+	minTime := mjd.New(0, 0)
+	maxTime := mjd.New(^uint64(0), 0)
+	cert, err := protocol.CreateCertificate(minTime, maxTime, onlinePublicKey, rootPrivateKey)
 	if err != nil {
 		log.Fatalf("Failed to generate certificate: %v", err)
 	}
@@ -72,7 +74,7 @@ func (s *RoughtimeServer) Run() {
 		if !ok || len(nonce) != protocol.NonceSize {
 			continue
 		}
-		midpoint := uint64(time.Now().UnixNano() / 1000)
+		midpoint := mjd.Now()
 		radius := uint32(1000000)
 		replies, err := protocol.CreateReplies([][]byte{nonce}, midpoint, radius, s.cert, s.pk)
 		if err != nil {
