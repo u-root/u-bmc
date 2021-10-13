@@ -7,7 +7,6 @@ package bmc
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 	"time"
@@ -67,7 +66,7 @@ func init() {
 }
 
 func LogGpio(line string, c chan bool, d bool) {
-	log.Printf("Monitoring GPIO line %-30s [initial value %v]", line, d)
+	log.Infof("Monitoring GPIO line %-30s [initial value %v]", line, d)
 	m := gpioLine.With(prometheus.Labels{"line": line})
 	if d {
 		m.Set(1)
@@ -81,14 +80,14 @@ func LogGpio(line string, c chan bool, d bool) {
 			m.Set(0)
 			f = "falling edge"
 		}
-		log.Printf("%s: %s", line, f)
+		log.Infof("%s: %s", line, f)
 	}
 }
 
 func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 	port, ok := g.p.GpioNameToPort(line)
 	if !ok {
-		return fmt.Errorf("Could not resolve GPIO %s", line)
+		return fmt.Errorf("could not resolve GPIO %s", line)
 	}
 	e, err := g.impl.getLineEvent(port)
 	if err != nil {
@@ -117,26 +116,26 @@ func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
 		case GPIO_EVENT_RISING_EDGE:
 			c <- true
 		default:
-			log.Printf("Received unknown event on GPIO line %s: %v", line, err)
+			log.Errorf("Received unknown event on GPIO line %s: %v", line, err)
 		}
 	}
 	close(c)
-	log.Printf("Monitoring stopped for GPIO line %s", line)
+	log.Infof("Monitoring stopped for GPIO line %s", line)
 	return nil
 }
 
 func (g *GpioSystem) Monitor(lines map[string]GpioCallback) {
-	log.Printf("Setting up %v GPIO monitors", len(lines))
+	log.Infof("Setting up %v GPIO monitors", len(lines))
 	for line, cb := range lines {
 		// TODO(bluecmd): This is a bit redundant, but there have been cases
 		// where u-bmc starts up but no monitors are started. This logging statement
 		// is here to help pin-point the issue if it happens again. If there are no
 		// reports of that happening, this log line can be removed.
-		log.Printf("Starting monitor for GPIO %v", line)
+		log.Infof("Starting monitor for GPIO %v", line)
 		go func(l string, cb GpioCallback) {
 			err := g.monitorOne(l, cb)
 			if err != nil {
-				log.Printf("Monitor %s failed: %v", l, err)
+				log.Errorf("Monitor %s failed: %v", l, err)
 			}
 		}(line, cb)
 	}
@@ -146,7 +145,7 @@ func (g *GpioSystem) Hog(lines map[string]bool) {
 	// TODO(bluecmd): There is a hard limit of 64 lines per kernel handle,
 	// if we ever hit that we will have to change this part.
 	if len(lines) > 64 {
-		log.Printf("Too many GPIO lines to hog: %d > 64", len(lines))
+		log.Errorf("Too many GPIO lines to hog: %d > 64", len(lines))
 		return
 	}
 	lidx := make([]uint32, len(lines))
@@ -155,18 +154,18 @@ func (g *GpioSystem) Hog(lines map[string]bool) {
 	for l, v := range lines {
 		port, ok := g.p.GpioNameToPort(l)
 		if !ok {
-			log.Printf("Could not resolve GPIO %s", l)
+			log.Errorf("Could not resolve GPIO %s", l)
 			return
 		}
 		lidx[i] = port
 		vals[i] = v
-		log.Printf("Hogging GPIO line %-30s = %v", l, v)
+		log.Infof("Hogging GPIO line %-30s = %v", l, v)
 		i++
 	}
 
 	_, err := g.impl.requestLineHandle(lidx, vals)
 	if err != nil {
-		log.Printf("Hog failed: %v", err)
+		log.Errorf("Hog failed: %v", err)
 	}
 }
 
@@ -182,14 +181,14 @@ func (g *GpioSystem) Button(b pb.Button) chan chan bool {
 
 func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32) (chan bool, error) {
 	if durMs > 1000*10 {
-		return nil, fmt.Errorf("Maximum allowed depress duration is 10 seconds")
+		return nil, fmt.Errorf("maximum allowed depress duration is 10 seconds")
 	}
 	dur := time.Duration(durMs) * time.Millisecond
 	g.m.RLock()
 	defer g.m.RUnlock()
 	c, ok := g.button[b]
 	if !ok {
-		return nil, fmt.Errorf("Unknown button %v", b)
+		return nil, fmt.Errorf("unknown button %v", b)
 	}
 
 	cc := make(chan bool)
@@ -219,30 +218,33 @@ func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32)
 func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
 	port, ok := g.p.GpioNameToPort(line)
 	if !ok {
-		log.Printf("Could not resolve GPIO %s", line)
+		log.Errorf("Could not resolve GPIO %s", line)
 		return
 	}
 	l, err := g.impl.requestLineHandle([]uint32{port}, []bool{true})
 	if err != nil {
-		log.Printf("ManageButton %s failed: %v", line, err)
+		log.Errorf("ManageButton %s failed: %v", line, err)
 		return
 	}
 	c := g.Button(b)
-	log.Printf("Initialized button %s", line)
+	log.Infof("Initialized button %s", line)
 
 	for {
 		pushc := <-c
 
 		for p := range pushc {
 			if p {
-				log.Printf("Pressing button %s", line)
+				log.Infof("Pressing button %s", line)
 			} else {
-				log.Printf("Releasing button %s", line)
+				log.Infof("Releasing button %s", line)
 			}
 			if flags&GPIO_INVERTED != 0 {
 				p = !p
 			}
-			l.setValues([]bool{p})
+			err = l.setValues([]bool{p})
+			if err != nil {
+				log.Error(err)
+			}
 		}
 	}
 }

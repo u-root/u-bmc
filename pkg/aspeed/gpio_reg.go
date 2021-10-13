@@ -6,7 +6,6 @@ package aspeed
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 )
@@ -382,7 +381,8 @@ func (s *State) PortValue(port uint32) bool {
 			return high
 		}
 	}
-	panic("Unknown port")
+	log.Panic("unknown port")
+	return false
 }
 
 func (s *State) PortDirection(port uint32) bool {
@@ -399,7 +399,8 @@ func (s *State) PortDirection(port uint32) bool {
 			return output
 		}
 	}
-	panic("Unknown port")
+	log.Panic("unknown port")
+	return false
 }
 
 func (s *State) Equal(b *State) bool {
@@ -463,7 +464,7 @@ func GpioPort(n string) uint32 {
 	}
 	o, err := strconv.ParseUint(n[off:], 10, 32)
 	if err != nil {
-		log.Fatalf("Unknown GPIO name: %s", n)
+		log.Fatalf("unknown GPIO name: %s", n)
 	}
 	idx += uint32(o)
 	return idx

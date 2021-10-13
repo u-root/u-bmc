@@ -5,15 +5,17 @@
 package platform
 
 import (
-	"log"
 	"time"
 
 	"github.com/u-root/u-bmc/pkg/aspeed"
 	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/pkg/logger"
 	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/gpio"
 
 	pb "github.com/u-root/u-bmc/proto"
 )
+
+var log = logger.LogContainer.GetSimpleLogger()
 
 type platform struct {
 	a *aspeed.Ast
@@ -79,12 +81,12 @@ func (p *platform) PowerButtonHandler(_ string, c chan bool, _ bool) {
 		// Power button is inverted
 		pressed := !state
 		if pressed {
-			log.Printf("Physical power button pressed")
+			log.Infof("Physical power button pressed")
 			pushc = make(chan bool)
 			p.g.Button(pb.Button_BUTTON_POWER) <- pushc
 			pushc <- true
 		} else if pushc != nil {
-			log.Printf("Physical power button released")
+			log.Infof("Physical power button released")
 			pushc <- false
 			close(pushc)
 			pushc = nil
@@ -97,7 +99,7 @@ func (p *platform) ResetButtonHandler(_ string, c chan bool, _ bool) {
 		// Reset button is inverted
 		pressed := !state
 		if pressed {
-			log.Printf("Physical reset button triggered")
+			log.Infof("Physical reset button triggered")
 			pushc := make(chan bool)
 			p.g.Button(pb.Button_BUTTON_RESET) <- pushc
 			pushc <- true
@@ -134,7 +136,7 @@ func (p *platform) InitializeSystem() error {
 	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x8c, 0)
 	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x0, 0x0)
 
-	log.Printf("Setting up Network Controller Sideband Interface (NC-SI) for eth0")
+	log.Infof("Setting up Network Controller Sideband Interface (NC-SI) for eth0")
 	go bmc.StartNcsi("eth0")
 	return nil
 }

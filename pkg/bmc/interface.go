@@ -7,7 +7,6 @@ package bmc
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"net"
 	"time"
 
@@ -29,7 +28,7 @@ type network struct {
 func addIp(cidr string, iface string) error {
 	l, err := netlink.LinkByName(iface)
 	if err != nil {
-		return fmt.Errorf("Unable to get interface %s: %v", iface, err)
+		return fmt.Errorf("unable to get interface %s: %v", iface, err)
 	}
 	addr, err := netlink.ParseAddr(cidr)
 	if err != nil {
@@ -41,7 +40,7 @@ func addIp(cidr string, iface string) error {
 	}
 	defer h.Delete()
 	if err := h.AddrReplace(l, addr); err != nil {
-		return fmt.Errorf("AddrReplace(%v): %v", addr, err)
+		return fmt.Errorf("addrReplace(%v): %v", addr, err)
 	}
 	return nil
 }
@@ -49,7 +48,7 @@ func addIp(cidr string, iface string) error {
 func setLinkUp(iface string) error {
 	l, err := netlink.LinkByName(iface)
 	if err != nil {
-		return fmt.Errorf("Unable to get interface %s: %v", iface, err)
+		return fmt.Errorf("unable to get interface %s: %v", iface, err)
 	}
 	h, err := netlink.NewHandle(unix.NETLINK_ROUTE)
 	if err != nil {
@@ -65,7 +64,7 @@ func setLinkUp(iface string) error {
 func setLinkDown(iface string) error {
 	l, err := netlink.LinkByName(iface)
 	if err != nil {
-		return fmt.Errorf("Unable to get interface %s: %v", iface, err)
+		return fmt.Errorf("unable to get interface %s: %v", iface, err)
 	}
 	h, err := netlink.NewHandle(unix.NETLINK_ROUTE)
 	if err != nil {
@@ -92,7 +91,7 @@ func ipv6LinkFixer(iface string) {
 	// of course reset DHCP etc.).
 	h, err := netlink.NewHandle(unix.NETLINK_ROUTE)
 	if err != nil {
-		log.Printf("netlink.NewHandle: %v", err)
+		log.Errorf("netlink.NewHandle: %v", err)
 		return
 	}
 	defer h.Delete()
@@ -103,7 +102,7 @@ func ipv6LinkFixer(iface string) {
 		sleep = 1 * time.Second
 		l, err := netlink.LinkByName(iface)
 		if err != nil {
-			log.Printf("Unable to get interface %s: %v", iface, err)
+			log.Errorf("Unable to get interface %s: %v", iface, err)
 			continue
 		}
 		a := l.Attrs()
@@ -114,7 +113,7 @@ func ipv6LinkFixer(iface string) {
 		}
 		addrs, err := h.AddrList(l, netlink.FAMILY_V6)
 		if err != nil {
-			log.Printf("handle.AddrList(%s): %v", iface, err)
+			log.Errorf("handle.AddrList(%s): %v", iface, err)
 			continue
 		}
 		found := false
@@ -125,9 +124,15 @@ func ipv6LinkFixer(iface string) {
 			}
 		}
 		if !found {
-			log.Printf("No link-local IPv6 address found for %s, resetting interface", iface)
-			setLinkDown(iface)
-			setLinkUp(iface)
+			log.Errorf("No link-local IPv6 address found for %s, resetting interface", iface)
+			err = setLinkDown(iface)
+			if err != nil {
+				log.Error(err)
+			}
+			err = setLinkUp(iface)
+			if err != nil {
+				log.Error(err)
+			}
 			// Back off 10 seconds before trying again to avoid flapping too much
 			sleep = 10 * time.Second
 		}
@@ -153,7 +158,7 @@ func (n *network) AddressLifetime() time.Duration {
 
 func startNetwork(config *pb.Network) (*network, error) {
 	if config == nil {
-		log.Printf("No network configuration detected, using defaults")
+		log.Infof("No network configuration detected, using defaults")
 		config = &pb.Network{}
 	}
 
@@ -174,7 +179,7 @@ func startNetwork(config *pb.Network) (*network, error) {
 
 	// TODO(bluecmd): Set ipv4/ipv6 objects to remember the host addresses
 	if config.Vlan != 0 {
-		log.Printf("TODO: Interface was configured to use VLAN but that's not implemented yet")
+		log.Infof("TODO: Interface was configured to use VLAN but that's not implemented yet")
 	}
 
 	// TODO use insomniacslk/dhcp instead of external dhclient
@@ -192,24 +197,24 @@ func startNetwork(config *pb.Network) (*network, error) {
 
 	if config.Ipv4Address != "" {
 		if err := addIp(config.Ipv4Address, iface); err != nil {
-			log.Printf("Error adding IPv4 %s to interface %s: %v", config.Ipv4Address, iface, err)
+			log.Errorf("Error adding IPv4 %s to interface %s: %v", config.Ipv4Address, iface, err)
 		}
 	}
 	if config.Ipv6Address != "" {
 		if err := addIp(config.Ipv6Address, iface); err != nil {
-			log.Printf("Error adding IPv6 %s to interface %s: %v", config.Ipv6Address, iface, err)
+			log.Errorf("Error adding IPv6 %s to interface %s: %v", config.Ipv6Address, iface, err)
 		}
 	}
 
 	if len(config.Ipv4Route)+len(config.Ipv6Route) > 0 {
-		log.Printf("TODO: IP routes are configured but not supported yet")
+		log.Infof("TODO: IP routes are configured but not supported yet")
 	}
 
 	go func() {
 		c := make(chan *RDNSSOption)
 		go rdnss(c)
 		for r := range c {
-			log.Printf("TODO: got RDNSS %v", r)
+			log.Infof("TODO: got RDNSS %v", r)
 		}
 	}()
 
@@ -221,7 +226,10 @@ func startNetwork(config *pb.Network) (*network, error) {
 	if config.Hostname != "" {
 		fqdn = config.Hostname
 	}
-	unix.Sethostname([]byte(fqdn))
+	err := unix.Sethostname([]byte(fqdn))
+	if err != nil {
+		log.Error(err)
+	}
 
 	return &network{fqdn: fqdn}, nil
 }

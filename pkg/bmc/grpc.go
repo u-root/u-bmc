@@ -104,7 +104,12 @@ func (m *mgmtServer) streamIn(stream pb.ManagementService_StreamConsoleServer, d
 
 func (m *mgmtServer) StreamConsole(stream pb.ManagementService_StreamConsoleServer) error {
 	done := make(chan struct{})
-	go m.streamIn(stream, done)
+	go func() {
+		err := m.streamIn(stream, done)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	w := m.uart.NewWriter()
 	defer close(done)
 	defer close(w)
@@ -152,7 +157,12 @@ func (m *mgmtServer) newServer(l net.Listener, c *tls.Certificate) {
 	pb.RegisterManagementServiceServer(g, m)
 	grpc_prometheus.Register(g)
 	reflection.Register(g)
-	go g.Serve(l)
+	go func() {
+		err := g.Serve(l)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 }
 
 func startGRPC(gpio rpcGpioSystem, fan rpcFanSystem, uart rpcUartSystem, v *config.Version) (*mgmtServer, error) {

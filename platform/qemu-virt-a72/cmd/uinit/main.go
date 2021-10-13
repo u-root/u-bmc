@@ -6,13 +6,19 @@ package main
 
 import (
 	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/pkg/logger"
 	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/platform"
 )
+
+var log = logger.LogContainer.GetSimpleLogger()
 
 func main() {
 	p := platform.Platform()
 	defer p.Close()
-	bmc.Startup(p)
+	err, _ := bmc.Startup(p)
+	if err != nil {
+		log.Error(err)
+	}
 	for {
 		bmc.Shell()
 	}

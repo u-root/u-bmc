@@ -106,7 +106,7 @@ func (a *Ast) SystemFlash() (Flash, error) {
 	if id == MX25L256_ID {
 		return newMX25L256Flash(a), nil
 	} else {
-		return nil, fmt.Errorf("Unknown flash ID: %06x", id)
+		return nil, fmt.Errorf("unknown flash ID: %06x", id)
 	}
 }
 
@@ -132,7 +132,7 @@ func (f *mx25l256) Read(b []byte) (int, error) {
 func (f *mx25l256) ReadAt(b []byte, off int64) (int, error) {
 	l := len(b)
 	if off+int64(l) > 32*1024*1024 {
-		return 0, fmt.Errorf("Read would have overflown chip")
+		return 0, fmt.Errorf("read would have overflown chip")
 	}
 	f.cs(0)
 	defer f.cs(1)
@@ -191,7 +191,7 @@ func (f *mx25l256) eraseBlock(b int32) {
 
 func (f *mx25l256) programPage(p int32, d []byte) {
 	if len(d) != 256 {
-		panic("Expected 256 byte page block")
+		log.Panic("expected 256 byte page block")
 	}
 	f.cmd8(MX25_OP_WREN)
 	f.cs(0)
@@ -219,13 +219,13 @@ func (f *mx25l256) WriteAt(b []byte, off int64) (int, error) {
 	// so we might do that at some point
 	l := len(b)
 	if l%1024*64 != 0 {
-		return 0, fmt.Errorf("Buffer needs to be multiple of 64KB")
+		return 0, fmt.Errorf("buffer needs to be multiple of 64KB")
 	}
 	if off < 0 || off%1024*64 != 0 {
-		return 0, fmt.Errorf("Offset needs to be positive multiple of 64KB")
+		return 0, fmt.Errorf("offset needs to be positive multiple of 64KB")
 	}
 	if off+int64(l) > 32*1024*1024 {
-		return 0, fmt.Errorf("Write would have overflown chip")
+		return 0, fmt.Errorf("write would have overflown chip")
 	}
 
 	for i := off; i < off+int64(l); i += 64 * 1024 {

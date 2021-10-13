@@ -20,6 +20,11 @@ func startMetrics() error {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
-	go http.Serve(l, mux)
+	go func() {
+		err := http.Serve(l, mux)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 	return nil
 }
