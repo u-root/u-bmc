@@ -64,7 +64,7 @@ func (a *Ast) MeasureFanRpm(fan uint) int {
 func (a *Ast) SetFanDutyCycle(fan uint, p uint8) {
 	v := a.Mem().MustRead32(PWM_BASE + 0x8)
 	if fan >= 2 {
-		panic("Fan must be 0 < x < 2")
+		log.Panic("fan must be 0 < x < 2")
 	}
 	// PTCR08: Duty Control 0 Register
 	if fan == 0 {

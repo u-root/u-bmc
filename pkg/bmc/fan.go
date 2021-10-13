@@ -24,7 +24,7 @@ type FanSystem struct {
 func readHwmon(m map[int]string, fan int) (int, error) {
 	fname, ok := m[fan]
 	if !ok {
-		return 0, fmt.Errorf("No such fan %d", fan)
+		return 0, fmt.Errorf("no such fan %d", fan)
 	}
 	f, err := os.OpenFile(fname, os.O_RDONLY, 0600)
 	if err != nil {
@@ -46,15 +46,15 @@ func readHwmon(m map[int]string, fan int) (int, error) {
 func writeHwmon(m map[int]string, fan int, v int) error {
 	fname, ok := m[fan]
 	if !ok {
-		return fmt.Errorf("No such fan %d", fan)
+		return fmt.Errorf("no such fan %d", fan)
 	}
 	f, err := os.OpenFile(fname, os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
-	f.Write([]byte(fmt.Sprintf("%d", v)))
-	return nil
+	_, err = f.Write([]byte(fmt.Sprintf("%d", v)))
+	return err
 }
 
 func (f *FanSystem) ReadFanRpm(fan int) (int, error) {

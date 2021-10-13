@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"net"
 	"time"
 
@@ -58,14 +57,14 @@ type RDNSSOption struct {
 func rdnss(c chan<- *RDNSSOption) {
 	s, err := nl.Subscribe(unix.NETLINK_ROUTE, unix.RTNLGRP_ND_USEROPT)
 	if err != nil {
-		log.Printf("failed to subscribe to RDNSS updates: %v", err)
+		log.Errorf("failed to subscribe to RDNSS updates: %v", err)
 		return
 	}
 	defer s.Close()
 	for {
 		msgs, _, err := s.Receive()
 		if err != nil {
-			log.Printf("netlink error on rdnss loop: %v", err)
+			log.Errorf("netlink error on rdnss loop: %v", err)
 			return
 		}
 		for _, m := range msgs {
@@ -75,7 +74,7 @@ func rdnss(c chan<- *RDNSSOption) {
 
 			opt, err := parseNDUserOpt(m.Data)
 			if err != nil {
-				log.Printf("error processing nd user opt: %v", err)
+				log.Errorf("error processing nd user opt: %v", err)
 			}
 
 			if opt == nil {

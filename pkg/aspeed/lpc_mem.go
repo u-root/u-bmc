@@ -6,7 +6,6 @@ package aspeed
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"time"
 )
@@ -38,7 +37,7 @@ type lpc struct {
 func openLpcMemory(port int) *lpc {
 	p, err := os.OpenFile("/dev/port", os.O_RDWR, 0600)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	l := &lpc{p: p, off: int64(port)}
@@ -59,7 +58,10 @@ func (l *lpc) ctrl(d byte) {
 	b := []byte{d}
 	l.stat.wr_count++
 	t := time.Now()
-	l.p.WriteAt(b, l.off)
+	_, err := l.p.WriteAt(b, l.off)
+	if err != nil {
+		log.Error(err)
+	}
 	l.stat.wr_time = l.stat.wr_time + time.Now().Sub(t)
 }
 
@@ -79,7 +81,10 @@ func (l *lpc) w(d byte) {
 	b := []byte{d}
 	l.stat.wr_count++
 	t := time.Now()
-	l.p.WriteAt(b, l.off+1)
+	_, err := l.p.WriteAt(b, l.off+1)
+	if err != nil {
+		log.Error(err)
+	}
 	l.stat.wr_time = l.stat.wr_time + time.Now().Sub(t)
 }
 
@@ -87,7 +92,10 @@ func (l *lpc) r() byte {
 	b := make([]byte, 1)
 	l.stat.rd_count++
 	t := time.Now()
-	l.p.ReadAt(b, l.off+1)
+	_, err := l.p.ReadAt(b, l.off+1)
+	if err != nil {
+		log.Error(err)
+	}
 	l.stat.rd_time = l.stat.rd_time + time.Now().Sub(t)
 	return b[0]
 }
@@ -112,7 +120,7 @@ func (l *lpc) Close() {
 
 	// Print some stats
 	if *printLpcStats {
-		fmt.Printf("LPC stats: %v RDs (time %v), %v WRs (time %v), cached %v WRs\n",
+		log.Infof("LPC stats: %v RDs (time %v), %v WRs (time %v), cached %v WRs\n",
 			l.stat.rd_count, l.stat.rd_time, l.stat.wr_count, l.stat.wr_time,
 			l.stat.cached_wr_count)
 	}

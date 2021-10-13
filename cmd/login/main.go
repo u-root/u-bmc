@@ -8,9 +8,9 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 
+	"github.com/u-root/u-bmc/pkg/logger"
 	"golang.org/x/sys/unix"
 )
 
@@ -22,12 +22,12 @@ func main() {
 	flag.Parse()
 
 	reader := bufio.NewReader(os.Stdin)
+	log := logger.LogContainer.GetSimpleLogger()
 
-	fmt.Println("")
-	fmt.Println("Press enter to activate terminal")
+	fmt.Println("\nPress enter to activate the terminal")
 	_, err := reader.ReadString('\n')
 	if err != nil {
-		log.Fatalf("Unable to read from terminal: %v", err)
+		log.Fatalf("unable to read from terminal: %v", err)
 	}
 
 	fmt.Printf(`
@@ -42,5 +42,5 @@ func main() {
 
 	env := []string{"TZ=UTC", "HOME=/root", "USER=root", "PATH=/bin"}
 	err = unix.Exec(*shell, []string{*shell}, env)
-	log.Fatalf("Failed to exec: %v", err)
+	log.Fatalf("failed to exec: %v", err)
 }

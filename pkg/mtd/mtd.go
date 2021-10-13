@@ -11,6 +11,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/u-root/u-bmc/pkg/logger"
 )
 
 const (
@@ -18,6 +20,8 @@ const (
 	MEMUNLOCK  = 0x40084d06
 	MEMERASE   = 0x40084d02
 )
+
+var log = logger.LogContainer.GetSimpleLogger()
 
 type mtdInfoUser struct {
 	Type uint8
@@ -92,7 +96,7 @@ func (m *mtdFile) Erase() {
 		buf := new(bytes.Buffer)
 		err := binary.Write(buf, binary.LittleEndian, ei)
 		if err != nil {
-			panic(err)
+			log.Panicf("MTD erase failed: %v", err)
 		}
 		// TODO(bluecmd) AMI BMC doesn't support UNLOCK even though it's supposed
 		// to be mandatory for erase? Oh well.
@@ -102,22 +106,28 @@ func (m *mtdFile) Erase() {
 		//}
 		err = m.ioctl(MEMERASE, buf.Bytes())
 		if err != nil {
-			panic(err)
+			log.Panicf("MTD erase failed: %v", err)
 		}
 	}
 }
 
 func (m *mtdFile) Write(f io.Reader) {
-	m.f.Seek(0, 0)
-	buf := make([]byte, m.WriteSize)
-	_, err := io.CopyBuffer(m.f, f, buf)
+	_, err := m.f.Seek(0, 0)
 	if err != nil {
-		panic(err)
+		log.Panicf("MTD write failed: %v", err)
+	}
+	buf := make([]byte, m.WriteSize)
+	_, err = io.CopyBuffer(m.f, f, buf)
+	if err != nil {
+		log.Panicf("MTD write failed: %v", err)
 	}
 }
 
 func (m *mtdFile) Verify(f io.Reader) bool {
-	m.f.Seek(0, 0)
+	_, err := m.f.Seek(0, 0)
+	if err != nil {
+		log.Panicf("MTD verify failed: %v", err)
+	}
 	buf1 := make([]byte, m.WriteSize)
 	buf2 := make([]byte, m.WriteSize)
 	for {

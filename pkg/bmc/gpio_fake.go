@@ -5,7 +5,6 @@
 package bmc
 
 import (
-	"log"
 	"sync"
 )
 
@@ -33,7 +32,7 @@ func (l *fakeGpioLine) setValues(vals []bool) error {
 		p := l.lines[i]
 		l.g.v[p] = v
 		pn, _ := l.g.p.GpioPortToName(p)
-		log.Printf("FakeGpio: System set port %v to %v\n", pn, v)
+		log.Infof("FakeGpio: System set port %v to %v\n", pn, v)
 		select {
 		case l.g.ports[p] <- v:
 		default:
@@ -46,7 +45,7 @@ func (g *fakeGpio) Set(port uint32, v bool) {
 	g.lock.Lock()
 	c := g.ports[port]
 	pn, _ := g.p.GpioPortToName(port)
-	log.Printf("FakeGpio: Test harness set port %v to %v\n", pn, v)
+	log.Infof("FakeGpio: Test harness set port %v to %v\n", pn, v)
 	g.v[port] = v
 	g.lock.Unlock()
 	c <- v

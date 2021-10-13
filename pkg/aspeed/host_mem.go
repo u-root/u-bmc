@@ -17,7 +17,7 @@ type hostMem struct {
 func openHostMemory() *hostMem {
 	f, err := os.OpenFile("/dev/mem", os.O_RDWR|os.O_SYNC, 0600)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return &hostMem{f}
 }
@@ -31,12 +31,12 @@ func (m *hostMem) MustRead32(address uintptr) uint32 {
 	offset := address - page
 	mem, err := syscall.Mmap(int(m.mf.Fd()), int64(page), int(ps), syscall.PROT_READ, syscall.MAP_SHARED)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	v := *(*uint32)(unsafe.Pointer(&mem[offset]))
 	err = syscall.Munmap(mem)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return v
 }
@@ -47,12 +47,12 @@ func (m *hostMem) MustRead8(address uintptr) uint8 {
 	offset := address - page
 	mem, err := syscall.Mmap(int(m.mf.Fd()), int64(page), int(ps), syscall.PROT_READ, syscall.MAP_SHARED)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	v := *(*uint8)(unsafe.Pointer(&mem[offset]))
 	err = syscall.Munmap(mem)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	return v
 }
@@ -63,12 +63,12 @@ func (m *hostMem) MustWrite32(address uintptr, data uint32) {
 	offset := address - page
 	mem, err := syscall.Mmap(int(m.mf.Fd()), int64(page), int(ps), syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	*(*uint32)(unsafe.Pointer(&mem[offset])) = data
 	err = syscall.Munmap(mem)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
 
@@ -78,12 +78,12 @@ func (m *hostMem) MustWrite8(address uintptr, data uint8) {
 	offset := address - page
 	mem, err := syscall.Mmap(int(m.mf.Fd()), int64(page), int(ps), syscall.PROT_WRITE, syscall.MAP_SHARED)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 	*(*uint8)(unsafe.Pointer(&mem[offset])) = data
 	err = syscall.Munmap(mem)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 }
 

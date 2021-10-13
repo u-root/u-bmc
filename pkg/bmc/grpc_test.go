@@ -2,7 +2,6 @@ package bmc
 
 import (
 	"context"
-	"log"
 	"net"
 	"os"
 	"runtime"
@@ -40,10 +39,15 @@ func Server() {
 		log.Fatalf("net.Listen: %v", err)
 	}
 	addr = l.Addr().String()
-	log.Printf("Listening on %s", addr)
+	log.Infof("Listening on %s", addr)
 	g := grpc.NewServer()
 	pb.RegisterManagementServiceServer(g, m)
-	go g.Serve(l)
+	go func() {
+		err := g.Serve(l)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
 }
 
 func NewClient(t *testing.T) (pb.ManagementServiceClient, *grpc.ClientConn) {

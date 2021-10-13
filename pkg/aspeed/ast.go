@@ -24,10 +24,6 @@
 
 package aspeed
 
-import (
-	"fmt"
-)
-
 type Ast struct {
 	mem memProvider
 }
@@ -37,7 +33,7 @@ func Open() *Ast {
 	a := &Ast{mem}
 
 	if _, err := a.ModelName(); err != nil {
-		panic(fmt.Sprintf("Could not detect supported SOC: %v", err))
+		log.Panicf("could not detect supported SOC: %v", err)
 	}
 	return a
 }
