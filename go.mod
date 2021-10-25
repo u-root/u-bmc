@@ -28,8 +28,10 @@ require (
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210817190340-bfb29a6856f2
+	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
+	golang.org/x/term v0.0.0-20210317153231-de623e64d2a6
 	google.golang.org/grpc v1.39.0
+	src.elv.sh v0.16.3
 )
 
 require (
@@ -43,6 +45,7 @@ require (
 	github.com/klauspost/compress v1.10.6 // indirect
 	github.com/klauspost/pgzip v1.2.4 // indirect
 	github.com/matryer/is v1.4.0 // indirect
+	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mdlayher/socket v0.0.0-20210307095302-262dc9984e00 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect

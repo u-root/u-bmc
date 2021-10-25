@@ -34,7 +34,7 @@ var (
 		"dirname",
 		"dmesg",
 		"echo",
-		"elvish", //TODO(MDr164) maybe use upstream instead?
+		"elvish", //TODO(MDr164) maybe use upstream instead (we already do so for the login)?
 		"false",
 		"find",
 		"free",
@@ -167,11 +167,6 @@ func Main() error {
 		if err != nil {
 			return err
 		}
-	}
-	os.RemoveAll("rootfs/bin/sh")
-	err = os.Symlink("elvish", "rootfs/bin/sh")
-	if err != nil {
-		return err
 	}
 
 	// Create default directory structure

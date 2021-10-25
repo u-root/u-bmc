@@ -6,28 +6,23 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"os"
 
 	"github.com/u-root/u-bmc/pkg/logger"
-	"golang.org/x/sys/unix"
-)
-
-var (
-	shell = flag.String("shell", "/bin/elvish", "Shell to login to")
+	"src.elv.sh/pkg/buildinfo"
+	"src.elv.sh/pkg/prog"
+	"src.elv.sh/pkg/shell"
 )
 
 func main() {
-	flag.Parse()
-
 	reader := bufio.NewReader(os.Stdin)
 	log := logger.LogContainer.GetSimpleLogger()
 
-	fmt.Println("\nPress enter to activate the terminal")
+	log.Info("\033[32mPress ENTER to activate the terminal\033[0m")
 	_, err := reader.ReadString('\n')
 	if err != nil {
-		log.Fatalf("unable to read from terminal: %v", err)
+		log.Fatalf("Unable to read from terminal: %v", err)
 	}
 
 	fmt.Printf(`
@@ -40,7 +35,16 @@ func main() {
 
 `)
 
-	env := []string{"TZ=UTC", "HOME=/root", "USER=root", "PATH=/bin"}
-	err = unix.Exec(*shell, []string{*shell}, env)
-	log.Fatalf("failed to exec: %v", err)
+	os.Exit(prog.Run([3]*os.File{os.Stdin, os.Stdout, os.Stderr}, os.Args,
+		buildinfo.Program, daemonStub{}, shell.Program{}))
+}
+
+type daemonStub struct{}
+
+func (daemonStub) ShouldRun(f *prog.Flags) bool {
+	return f.Daemon
+}
+
+func (daemonStub) Run(fds [3]*os.File, f *prog.Flags, args []string) error {
+	return fmt.Errorf("daemon mode not supported in this build")
 }
