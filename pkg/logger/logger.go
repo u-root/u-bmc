@@ -7,12 +7,17 @@ package logger
 import (
 	"log"
 	"os"
+	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-var LogContainer logContainer
+var (
+	LogContainer     logContainer
+	loggerInit       sync.Once
+	simpleLoggerInit sync.Once
+)
 
 type logContainer struct {
 	logger       *zap.Logger
@@ -21,9 +26,9 @@ type logContainer struct {
 
 // GetLogger returns the pointer to the logger and creates one if none exists
 func (l *logContainer) GetLogger() *zap.Logger {
-	if l.logger == nil {
-		l.logger = zap.New(getConsoleCore(), zap.AddCaller())
-	}
+	loggerInit.Do(func() {
+		l.logger = zap.New(getCombinedCore(), zap.AddCaller())
+	})
 	defer l.logger.Sync()
 	return l.logger
 }
@@ -31,10 +36,10 @@ func (l *logContainer) GetLogger() *zap.Logger {
 // GetSimpleLogger returns the pointer to the sugared logger and creates one
 // if none exists
 func (l *logContainer) GetSimpleLogger() *zap.SugaredLogger {
-	if l.simpleLogger == nil {
-		logger := zap.New(getConsoleCore(), zap.AddCaller())
+	simpleLoggerInit.Do(func() {
+		logger := zap.New(getCombinedCore(), zap.AddCaller())
 		l.simpleLogger = logger.Sugar()
-	}
+	})
 	defer l.simpleLogger.Sync()
 	return l.simpleLogger
 }
