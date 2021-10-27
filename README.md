@@ -62,6 +62,9 @@ To give you some sense of what we want to create:
    * Must have: USB storage from image
    * Cool to have: USB ethernet to host, replaces KCS IPMI interface.
    * Cool to have: USB graphics card + mouse + keyboard for KVM
+ * Optional WebUI
+   * Uses the same API as the gRPC client
+   * optional so the BMC can stay lean without loosing functionality
 
 # Usage
 
@@ -70,7 +73,7 @@ Prerequisites:
 u-bmc uses the Taskfile build system, install it using their [official installation guide](https://taskfile.dev/#/installation).
 
 Packages needed:
-- go
+- go (at least 1.17)
 - gcc-arm-none-eabi (for arm32)
 - gcc-aarch64-linux-gnu (for arm64)
 - mtd-utils (for targets using flash)
@@ -84,39 +87,44 @@ Packages needed:
 - libelf-dev
 - qemu-kvm
 
-Get them via e.g.:
+Get them for 32bit via e.g.:
 ```
 sudo apt install gcc-arm-none-eabi mtd-utils golang fakeroot flex bison device-tree-compiler bc libssl-dev libelf-dev qemu-kvm
 ```
 
-We also need u-root in our GOPATH so install it with:
+We also need both u-bmc and u-root in our GOPATH so install them with:
 ```
 GO111MODULE=off go get github.com/u-root/u-root
-```
-
-Clone source code:
-```
 GO111MODULE=off go get github.com/u-root/u-bmc
-cd ~/go/src/github.com/u-root/u-bmc
+```
+Or use git clone:
+```
+mkdir $GOPATH/src/github.com/u-root
+cd $GOPATH/src/github.com/u-root
+git clone https://github.com/u-root/u-root
+git clone https://github.com/u-root/u-bmc
 ```
 
 Setup configuration:
 ```
 # SSH ECDSA public keys does not work for now
-cp ~/.ssh/id_rsa.pub config/ssh_keys.pub
+
+cp ~/.ssh/*.pub config/ssh_keys.pub
+
 # Agree to the terms of the configured ACME server
 # By default it's just a toy ACME server so this is fine, but if you're
 # using another ACME server like Let's Encrypt (LE) ensure you agree to their terms.
 # For LE, you can find them at https://letsencrypt.org/repository/.
+
 touch i_agree_to_the_acme_terms
 task config:generate
 ```
 
 Build image:
 ```
-cp config/TARGET.tmpl TARGET
+cp TARGET.tmpl TARGET
 ```
-then uncomment the desired target platform in TARGET and run
+then uncomment the desired target platform e.g. qemu-virt-a72 in TARGET and run
 ```
 task build
 ```
@@ -125,12 +133,6 @@ Since u-bmc uses signed binaries it is important that you back up the
 contents of build/boot/keys/ after building as u-bmc will only accept updates
 signed with these keys.
 
-# Hacking
-
-To run the simulator and the integration test you need a special
-Qemu from https://github.com/openbmc/qemu. Using the upstream Qemu will
-not work predictably.
-
 ## Simulator
 
 Trying out u-bmc is easiest using the simulator.
@@ -138,13 +140,20 @@ First select a Qemu target in the TARGET file then to launch it, run:
 
 ```
 # Build Qemu target
+
 task build
+
 # Launch a local ACME server in one terminal
+
 task pebble
+
 # Launch the u-bmc simulator in another terminal
+
 task virtual-bmc -- 64bit
+
 # (Optional, run in another terminal) Launch a local emulated BIOS to produce some data on the UART
 # Needs to have u-bmc simulator above running for it to attach correctly.
+
 task virtual-host
 ```
 
@@ -158,12 +167,15 @@ When the u-bmc guest tries to access 10.0.2.100 a local service called
 ubmc-pebble is started which uses Let's Encrypt's pebble service to generate
 an HTTPS certificate. The CA used is located in config/sim-ca.crt.
 
-You can interact with u-bmc running in the simulator by using ubmcctl:
+You can interact with u-bmc running in the simulator by pressing Enter to get a shell
+or by using ubmcctl:
 
 ```
 go install github.com/u-root/u-bmc/cmd/ubmcctl
+
 # The root CA is regenerated every time pebble is started to prevent
 # testing to accidentally become production
+
 curl https://localhost:14000/root --cacert config/sim-pebble.crt > root.crt
 echo '127.0.1.2	ubmc.example.com' | sudo tee -a /etc/hosts
 SSL_CERT_FILE=root.crt ubmcctl -host ubmc.example.com:6443
@@ -193,15 +205,20 @@ you can use SCP like this:
 scp build/rootfs/bin/bb my-ubmc:/bb
 scp build/rootfs/bin/bb.sig my-ubmc:/bb.sig
 ssh my-ubmc
+
 # Verify that bb is sane by executing /bb
 /bb
+
 # Should return:
 # <timestmap> You need to specify which command to invoke.
 # Exception: /bin/bb exited with 1
 # [tty], line 1: /bin/bb
+
 mv /bb /bin/bb
 mv /bb.sig /bin/bb.sig
+
 # Verify the signature before rebooting
+
 gpgv /etc/u-bmc.pub /bin/bb.sig /bin/bb
 sync
 shutdown -r
@@ -214,5 +231,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md)
 Since this is an early experiment if this is at all interesting for you or your
 company, do reach out in our Slack channel:
 
-- [Slack](https://u-root.slack.com), sign up [here](http://slack.u-root.com/)
+- [Slack](https://osfw.slack.com), sign up [here](http://slack.u-root.com/)
 
