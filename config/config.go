@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:generate go run -ldflags "-X main.gitVersion=$GITVERSION -X main.gitHash=$GITHASH" generate.go
+
 package config
 
 import (
@@ -73,9 +75,18 @@ var DefaultConfig = &Config{
 	},
 }
 
-const (
-	// Source: https://letsencrypt.org/certs/letsencryptauthorityx3.pem.txt
-	letsEncryptAPICA = `
+	ACME: ACME{
+		// Production LE is https://acme-v02.api.letsencrypt.org/directory
+		// 10.0.2.2 is QEMUs address for the host and where pebble is running.
+		Directory:   "https://10.0.2.2:14000/dir",
+		Contact:     "mailto:nobody@localhost",
+		TermsAgreed: termsAgreed,
+		APICA:       simPebbleAPICA,
+	},
+}
+
+// Source: https://letsencrypt.org/certs/letsencryptauthorityx3.pem.txt
+const letsEncryptAPICA = `
 -----BEGIN CERTIFICATE-----
 MIIFjTCCA3WgAwIBAgIRANOxciY0IzLc9AUoUSrsnGowDQYJKoZIhvcNAQELBQAw
 TzELMAkGA1UEBhMCVVMxKTAnBgNVBAoTIEludGVybmV0IFNlY3VyaXR5IFJlc2Vh
@@ -109,4 +120,3 @@ PB0t6JzUA81mSqM3kxl5e+IZwhYAyO0OTg3/fs8HqGTNKd9BqoUwSRBzp06JMg5b
 rUCGwbCUDI0mxadJ3Bz4WxR6fyNpBK2yAinWEsikxqEt
 -----END CERTIFICATE-----
 `
-)
