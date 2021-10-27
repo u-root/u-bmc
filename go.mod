@@ -7,6 +7,7 @@ require (
 	github.com/beevik/ntp v0.3.0
 	github.com/cleroux/rtc v0.1.1
 	github.com/cloudflare/roughtime v0.0.0-20210217223727-1fe56bcbcfd4
+	github.com/creack/pty v1.1.11
 	github.com/fullstorydev/grpcurl v1.8.1
 	github.com/golang/protobuf v1.5.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -29,7 +30,6 @@ require (
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210820121016-41cdb8703e55
-	golang.org/x/term v0.0.0-20210317153231-de623e64d2a6
 	google.golang.org/grpc v1.39.0
 	src.elv.sh v0.16.3
 )

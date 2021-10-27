@@ -9,12 +9,14 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"net"
 	"os"
+	"os/exec"
 	"strings"
 
+	"github.com/creack/pty"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/term"
 )
 
 type SshServer struct {
@@ -173,16 +175,27 @@ func handleRequests(channel ssh.Channel, requests <-chan *ssh.Request) {
 	}
 }
 
+//TODO(MDr164): Don't use exec.Cmd here but rather implement a proper
+// in-process shell like we do in the login cmd
 func attachShell(channel ssh.Channel) error {
-
-	t := term.NewTerminal(channel, "=> ")
-	for {
-		line, err := t.ReadLine()
-		if err != nil {
-			break
+	sh := exec.Command("elvish")
+	close := func() {
+		channel.Close()
+		if sh.Process != nil {
+			sh.Process.Wait()
 		}
-		fmt.Println(line)
 	}
+	shf, err := pty.Start(sh)
+	if err != nil {
+		close()
+		return err
+	}
+	go func() {
+		io.Copy(channel, shf)
+	}()
+	go func() {
+		io.Copy(shf, channel)
+	}()
 
 	return nil
 }
