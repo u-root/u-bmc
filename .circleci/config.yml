@@ -55,7 +55,7 @@ jobs:
           name: Install Task
           command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
       - run:
-          name: Create config files
+          name: Generate config
           command: |
             echo qemu-virt-a72 > TARGET
             task config:generate
@@ -77,6 +77,11 @@ jobs:
       - run:
           name: Install Task
           command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      - run:
+          name: Generate config
+          command: |
+            echo qemu-virt-a7 > TARGET
+            task config:generate
       - run:
           name: build all commands
           command: |
@@ -112,10 +117,10 @@ jobs:
             sudo make install
             sudo ln -sf /usr/local/bin/mkfs.erofs /usr/bin/mkfs.erofs
       - run:
-          name: Create test key
+          name: Generate config
           command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/generate/ssh-pubkeys
             echo qemu-virt-a72 > TARGET
+            task config:generate
       - run:
           name: Build image
           command: task build
