@@ -6,10 +6,16 @@ tasks:
     deps:
       - ssh-keys
       - sim-crt
-    dir: config
+    dir: config/generate
     cmds:
       - echo "Generating config..."
-      - GITVERSION={{.GIT_VERSION}} GITHASH={{.GIT_HASH}} go generate
+      - |
+        go run \
+        -ldflags "\
+        -X main.gitVersion={{.GIT_VERSION}} \
+        -X main.gitHash={{.GIT_HASH}}" \
+        -tags "config {{.CLI_ARGS}}" \
+        .
       - echo "Config generated successfully!"
     vars:
       GIT_VERSION:
@@ -19,7 +25,7 @@ tasks:
 
   # Make sure list of allowed ssh public keys exists
   ssh-keys:
-    dir: config
+    dir: config/generate
     cmds:
       - touch ssh-pubkeys
     status:
@@ -27,7 +33,7 @@ tasks:
 
   # Create pebble key
   sim-key:
-    dir: config
+    dir: config/generate
     cmds:
       - |
         openssl ecparam \
@@ -42,7 +48,7 @@ tasks:
   sim-crt:
     deps:
       - sim-key
-    dir: config
+    dir: config/generate
     cmds:
       - |
         openssl req \
@@ -53,10 +59,10 @@ tasks:
         -subj /CN=sim-pebble \
         -reqexts SAN \
         -extensions SAN \
-        -config ./sim-pebble.cnf \
+        -config ../sim-pebble.cnf \
         -sha256 \
         -days 36500
     sources:
-      - sim-pebble.cnf
+      - ../sim-pebble.cnf
     generates:
       - sim-pebble.crt

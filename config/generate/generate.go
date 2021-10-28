@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build ignore
-// +build ignore
-
 package main
 
 import (
@@ -16,10 +13,8 @@ import (
 )
 
 var (
-	termsAgreed = false
-	debugSSH    = false
-	gitVersion  = `"0"`
-	gitHash     = `"none"`
+	gitVersion = `"0"`
+	gitHash    = `"none"`
 
 	//go:embed sim-pebble.crt
 	simPebbleAPICA string
@@ -50,7 +45,7 @@ var (
 func main() {
 	authorizedKeys := strings.Split(keyFile, "\n")
 
-	f, err := os.Create("generated.go")
+	f, err := os.Create("../generated.go")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -1,6 +1,6 @@
 build/*
 .task/*
 TARGET
-config/ssh-pubkeys
-config/sim-pebble.crt
-config/sim-pebble.key
+config/generate/ssh-pubkeys
+config/generate/sim-pebble.crt
+config/generate/sim-pebble.key
