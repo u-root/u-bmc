@@ -107,17 +107,16 @@ git clone https://github.com/u-root/u-bmc
 
 Setup configuration:
 ```
-# SSH ECDSA public keys does not work for now
+# RSA keys will be considered legacy and support will be added again later
 
-cp ~/.ssh/*.pub config/ssh_keys.pub
+cp ~/.ssh/*.pub config/generate/ssh-pubkeys
 
 # Agree to the terms of the configured ACME server
 # By default it's just a toy ACME server so this is fine, but if you're
 # using another ACME server like Let's Encrypt (LE) ensure you agree to their terms.
 # For LE, you can find them at https://letsencrypt.org/repository/.
 
-touch i_agree_to_the_acme_terms
-task config:generate
+task config:generate -- acme
 ```
 
 Build image:
@@ -176,7 +175,7 @@ go install github.com/u-root/u-bmc/cmd/ubmcctl
 # The root CA is regenerated every time pebble is started to prevent
 # testing to accidentally become production
 
-curl https://localhost:14000/root --cacert config/sim-pebble.crt > root.crt
+curl https://localhost:14000/root --cacert config/generate/sim-pebble.crt > root.crt
 echo '127.0.1.2	ubmc.example.com' | sudo tee -a /etc/hosts
 SSL_CERT_FILE=root.crt ubmcctl -host ubmc.example.com:6443
 ```

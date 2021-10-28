@@ -7,9 +7,6 @@ workflows:
       - test:
           requires:
             - clean-code
-      - race:
-          requires:
-            - clean-code
       - compile:
           requires:
             - clean-code
@@ -27,6 +24,7 @@ workflows:
     jobs:
       - compile
       - image
+
 #TODO: Utilize CircleCI caching for at least the kernel tarball
 jobs:
   clean-code:
@@ -38,16 +36,6 @@ jobs:
       - run:
           name: Install ineffassign
           command: go get github.com/gordonklaus/ineffassign
-      - run:
-          name: Install Task
-          command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
-      - run:
-          name: Create test key
-          command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
-            touch i_agree_to_the_acme_terms
-            echo qemu-virt-a72 > TARGET
-            task config:generate
       - run:
           name: vet
           command: go vet $(go list ./...)
@@ -67,10 +55,8 @@ jobs:
           name: Install Task
           command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
       - run:
-          name: Create test key
+          name: Create config files
           command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
-            touch i_agree_to_the_acme_terms
             echo qemu-virt-a72 > TARGET
             task config:generate
       - run:
@@ -79,24 +65,8 @@ jobs:
       - run:
           name: Test coverage
           command: task coverage
-  race:
-    docker:
-      - image: cimg/go:1.17.1
-    working_directory: ~/go/src/github.com/u-root/u-bmc
-    steps:
-      - checkout
       - run:
-          name: Install Task
-          command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
-      - run:
-          name: Create test key
-          command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
-            touch i_agree_to_the_acme_terms
-            echo qemu-virt-a72 > TARGET
-            task config:generate
-      - run:
-          name: Race detector
+          name: Test race conditions
           command: task race
   compile:
     docker:
@@ -107,13 +77,6 @@ jobs:
       - run:
           name: Install Task
           command: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
-      - run:
-          name: Create test key
-          command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
-            touch i_agree_to_the_acme_terms
-            echo qemu-virt-a72 > TARGET
-            task config:generate
       - run:
           name: build all commands
           command: |
@@ -151,8 +114,7 @@ jobs:
       - run:
           name: Create test key
           command: |
-            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/ssh_keys
-            touch i_agree_to_the_acme_terms
+            ssh-keygen -t rsa -b 4096 -C "testkey" -N "testpass" -f config/generate/ssh-pubkeys
             echo qemu-virt-a72 > TARGET
       - run:
           name: Build image
@@ -163,6 +125,7 @@ jobs:
       - store_artifacts:
           path: build/linux/zImage.boot
           destination: zImage.boot
+      #TODO(MDr164): Fix integration tests uinit
       # - run:
       #     name: Run integration tests
       #     command: task integration
