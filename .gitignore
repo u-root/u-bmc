@@ -4,3 +4,4 @@ TARGET
 config/generate/ssh-pubkeys
 config/generate/sim-pebble.crt
 config/generate/sim-pebble.key
+config/generated.go
