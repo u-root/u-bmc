@@ -60,18 +60,18 @@ tasks:
       - echo "127.0.0.1 localhost" >> rootfs/etc/hosts
         # Copy over runtime kernel, devicetree and their signatures 
       - cp linux/zImage.full rootfs/boot/zImage-"{{.GIT_VERSION}}"
-      - cat linux/zImage.full | boot/signer >> rootfs/boot/zImage-{{.GIT_VERSION}}.gpg
+      - boot/signer -sign linux/zImage.full >> rootfs/boot/zImage-{{.GIT_VERSION}}.sig
       - touch boot/platform.dtb.full # Needed for Qemu as it generates the dtb dynamically
       - cp boot/platform.dtb.full rootfs/boot/platform-{{.GIT_VERSION}}.dtb
-      - cat boot/platform.dtb.full | boot/signer > rootfs/boot/platform-{{.GIT_VERSION}}.dtb.gpg
+      - boot/signer -sign boot/platform.dtb.full >> rootfs/boot/platform-{{.GIT_VERSION}}.dtb.sig
         # Link files with git revision names to generic names
       - ln -sf zImage-{{.GIT_VERSION}} rootfs/boot/zImage
-      - ln -sf zImage-{{.GIT_VERSION}}.gpg rootfs/boot/zImage.gpg
+      - ln -sf zImage-{{.GIT_VERSION}}.sig rootfs/boot/zImage.sig
       - ln -sf platform-{{.GIT_VERSION}}.dtb rootfs/boot/platform.dtb
-      - ln -sf platform-{{.GIT_VERSION}}.dtb.gpg rootfs/boot/platform.dtb.gpg
-      - cat rootfs/bin/bb | boot/signer > rootfs/bin/bb.gpg
+      - ln -sf platform-{{.GIT_VERSION}}.dtb.sig rootfs/boot/platform.dtb.sig
+      - boot/signer -sign rootfs/bin/bb >> rootfs/bin/bb.sig
       - cp boot/keys/u-bmc.pub rootfs/etc/
-      - ln -sf bb.gpg rootfs/bin/init.gpg
+      - ln -sf bb.sig rootfs/bin/init.sig
       - cp ../proto/system.textpb.default rootfs/config/system.textpb
     vars:
       GIT_VERSION:

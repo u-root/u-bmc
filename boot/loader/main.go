@@ -15,24 +15,18 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"crypto"
 	"flag"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"path/filepath"
-	"time"
 
-	"github.com/machinebox/progress"
+	"aead.dev/minisign"
+	"github.com/u-root/u-bmc/pkg/logger"
 	"github.com/u-root/u-root/pkg/boot"
 	"github.com/u-root/u-root/pkg/boot/kexec"
 	"github.com/u-root/u-root/pkg/kmodule"
 	uroot "github.com/u-root/u-root/pkg/mount"
 	"github.com/u-root/u-root/pkg/uio"
-	"golang.org/x/crypto/openpgp/errors"
-	"golang.org/x/crypto/openpgp/packet"
 	"golang.org/x/sys/unix"
 )
 
@@ -44,12 +38,14 @@ const (
 )
 
 var (
-	kload  = flag.Bool("kexec", false, "Mount rootfs and call kexec")
-	swroot = flag.Bool("switch", false, "Mount rootfs and call switch_root")
-	mtd    = flag.Bool("mtd", false, "Mount and load u-bmc from MTD flash")
-	blk    = flag.Bool("blk", false, "Mount and load u-bmc from block device")
-	ast    = flag.Bool("ast", false, "ASPEED ast specific option")
-	verify = []string{initPath, kernelPath, dtbPath}
+	kload    = flag.Bool("kexec", false, "Mount rootfs and call kexec")
+	swroot   = flag.Bool("switch", false, "Mount rootfs and call switch_root")
+	mtd      = flag.Bool("mtd", false, "Mount and load u-bmc from MTD flash")
+	blk      = flag.Bool("blk", false, "Mount and load u-bmc from block device")
+	ast      = flag.Bool("ast", false, "ASPEED ast specific option")
+	toVerify = []string{initPath, kernelPath, dtbPath}
+	lc       = logger.LogContainer
+	log      = lc.GetLogger()
 )
 
 func main() {
@@ -67,10 +63,7 @@ func main() {
 		log.Fatal("please choose either kexec or switch!")
 	}
 	if *ast {
-		err := loadModule("/bootlock.ko")
-		if err != nil {
-			log.Fatalf("loadModule(/bootlock.ko): %v", err)
-		}
+		loadModule("/bootlock.ko")
 	}
 	if *kload {
 		loadAndExec()
@@ -83,6 +76,7 @@ func main() {
 // mountAndSwitchRoot mounts the rootfs and overlay then runs switch_root
 func mountAndSwitchRoot() {
 	createBasicHirarchy()
+
 	if *mtd {
 		mountMtd()
 	}
@@ -91,23 +85,11 @@ func mountAndSwitchRoot() {
 	}
 	mountOverlay()
 
-	err := uroot.SwitchRoot("/mnt", "/bin/init")
-	if err != nil {
-		log.Fatalf("SwitchRoot: %v", err)
-	}
+	check(uroot.SwitchRoot("/mnt", "/bin/init"), "Failed to execute SwitchRoot")
 }
 
 // loadAndExec validates boot files and runs them via kexec
 func loadAndExec() {
-	keyf, err := os.Open(pubKeyPath)
-	if err != nil {
-		log.Fatalf("Open(%s): %v", pubKeyPath, err)
-	}
-	key, err := readPublicSigningKey(keyf)
-	if err != nil {
-		log.Fatalf("readPublicSigningKey(%s): %v", pubKeyPath, err)
-	}
-
 	createBasicHirarchy()
 	if *mtd {
 		mountMtd()
@@ -116,39 +98,24 @@ func loadAndExec() {
 		mountBlk()
 	}
 
-	for _, path := range verify {
-		f, err := openAndVerify(path, key)
-		if err != nil {
-			log.Fatalf("openAndVerify(%s): %v", path, err)
-		}
-		f.Close()
+	for _, path := range toVerify {
+		verify(path)
 	}
-	log.Printf("Integrity check OK")
+	log.Info("Integrity check OK")
 
 	// Try kexec_file_load first
 	kernel, err := os.Open(kernelPath)
-	if err != nil {
-		log.Fatalf("Open(%s): %v", kernelPath, err)
-	}
-	err = kexec.FileLoad(kernel, nil, "")
-	if err != nil {
-		log.Fatalf("KexecFileLoad: %v", err)
-	}
+	check(err, fmt.Sprintf("Failed to open %s", kernelPath))
+	check(kexec.FileLoad(kernel, nil, ""), "Failed to call KexecFileLoad")
 	kernel.Close()
-	log.Print("Looks like kexec_file_load didn't work, let's try kexec_load")
+	log.Info("Looks like kexec_file_load didn't work, let's try kexec_load")
 
 	// If kexec_file_load fails try kexec_load second
 	image := &boot.LinuxImage{
 		Kernel: uio.NewLazyFile(kernelPath),
 	}
-	err = image.Load(true)
-	if err != nil {
-		log.Fatalf("Load(%s): %v", kernelPath, err)
-	}
-	err = kexec.Reboot()
-	if err != nil {
-		log.Fatalf("Reboot: %v", err)
-	}
+	check(image.Load(true), "Failed to load kernel")
+	check(kexec.Reboot(), "Failed to call kexec")
 }
 
 // createBasicHirarchy creates some basic directories and mounts if they don't exist yet
@@ -156,10 +123,7 @@ func createBasicHirarchy() {
 	// Create base directories
 	dirs := []string{"/mnt", "/ro", "/tmp", "/proc", "/sys", "/dev"}
 	for _, dir := range dirs {
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			log.Fatalf("Mkdir(%s): %v", dir, err)
-		}
+		check(os.MkdirAll(dir, 0755), fmt.Sprintf("Failed to create %s", dir))
 	}
 
 	// Mount base directories
@@ -169,24 +133,14 @@ func createBasicHirarchy() {
 	}
 
 	// Set up remaining parts for /dev
-	err := os.MkdirAll("/dev/pts", 0755)
-	if err != nil {
-		log.Fatalf("Mkdir(/dev/pts): %v", err)
-	}
+	check(os.MkdirAll("/dev/pts", 0755), "Failed to create /dev/pts")
 	mount("devpts")
-	// err = os.Symlink("/dev/pts/ptmx", "/dev/ptmx")
-	// if err != nil {
-	// 	log.Fatalf("Symlink(/dev/ptmx): %v", err)
-	// }
-
+	//check(os.Symlink("/dev/pts/ptmx", "/dev/ptmx"), "Failed to symlink /dev/ptmx")
 }
 
 // mountMtd mounts u-bmc on MTD flash
 func mountMtd() {
-	err := unix.Mount("ubi0:root", "/ro", "ubifs", unix.MS_RDONLY, "")
-	if err != nil {
-		log.Fatalf("Mount(ubi0:root): %v", err)
-	}
+	check(unix.Mount("ubi0:root", "/ro", "ubifs", unix.MS_RDONLY, ""), "Failed to mount ubi0:root")
 }
 
 // mountBlk mounts u-bmc on a block device
@@ -199,16 +153,11 @@ func mountBlk() {
 	for _, dev := range devs {
 		dev = "/dev/" + filepath.Base(dev)
 		bd, err := os.Open(dev)
-		if err != nil {
-			log.Fatalf("Open(%s): %v", dev, err)
-		}
+		check(err, fmt.Sprintf("Failed to open %s", dev))
 		_, err = bd.ReadAt(data, offset)
 		bd.Close()
 		if err == nil && bytes.Equal(data, uuid) {
-			err = unix.Mount(dev, "/ro", "erofs", unix.MS_RDONLY, "")
-			if err != nil {
-				log.Fatalf("Mount(%s): %v", dev, err)
-			}
+			check(unix.Mount(dev, "/ro", "erofs", unix.MS_RDONLY, ""), fmt.Sprintf("Failed to mount %s", dev))
 		}
 	}
 }
@@ -217,10 +166,7 @@ func mountBlk() {
 func mountOverlay() {
 	tmpdirs := []string{"/tmp/upper", "/tmp/work"}
 	for _, dir := range tmpdirs {
-		err := os.MkdirAll(dir, 0755)
-		if err != nil {
-			log.Fatalf("Mkdir(%s): %v", dir, err)
-		}
+		check(os.MkdirAll(dir, 0755), fmt.Sprintf("Failed to create %s", dir))
 	}
 	mount("overlayfs")
 }
@@ -242,107 +188,34 @@ func mount(fs string) {
 	case "overlayfs":
 		err = unix.Mount(fs, "/mnt", "overlay", 0, "lowerdir=/ro,upperdir=/tmp/upper,workdir=/tmp/work")
 	}
-	if err != nil {
-		log.Fatalf("Mount(%s): %v", fs, err)
+	check(err, fmt.Sprintf("Failed mounting %s", fs))
+}
+
+func verify(filePath string) {
+	f, err := os.ReadFile(filePath)
+	check(err, fmt.Sprintf("Failed to open %s", filePath))
+
+	sig, err := os.ReadFile(filePath + ".sig")
+	check(err, fmt.Sprintf("Failed to open %s", filePath+".sig"))
+
+	key, err := minisign.PublicKeyFromFile(pubKeyPath)
+	check(err, fmt.Sprintf("Failed to read public key %s", pubKeyPath))
+
+	if !minisign.Verify(key, f, sig) {
+		log.Fatal(fmt.Sprintf("Signature for %s does not match, bailing out!", filePath))
 	}
 }
 
-func openAndVerify(path string, key *packet.PublicKey) (*os.File, error) {
-	sigf, err := os.Open(path + ".gpg")
-	if err != nil {
-		return nil, err
-	}
-	defer sigf.Close()
-	contentf, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	if err = verifyDetachedSignature(contentf, sigf, key); err != nil {
-		return nil, err
-	}
-	return contentf, nil
-}
-
-func readPublicSigningKey(keyf io.Reader) (*packet.PublicKey, error) {
-	keypackets := packet.NewReader(keyf)
-	p, err := keypackets.Next()
-	if err != nil {
-		return nil, err
-	}
-	switch pkt := p.(type) {
-	case *packet.PublicKey:
-		return pkt, nil
-	default:
-		log.Printf("ReadPublicSigningKey: got %T, want *packet.PublicKey", pkt)
-	}
-	return nil, errors.StructuralError("expected first packet to be PublicKey")
-}
-
-func verifyDetachedSignature(contentf, sigf *os.File, key *packet.PublicKey) error {
-	var hashFunc crypto.Hash
-
-	packets := packet.NewReader(sigf)
-	p, err := packets.Next()
-	if err != nil {
-		return fmt.Errorf("reading signature file: %v", err)
-	}
-	switch sig := p.(type) {
-	case *packet.Signature:
-		hashFunc = sig.Hash
-	case *packet.SignatureV3:
-		hashFunc = sig.Hash
-	default:
-		return errors.UnsupportedError("unrecognized signature")
-	}
-
-	size, err := contentf.Seek(0, io.SeekEnd)
-	if err != nil {
-		return fmt.Errorf("seek end: %v", err)
-	}
-	if _, err := contentf.Seek(0, io.SeekStart); err != nil {
-		return fmt.Errorf("seek start: %v", err)
-	}
-
-	r := progress.NewReader(contentf)
-	c := make(chan struct{})
-
-	go func(path string) {
-		ctx := context.Background()
-		path, err := filepath.EvalSymlinks(path)
-		if err != nil {
-			path = fmt.Sprintf("{%v}", err)
-		}
-		progressChan := progress.NewTicker(ctx, r, size, 200*time.Millisecond)
-		for p := range progressChan {
-			fmt.Printf("Verifying %s integrity: %d %%\r", path, int(p.Percent()))
-			os.Stdout.Sync()
-		}
-		fmt.Printf("Verifying %s integrity: complete\n", path)
-		close(c)
-	}(contentf.Name())
-
-	h := hashFunc.New()
-	if _, err := io.Copy(h, r); err != nil && err != io.EOF {
-		return err
-	}
-	switch sig := p.(type) {
-	case *packet.Signature:
-		err = key.VerifySignature(h, sig)
-	case *packet.SignatureV3:
-		err = key.VerifySignatureV3(h, sig)
-	default:
-		panic("unreachable")
-	}
-	// Wait for the final status printout to not mess up the log
-	_ = <-c
-	return err
-}
-
-func loadModule(fp string) error {
+func loadModule(fp string) {
 	f, err := os.Open(fp)
-	if err != nil {
-		return err
-	}
+	check(err, fmt.Sprintf("Failed to open kmod %s", fp))
+
 	defer f.Close()
-	return kmodule.FileInit(f, "", 0)
+	check(kmodule.FileInit(f, "", 0), "Failed loading kernel")
+}
+
+func check(err error, msg string) {
+	if err != nil {
+		log.Fatal(msg, lc.String("err", err.Error()))
+	}
 }

@@ -3,6 +3,7 @@ module github.com/u-root/u-bmc
 go 1.17
 
 require (
+	aead.dev/minisign v0.2.0
 	github.com/anatol/vmtest v0.0.0-20210922030747-b951d158b7cc
 	github.com/beevik/ntp v0.3.0
 	github.com/cleroux/rtc v0.1.1
@@ -15,7 +16,6 @@ require (
 	github.com/jmhodges/clock v0.0.0-20160418191101-880ee4c33548
 	github.com/jpillora/backoff v1.0.0
 	github.com/letsencrypt/pebble v1.0.1
-	github.com/machinebox/progress v0.2.0
 	github.com/mdlayher/genetlink v1.0.0
 	github.com/mdlayher/netlink v1.4.1
 	github.com/miekg/dns v1.1.43
@@ -44,7 +44,6 @@ require (
 	github.com/josharian/native v0.0.0-20200817173448-b6b71def0850 // indirect
 	github.com/klauspost/compress v1.10.6 // indirect
 	github.com/klauspost/pgzip v1.2.4 // indirect
-	github.com/matryer/is v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mdlayher/socket v0.0.0-20210307095302-262dc9984e00 // indirect

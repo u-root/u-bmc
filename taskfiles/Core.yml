@@ -13,31 +13,20 @@ tasks:
     generates:
       - build/u-bmc
 
-  # Generate a private key
-  u-bmc-key:
-    dir: build/boot/keys
-    cmds:
-      - echo "Generating private key..."
-      - chmod 700 .
-      - openssl genrsa -out u-bmc.key # This could be ECDSA I guess
-      - echo "Done!"
-    status:
-      - test -f u-bmc.key
-
-  # Build the signer and let it generate a public key
+  # Build the signer and let it generate a key pair
   signer:
-    deps:
-      - u-bmc-key
     dir: build/boot
     cmds:
-      - echo "Building signer and generating public key..."
+      - echo "Building signer and generating key pair..."
       - cd ../../boot/signer && go build -o ../../build/boot/
-      - echo | ./signer > /dev/null
+      - mkdir -p keys/
+      - ./signer -gen
       - echo "Done!"
     sources:
       - ../../boot/signer/*.go
     generates:
       - signer
+      - keys/u-bmc.key
       - keys/u-bmc.pub
 
   # Build the LinuxBoot bootloader
