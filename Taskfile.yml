@@ -69,14 +69,12 @@ tasks:
     cmds:
       - echo "Wiping the whole build directory and config files!"
       - rm -rf build/
-      - rm -f config/acme.go
-      - rm -f config/version.go
-      - rm -f config/sim_pebble.go
+      - rm -f config/generated.go
       - rm -f config/sim-pebble.crt
       - rm -f config/sim-pebble.key
-      - rm -f config/ssh_keys.go
-      - rm -f config/ssh_keys.pub
-      - rm -f i_agree_to_the_acme_terms
+      - rm -f config/generate/sim-pebble.crt
+      - rm -f config/generate/sim-pebble.key
+      - rm -f config/generate/ssh-pubkeys
       - rm -f TARGET
       - echo "Done!"
 
