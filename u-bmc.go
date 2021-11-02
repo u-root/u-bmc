@@ -125,11 +125,11 @@ func Main() error {
 	}
 	var extracmds []string
 	for _, arg := range flag.Args() {
-		path, _ := filepath.Glob(arg)
-		extracmds = append(extracmds, path...)
+		path, err := filepath.Glob(arg)
 		if err != nil {
-			return err
+			continue
 		}
+		extracmds = append(extracmds, path...)
 	}
 	var commands []string
 	commands = append(commands, bmccmds...)
