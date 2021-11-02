@@ -27,7 +27,7 @@ type logContainer struct {
 // GetLogger returns the pointer to the logger and creates one if none exists
 func (l *logContainer) GetLogger() *zap.Logger {
 	loggerInit.Do(func() {
-		l.logger = zap.New(getCombinedCore(), zap.AddCaller())
+		l.logger = zap.New(getCombinedCore())
 	})
 	defer l.logger.Sync()
 	return l.logger
@@ -37,7 +37,7 @@ func (l *logContainer) GetLogger() *zap.Logger {
 // if none exists
 func (l *logContainer) GetSimpleLogger() *zap.SugaredLogger {
 	simpleLoggerInit.Do(func() {
-		logger := zap.New(getCombinedCore(), zap.AddCaller())
+		logger := zap.New(getCombinedCore())
 		l.simpleLogger = logger.Sugar()
 	})
 	defer l.simpleLogger.Sync()
