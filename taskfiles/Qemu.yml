@@ -6,6 +6,7 @@ tasks:
     deps:
       - :ovmf:build
     dir: build
+    interactive: true
     cmds:
       - |
         qemu-system-x86_64 \
@@ -24,6 +25,7 @@ tasks:
   # Run Qemu emulating a 64bit ARM machine with u-bmc
   bmc-64bit:
     dir: build
+    interactive: true
     cmds:
       - |
         qemu-system-aarch64 \
@@ -45,6 +47,7 @@ tasks:
   # Run Qemu emulating a 32bit ARM machine with u-bmc
   bmc-32bit:
     dir: build
+    interactive: true
     cmds:
       - |
         qemu-system-arm \

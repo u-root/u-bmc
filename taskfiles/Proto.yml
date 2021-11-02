@@ -7,3 +7,7 @@ tasks:
     cmds:
       - protoc --go_out=plugins=grpc:. bmc.proto
       - protoc --go_out=plugins=grpc:. config.proto
+    sources:
+      - ./*.proto
+    generates:
+      - ./*.go
