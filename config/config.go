@@ -44,11 +44,10 @@ var DefaultConfig = &Config{
 	// Instead, u-bmc will refuse to execute any remote actions until an accurate
 	// time source has been established.
 	RoughtimeServers: []ttime.RoughtimeServer{
-		// TODO(bluecmd): Doubled entries due to https://github.com/cloudflare/roughtime/issues/10
-		{Protocol: "udp4", Address: "roughtime.cloudflare.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "gD63hSj3ScS+wuOeGrubXlq35N1c5Lby/S+T7MNTjxo="},
-		{Protocol: "udp6", Address: "roughtime.cloudflare.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "gD63hSj3ScS+wuOeGrubXlq35N1c5Lby/S+T7MNTjxo="},
-		{Protocol: "udp4", Address: "roughtime.sandbox.google.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "etPaaIxcBMY1oUeGpwvPMCJMwlRVNxv51KK/tktoJTQ="},
-		{Protocol: "udp6", Address: "roughtime.sandbox.google.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "etPaaIxcBMY1oUeGpwvPMCJMwlRVNxv51KK/tktoJTQ="},
+		{Protocol: "udp", Address: "roughtime.cloudflare.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "gD63hSj3ScS+wuOeGrubXlq35N1c5Lby/S+T7MNTjxo="},
+		{Protocol: "udp", Address: "roughtime.sandbox.google.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "etPaaIxcBMY1oUeGpwvPMCJMwlRVNxv51KK/tktoJTQ="},
+		{Protocol: "udp", Address: "time.0xt.ca:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "iBVjxg/1j7y1+kQUTBYdTabxCppesU/07D4PMDJk2WA="},
+		{Protocol: "udp", Address: "roughtime.int80h.com:2002", PublicKeyType: ttime.KEY_TYPE_ED25519, PublicKey: "AW5uAoTSTDfG5NfY1bTh08GUnOqlRb+HVhbJ3ODJvsE="},
 	},
 
 	// While u-bmc has been granted 0.u-bmc.pool.ntp.org, they do not currently
