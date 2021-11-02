@@ -33,22 +33,24 @@ tasks:
 
   # Create pebble key
   sim-key:
-    dir: config/generate
+    dir: config
     cmds:
       - |
         openssl ecparam \
-        -name secp256r1 \
+        -name prime256v1 \
         -genkey \
         -noout \
         -out sim-pebble.key
+      - cp sim-pebble.key generate/sim-pebble.key
     status:
       - test -f sim-pebble.key
+      - test -f generate/sim-pebble.key
 
   # Create pebble certificate
   sim-crt:
     deps:
       - sim-key
-    dir: config/generate
+    dir: config
     cmds:
       - |
         openssl req \
@@ -59,10 +61,12 @@ tasks:
         -subj /CN=sim-pebble \
         -reqexts SAN \
         -extensions SAN \
-        -config ../sim-pebble.cnf \
+        -config sim-pebble.cnf \
         -sha256 \
         -days 36500
+      - cp sim-pebble.crt generate/sim-pebble.crt
     sources:
-      - ../sim-pebble.cnf
+      - sim-pebble.cnf
     generates:
       - sim-pebble.crt
+      - generate/sim-pebble.crt
