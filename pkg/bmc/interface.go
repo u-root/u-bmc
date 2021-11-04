@@ -128,10 +128,12 @@ func ipv6LinkFixer(iface string) {
 			err = setLinkDown(iface)
 			if err != nil {
 				log.Error(err)
+				continue
 			}
 			err = setLinkUp(iface)
 			if err != nil {
 				log.Error(err)
+				continue
 			}
 			// Back off 10 seconds before trying again to avoid flapping too much
 			sleep = 10 * time.Second

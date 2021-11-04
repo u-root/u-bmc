@@ -227,7 +227,7 @@ func (m *Manager) renew() (*tls.Certificate, error) {
 		}
 	}
 	if !handled {
-		return nil, fmt.Errorf("fo DNS01 ACME handler could handle challenge")
+		return nil, fmt.Errorf("no DNS01 ACME handler could handle challenge")
 	}
 
 	_, err = c.AcceptChallenge(context.Background(), challenge)
