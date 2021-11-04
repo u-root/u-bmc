@@ -69,9 +69,12 @@ func (c *ACMEConfig) GetManagedCert(fqdn []string, staging bool, mux *http.Serve
 	})
 	// Add manager to handler and start HTTP01 solver
 	acmeHandler.Issuers = []certmagic.Issuer{acmeManager}
-	http.ListenAndServe(":80", acmeManager.HTTPChallengeHandler(mux))
+	err := http.ListenAndServe(":80", acmeManager.HTTPChallengeHandler(mux))
+	if err != nil {
+		return nil, err
+	}
 	// Obtain and renew certificates
-	err := acmeHandler.ManageSync(context.TODO(), fqdn)
+	err = acmeHandler.ManageSync(context.TODO(), fqdn)
 	if err != nil {
 		return nil, err
 	}
@@ -102,19 +105,25 @@ func (c *ACMEConfig) GetSelfSignedCert(fqdn []string) (*tls.Config, error) {
 		return nil, err
 	}
 	caPEM := new(bytes.Buffer)
-	pem.Encode(caPEM, &pem.Block{
+	err = pem.Encode(caPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: caBytes,
 	})
+	if err != nil {
+		return nil, err
+	}
 	caPrivkeyBytes, err := x509.MarshalECPrivateKey(caPrivKey)
 	if err != nil {
 		return nil, err
 	}
 	caPrivKeyPEM := new(bytes.Buffer)
-	pem.Encode(caPrivKeyPEM, &pem.Block{
+	err = pem.Encode(caPrivKeyPEM, &pem.Block{
 		Type:  "EC PRIVATE KEY",
 		Bytes: caPrivkeyBytes,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(4200),
@@ -138,19 +147,25 @@ func (c *ACMEConfig) GetSelfSignedCert(fqdn []string) (*tls.Config, error) {
 		return nil, err
 	}
 	certPEM := new(bytes.Buffer)
-	pem.Encode(certPEM, &pem.Block{
+	err = pem.Encode(certPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: certBytes,
 	})
+	if err != nil {
+		return nil, err
+	}
 	certPrivKeyBytes, err := x509.MarshalECPrivateKey(certPrivKey)
 	if err != nil {
 		return nil, err
 	}
 	certPrivKeyPEM := new(bytes.Buffer)
-	pem.Encode(certPrivKeyPEM, &pem.Block{
+	err = pem.Encode(certPrivKeyPEM, &pem.Block{
 		Type:  "EC PRIVATE KEY",
 		Bytes: certPrivKeyBytes,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	serverCert, err := tls.X509KeyPair(certPEM.Bytes(), certPrivKeyPEM.Bytes())
 	if err != nil {
