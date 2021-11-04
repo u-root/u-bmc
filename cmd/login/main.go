@@ -25,16 +25,13 @@ func main() {
 		log.Fatalf("Unable to read from terminal: %v", err)
 	}
 
-	fmt.Printf(`
-██╗   ██╗      ██████╗ ███╗   ███╗ ██████╗
-██║   ██║      ██╔══██╗████╗ ████║██╔════╝
-██║   ██║█████╗██████╔╝██╔████╔██║██║
-██║   ██║╚════╝██╔══██╗██║╚██╔╝██║██║
-╚██████╔╝      ██████╔╝██║ ╚═╝ ██║╚██████╗
- ╚═════╝       ╚═════╝ ╚═╝     ╚═╝ ╚═════╝
+	fmt.Print(` ___ _  _ ___ _    _    
+/ __| || | __| |  | |   
+\__ \ __ | _|| |__| |__ 
+|___/_||_|___|____|____|						
 
 `)
-
+	// TODO(MDr164): Make use of daemon mode
 	os.Exit(prog.Run([3]*os.File{os.Stdin, os.Stdout, os.Stderr}, os.Args,
 		buildinfo.Program, daemonStub{}, shell.Program{}))
 }
