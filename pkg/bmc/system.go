@@ -105,16 +105,18 @@ func intrHandler(cmd *exec.Cmd, exited chan bool) {
 	}
 }
 
-func startSsh(ak []string) error {
+func startSSH(ak []string) error {
+	s := SSHServer{}
+	// Create host key if not existing
 	_, err := os.Stat("/config/ssh_host_ed25519_key")
 	if os.IsNotExist(err) {
-		log.Infof("Generating new SSH server key")
-		err = SshKeyGen("/config/ssh_host_ed25519_key", "")
+		log.Info("Generating new SSH server key")
+		err = s.SSHKeyGen("/config/ssh_host_ed25519_key", "")
 		if err != nil {
 			log.Errorf("Failed to create server key: %v", err)
 		}
 	}
-	return RunSshServer(ak)
+	return s.LaunchSSHServer(ak)
 }
 
 func acquireTime(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
@@ -274,7 +276,8 @@ func StartupWithConfig(plat Platform, conf *config.Config) (error, chan error) {
 	if conf.StartDebugSshServer {
 		log.Infof("Starting debug SSH server")
 		// Make sure sshd starts up completely before we continue, to allow for debugging
-		if err := startSsh(conf.DebugSshServerKeys); err != nil {
+		err := startSSH(conf.DebugSshServerKeys)
+		if err != nil {
 			log.Errorf("ssh server failed: %v", err)
 		}
 	}
