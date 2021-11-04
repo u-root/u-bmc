@@ -29,7 +29,6 @@ func (l *logContainer) GetLogger() *zap.Logger {
 	loggerInit.Do(func() {
 		l.logger = zap.New(getCombinedCore())
 	})
-	defer l.logger.Sync()
 	return l.logger
 }
 
@@ -40,7 +39,6 @@ func (l *logContainer) GetSimpleLogger() *zap.SugaredLogger {
 		logger := zap.New(getCombinedCore())
 		l.simpleLogger = logger.Sugar()
 	})
-	defer l.simpleLogger.Sync()
 	return l.simpleLogger
 }
 
