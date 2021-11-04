@@ -6,7 +6,6 @@ package bmc
 
 import (
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -106,7 +105,7 @@ func (u *uartSystem) uartSender() {
 		buf := <-u.w
 		_, err := u.u.Write(buf)
 		if err != nil {
-			log.Printf("UART write error: %v", err)
+			log.Errorf("UART write error: %v", err)
 			break
 		}
 	}
@@ -117,7 +116,7 @@ func (u *uartSystem) uartReceiver() {
 		buf := make([]byte, 128)
 		n, err := u.u.Read(buf)
 		if err != nil {
-			log.Printf("UART read error: %v", err)
+			log.Errorf("UART read error: %v", err)
 			break
 		}
 

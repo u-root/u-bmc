@@ -5,7 +5,6 @@
 package bmc
 
 import (
-	"log"
 	"net"
 	"time"
 
@@ -50,7 +49,7 @@ func (s *dnsServer) Reply(w dns.ResponseWriter, r *dns.Msg) {
 		m.SetRcode(r, dns.RcodeNameError)
 	}
 	if err := w.WriteMsg(m); err != nil {
-		log.Printf("DNS WriteMsg failed: %v", err)
+		log.Errorf("DNS WriteMsg failed: %v", err)
 	}
 }
 
@@ -64,13 +63,13 @@ func startDNS(fqdn string, a Addresser) (*dnsServer, error) {
 	go func() {
 		s := &dns.Server{Addr: ":53", Net: "udp"}
 		if err := s.ListenAndServe(); err != nil {
-			log.Printf("DNS server failed (udp): %v", err)
+			log.Errorf("DNS server failed (udp): %v", err)
 		}
 	}()
 	go func() {
 		s := &dns.Server{Addr: ":53", Net: "tcp"}
 		if err := s.ListenAndServe(); err != nil {
-			log.Printf("DNS server failed (tcp): %v", err)
+			log.Errorf("DNS server failed (tcp): %v", err)
 		}
 	}()
 	return s, nil

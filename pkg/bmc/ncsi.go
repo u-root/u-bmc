@@ -5,7 +5,6 @@
 package bmc
 
 import (
-	"log"
 	"net"
 	"time"
 
@@ -24,7 +23,7 @@ func registerNcsiPackage(b []byte) error {
 		switch ad.Type() {
 		case unix.NCSI_PKG_ATTR_ID:
 			id := ad.Uint32()
-			log.Printf("NCSI package %d present", id)
+			log.Infof("NCSI package %d present", id)
 		case unix.NCSI_PKG_ATTR_CHANNEL_LIST:
 			ad.Do(handleNcsiChannelList)
 		}
@@ -63,7 +62,7 @@ func registerNcsiChannel(b []byte) error {
 		return err
 	}
 
-	log.Printf("NCSI channel %d present [link state: %d, active: %v, forced: %v]", id, ls, active, forced)
+	log.Infof("NCSI channel %d present [link state: %d, active: %v, forced: %v]", id, ls, active, forced)
 	return nil
 }
 
@@ -100,20 +99,20 @@ func handleNcsiPackageList(b []byte) error {
 func StartNcsi(iface string) {
 	c, err := genetlink.Dial(nil)
 	if err != nil {
-		log.Printf("dial generic netlink: %v", err)
+		log.Errorf("dial generic netlink: %v", err)
 		return
 	}
 	defer c.Close()
 
 	family, err := c.GetFamily("NCSI")
 	if err != nil {
-		log.Printf("get NCSI netlink family: %v", err)
+		log.Errorf("get NCSI netlink family: %v", err)
 		return
 	}
 
 	ifi, err := net.InterfaceByName(iface)
 	if err != nil {
-		log.Printf("unable to get interface %s: %v", iface, err)
+		log.Errorf("unable to get interface %s: %v", iface, err)
 		return
 	}
 
@@ -121,7 +120,7 @@ func StartNcsi(iface string) {
 	ae.Uint32(unix.NCSI_ATTR_IFINDEX, uint32(ifi.Index))
 	ed, err := ae.Encode()
 	if err != nil {
-		log.Printf("failed to encode NCSI attribute data: %v", err)
+		log.Errorf("failed to encode NCSI attribute data: %v", err)
 		return
 	}
 
@@ -137,16 +136,16 @@ func StartNcsi(iface string) {
 
 		msgs, err := c.Execute(req, family.ID, netlink.Request|netlink.Dump)
 		if err != nil {
-			log.Printf("execute NCSI dump: %v", err)
+			log.Errorf("execute NCSI dump: %v", err)
 			return
 		}
 
-		log.Printf("got %v replies", len(msgs))
+		log.Infof("got %v replies", len(msgs))
 
 		for _, m := range msgs {
 			ad, err := netlink.NewAttributeDecoder(m.Data)
 			if err != nil {
-				log.Printf("failed to create attribute decoder: %v", err)
+				log.Errorf("failed to create attribute decoder: %v", err)
 				return
 			}
 			for ad.Next() {
@@ -156,7 +155,7 @@ func StartNcsi(iface string) {
 			}
 
 			if ad.Err() != nil {
-				log.Printf("failed to decode NCSI attributes: %v", err)
+				log.Errorf("failed to decode NCSI attributes: %v", err)
 				return
 			}
 		}

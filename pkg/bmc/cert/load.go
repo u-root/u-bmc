@@ -87,19 +87,19 @@ func SaveKeyPair(kp *tls.Certificate, crt, key string) error {
 func saveKeyPair(fs afero.Fs, kp *tls.Certificate, crt, key string) error {
 	b, err := encodeCert(kp.Certificate)
 	if err != nil {
-		return fmt.Errorf("Failed to encode certificate, please file a bug about this: %v", err)
+		return fmt.Errorf("failed to encode certificate, please file a bug about this: %v", err)
 	} else {
 		if err := afero.WriteFile(fs, crt, b, 0644); err != nil {
-			return fmt.Errorf("Failed to save system certificate %s: %v", crt, err)
+			return fmt.Errorf("failed to save system certificate %s: %v", crt, err)
 		}
 	}
 
 	b, err = encodeKey(kp.PrivateKey.(*ecdsa.PrivateKey))
 	if err != nil {
-		return fmt.Errorf("Failed to encode certificate, please file a bug about this")
+		return fmt.Errorf("failed to encode certificate, please file a bug about this")
 	} else {
 		if err := afero.WriteFile(fs, key, b, 0600); err != nil {
-			return fmt.Errorf("Failed to save system certificate key %s: %v", key, err)
+			return fmt.Errorf("failed to save system certificate key %s: %v", key, err)
 		}
 	}
 	return nil
@@ -227,7 +227,7 @@ func (m *Manager) renew() (*tls.Certificate, error) {
 		}
 	}
 	if !handled {
-		return nil, fmt.Errorf("No DNS01 ACME handler could handle challenge")
+		return nil, fmt.Errorf("no DNS01 ACME handler could handle challenge")
 	}
 
 	_, err = c.AcceptChallenge(context.Background(), challenge)

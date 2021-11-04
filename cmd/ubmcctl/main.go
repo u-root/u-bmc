@@ -10,7 +10,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 
@@ -19,6 +18,7 @@ import (
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/grpcreflect"
+	"github.com/u-root/u-bmc/pkg/logger"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -32,6 +32,7 @@ const (
 )
 
 var (
+	log  = logger.LogContainer.GetSimpleLogger()
 	host = flag.String("host", "localhost", "Which u-bmc host to connect to")
 )
 
