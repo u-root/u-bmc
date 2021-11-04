@@ -72,8 +72,12 @@ func (s SSHServer) LaunchSSHServer(authorizedKeys []string) error {
 	}
 	s.conf.AddHostKey(private)
 	// Launch actual server in a new goroutine
-	go s.startSSHServer()
-
+	go func() {
+		err := s.startSSHServer()
+		if err != nil {
+			return
+		}
+	}()
 	return nil
 }
 
@@ -142,7 +146,10 @@ func handleChannel(newChannel ssh.NewChannel) {
 	// We only handle session type connections
 	t := newChannel.ChannelType()
 	if t != "session" {
-		newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
+		err := newChannel.Reject(ssh.UnknownChannelType, fmt.Sprintf("unknown channel type: %s", t))
+		if err != nil {
+			log.Errorf("Failed rejecting channel: %v", err)
+		}
 		return
 	}
 	channel, requests, err := newChannel.Accept()
@@ -159,7 +166,10 @@ func handleRequests(channel ssh.Channel, requests <-chan *ssh.Request) {
 		switch req.Type {
 		case "shell":
 			err := attachShell(channel)
-			req.Reply(err == nil, nil)
+			err = req.Reply(err == nil, nil)
+			if err != nil {
+				log.Errorf("Failed to reply to request: %v", err)
+			}
 		default:
 			log.Debugf("unhandled SSH request: %s (reply: %v, data: %x)", req.Type, req.WantReply, req.Payload)
 		}
@@ -173,7 +183,10 @@ func attachShell(channel ssh.Channel) error {
 	close := func() {
 		channel.Close()
 		if sh.Process != nil {
-			sh.Process.Wait()
+			_, err := sh.Process.Wait()
+			if err != nil {
+				log.Errorf("Failed stopping remote shell: %v", err)
+			}
 		}
 	}
 	shf, err := pty.Start(sh)
@@ -182,10 +195,16 @@ func attachShell(channel ssh.Channel) error {
 		return err
 	}
 	go func() {
-		io.Copy(channel, shf)
+		_, err := io.Copy(channel, shf)
+		if err != nil {
+			log.Errorf("Failed copying io from local to remote: %v", err)
+		}
 	}()
 	go func() {
-		io.Copy(shf, channel)
+		_, err := io.Copy(shf, channel)
+		if err != nil {
+			log.Errorf("Failed copying io from remote to local: %v", err)
+		}
 	}()
 
 	return nil
