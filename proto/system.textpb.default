@@ -1,6 +1,6 @@
 # Example configuration
 network {
-  hostname: "ubmc.example.com"
+  hostname: "ubmc.local"
   # vlan: 100
   ipv4_address: "10.0.2.15/24"
   # ipv6_address: "fd00::cafe/48"

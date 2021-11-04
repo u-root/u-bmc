@@ -7,7 +7,6 @@ package bmc
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -135,7 +134,7 @@ func (m *mgmtServer) GetVersion(ctx context.Context, r *pb.GetVersionRequest) (*
 	return &pb.GetVersionResponse{Version: m.v.Version, GitHash: m.v.GitHash}, nil
 }
 
-func (m *mgmtServer) EnableRemote(c *tls.Certificate) error {
+func (m *mgmtServer) EnableRemote(c *tls.Config) error {
 	l, err := net.Listen("tcp", ":443")
 	if err != nil {
 		return fmt.Errorf("could not listen: %v", err)
@@ -144,19 +143,14 @@ func (m *mgmtServer) EnableRemote(c *tls.Certificate) error {
 	return nil
 }
 
-func (m *mgmtServer) newServer(l net.Listener, c *tls.Certificate) {
+func (m *mgmtServer) newServer(l net.Listener, c *tls.Config) {
 	opts := []grpc.ServerOption{
 		grpc.StreamInterceptor(grpc_prometheus.StreamServerInterceptor),
 		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 	}
 	if c != nil {
-		creds := credentials.NewServerTLSFromCert(c)
+		creds := credentials.NewTLS(c)
 		opts = []grpc.ServerOption{grpc.Creds(creds)}
-		c, err := x509.ParseCertificate(c.Certificate[0])
-		if err == nil {
-			tlsCertificateLoaded.Set(float64(1))
-			tlsCertificateExpiry.Set(float64(c.NotAfter.Unix()))
-		}
 	}
 
 	g := grpc.NewServer(opts...)

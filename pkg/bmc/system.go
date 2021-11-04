@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -22,7 +23,7 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/u-root/u-bmc/config"
-	"github.com/u-root/u-bmc/pkg/bmc/cert"
+	"github.com/u-root/u-bmc/pkg/acme"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
 	pb "github.com/u-root/u-bmc/proto"
 	"golang.org/x/sys/unix"
@@ -54,8 +55,6 @@ var (
 
 	timeRetry   = &backoff.Backoff{Min: 1 * time.Second, Max: 1 * time.Hour, Factor: 5, Jitter: true}
 	timeRefresh = &backoff.Backoff{Min: 3 * time.Hour, Max: 6 * time.Hour, Factor: 2, Jitter: true}
-	certRetry   = &backoff.Backoff{Min: 1 * time.Second, Max: 1 * time.Hour, Factor: 5, Jitter: true}
-	certRefresh = &backoff.Backoff{Min: 240 * time.Hour, Max: 480 * time.Hour, Factor: 2, Jitter: true}
 )
 
 func init() {
@@ -75,7 +74,7 @@ type Platform interface {
 }
 
 type RPCServer interface {
-	EnableRemote(*tls.Certificate) error
+	EnableRemote(*tls.Config) error
 }
 
 func createFile(file string, mode os.FileMode, c []byte) error {
@@ -185,14 +184,14 @@ func loadSysconf(path string) *pb.SystemConfig {
 	return sysconf
 }
 
-func Startup(p Platform) (error, chan error) {
-	return StartupWithConfig(p, config.DefaultConfig)
+func Startup(plat Platform) (error, chan error) {
+	return StartupWithConfig(plat, config.DefaultConfig)
 }
 
-func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
+func StartupWithConfig(plat Platform, conf *config.Config) (error, chan error) {
 	fmt.Print("\n" + banner)
-	fmt.Printf("Welcome to u-bmc version %s\n\n", c.Version.Version)
-	systemVersion.With(prometheus.Labels{"version": c.Version.Version}).Inc()
+	fmt.Printf("Welcome to u-bmc version %s\n\n", conf.Version.Version)
+	systemVersion.With(prometheus.Labels{"version": conf.Version.Version}).Inc()
 
 	// Seed the non-crypto random generator using the crypto one (which is
 	// hardware based). The non-crypto generator is used for random back-off
@@ -200,26 +199,26 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	seedRandomGenerator()
 
 	log.Infof("Initialize system hardware")
-	if err := p.InitializeSystem(); err != nil {
+	if err := plat.InitializeSystem(); err != nil {
 		log.Errorf("platform.InitializeSystem: %v", err)
 		return err, nil
 	}
 
 	log.Infof("Starting GPIO drivers")
-	gpio, err := startGpio(p)
+	gpio, err := startGpio(plat)
 	if err != nil {
 		log.Errorf("startGpio failed: %v", err)
 		return err, nil
 	}
 
 	log.Infof("Starting fan system")
-	fan, err := startFan(p)
+	fan, err := startFan(plat)
 	if err != nil {
 		log.Errorf("startFan failed: %v", err)
 		return err, nil
 	}
 
-	tty, baud := p.HostUart()
+	tty, baud := plat.HostUart()
 	log.Infof("Configuring host UART console %s @ %d baud", tty, baud)
 	uart, err := startUart(tty, baud)
 	if err != nil {
@@ -230,7 +229,7 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	log.Infof("Loading system configuration")
 	sysconf := loadSysconf("/config/system.textpb")
 
-	network, err := startNetwork(sysconf.Network)
+	_, err = startNetwork(sysconf.Network)
 	if err != nil {
 		log.Errorf("startNetwork failed: %v", err)
 		return err, nil
@@ -246,9 +245,9 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 			// This means that if the RTC is set, don't block waiting getting trusted
 			// time. If we do get a new trusted time however, make sure to update RTC.
 			timeAcquired <- true
-			acquireTime(c.RoughtimeServers, c.NtpServers)
+			acquireTime(conf.RoughtimeServers, conf.NtpServers)
 		} else {
-			acquireTime(c.RoughtimeServers, c.NtpServers)
+			acquireTime(conf.RoughtimeServers, conf.NtpServers)
 			timeAcquired <- true
 		}
 		r, err := rtc.NewRTC("/dev/rtc0")
@@ -267,57 +266,40 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	if err != nil {
 		log.Error(err)
 	}
-	err = createFile("/etc/group", 0644, []byte("root:x:0:"))
+	err = createFile("/etc/group", 0644, []byte("root:x:0:root"))
 	if err != nil {
 		log.Error(err)
 	}
 
-	if c.StartDebugSshServer {
+	if conf.StartDebugSshServer {
 		log.Infof("Starting debug SSH server")
 		// Make sure sshd starts up completely before we continue, to allow for debugging
-		if err := startSsh(c.DebugSshServerKeys); err != nil {
+		if err := startSsh(conf.DebugSshServerKeys); err != nil {
 			log.Errorf("ssh server failed: %v", err)
 		}
 	}
 
+	log.Info("Allocating web server")
+	webMux := http.NewServeMux()
+
 	log.Infof("Starting OpenMetrics interface")
-	if err := startMetrics(); err != nil {
+	if err := startMetrics(webMux); err != nil {
 		log.Errorf("startMetrics failed: %v", err)
 		return err, nil
 	}
 
 	log.Infof("Starting gRPC interface")
-	rpc, err := startGRPC(gpio, fan, uart, &c.Version)
+	rpc, err := startGRPC(gpio, fan, uart, &conf.Version)
 	if err != nil {
 		log.Errorf("startGRPC failed: %v", err)
 		return err, nil
-	}
-
-	log.Infof("Starting DNS interface")
-	dns, err := startDNS(network.FQDN(), network)
-	if err != nil {
-		log.Errorf("startDNS failed: %v", err)
-		return err, nil
-	}
-
-	akey, err := cert.LoadOrGenerateKey("/config/acme.key")
-	if err != nil {
-		log.Errorf("Failed to load ACME key: %v", err)
-		return err, nil
-	}
-
-	cm := &cert.Manager{
-		FQDN:         network.FQDN(),
-		AccountKey:   akey,
-		ACMEConfig:   &c.ACME,
-		ACMEHandlers: []cert.ACMEHandler{dns},
 	}
 
 	// The rest of the startup depends on the system having the correct time,
 	// so initialize the rest in the background
 	startupResult := make(chan error)
 	go func() {
-		if err := asyncStartup(p, c, rpc, cm, timeAcquired); err != nil {
+		if err := asyncStartup(plat, conf, rpc, webMux, timeAcquired); err != nil {
 			startupResult <- err
 			return
 		}
@@ -327,47 +309,34 @@ func StartupWithConfig(p Platform, c *config.Config) (error, chan error) {
 	return nil, startupResult
 }
 
-func asyncStartup(p Platform, c *config.Config, rpc RPCServer, cm *cert.Manager, t chan bool) error {
+func asyncStartup(plat Platform, conf *config.Config, rpc RPCServer, mux *http.ServeMux, t chan bool) error {
 	// Before we enable remote calls, make sure we have acquired accurate time
 	<-t
 	systemHasTime.Set(1)
 
 	// Start background time sync
-	go backgroundTimeSync(c.RoughtimeServers, c.NtpServers)
+	go backgroundTimeSync(conf.RoughtimeServers, conf.NtpServers)
 
 	log.Infof("Time has been verified, loading system certificate")
-	domain := cm.FQDN
-	cf := fmt.Sprintf("/config/%s.crt", domain)
-	kf := fmt.Sprintf("/config/%s.key", domain)
-
-	var kp *tls.Certificate
-	for {
-		skp, err := tls.LoadX509KeyPair(cf, kf)
+	var tlsConf *tls.Config
+	acmeConf := acme.ACMEConfig{conf.ACME}
+	if conf.ACME.TermsAgreed {
+		t, err := acmeConf.GetManagedCert([]string{"ubmc.local"}, true, mux)
 		if err != nil {
-			if !os.IsNotExist(err) {
-				log.Errorf("tls.LoadX509KeyPair failed: %v", err)
-			}
+			log.Error(err)
+			return err
 		}
-
-		kp, err = cm.MaybeRenew(&skp)
-		if err == nil {
-			break
+		tlsConf = t
+	} else {
+		t, err := acmeConf.GetSelfSignedCert([]string{"ubmc.local"})
+		if err != nil {
+			log.Error(err)
+			return err
 		}
-		log.Errorf("cert.Load failed: %v", err)
-		delay := certRetry.Duration()
-		log.Infof("Waiting %v before retrying certificate acquisition", delay)
-		time.Sleep(delay)
+		tlsConf = t
 	}
-	certRetry.Reset()
-
-	// Fail soft on failing to write these files. We can still serve from memory
-	// and next reboot we will have to renew instead.
-	if err := cert.SaveKeyPair(kp, cf, kf); err != nil {
-		log.Warnf("WARNING: System will use certificate from memory, but will have to renew it on reboot. Error was: %v", err)
-	}
-
 	log.Infof("Certificate available, enabling remote RPCs")
-	if err := rpc.EnableRemote(kp); err != nil {
+	if err := rpc.EnableRemote(tlsConf); err != nil {
 		log.Errorf("rpc.EnableRemote failed: %v", err)
 		return err
 	}

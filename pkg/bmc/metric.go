@@ -12,13 +12,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-func startMetrics() error {
+func startMetrics(mux *http.ServeMux) error {
 	// u-bmc has been allocated port 9370
 	l, err := net.Listen("tcp", "[::]:9370")
 	if err != nil {
 		return fmt.Errorf("could not listen: %v", err)
 	}
-	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 	go func() {
 		err := http.Serve(l, mux)

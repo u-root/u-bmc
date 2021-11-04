@@ -56,8 +56,8 @@ tasks:
       - echo "nameserver 2606:4700:4700::1001" >> rootfs/etc/resolv.conf
       - echo "nameserver 1.1.1.1" >> rootfs/etc/resolv.conf
       - echo "nameserver 1.0.0.1" >> rootfs/etc/resolv.conf
-      - echo "::1 localhost" >> rootfs/etc/hosts
-      - echo "127.0.0.1 localhost" >> rootfs/etc/hosts
+      - echo "::1 localhost ubmc.local" >> rootfs/etc/hosts
+      - echo "127.0.0.1 localhost ubmc.local" >> rootfs/etc/hosts
         # Copy over runtime kernel, devicetree and their signatures 
       - cp linux/zImage.full rootfs/boot/zImage-"{{.GIT_VERSION}}"
       - boot/signer -sign linux/zImage.full >> rootfs/boot/zImage-{{.GIT_VERSION}}.sig
@@ -77,7 +77,8 @@ tasks:
       GIT_VERSION:
         sh: git describe --tags --long --always
     sources:
-      - u-bmc
+      - ../cmd/**
+      - ../pkg/**
       - linux/zImage*
       - boot/platform.dtb*
       - boot/signer
@@ -137,6 +138,6 @@ tasks:
         rootfs
       - echo "Done!"
     sources:
-      - rootfs/
+      - rootfs/**
     generates:
       - img/rootfs.img      

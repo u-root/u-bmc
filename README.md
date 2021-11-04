@@ -110,13 +110,6 @@ Setup configuration:
 # RSA keys will be considered legacy and support will be added again later
 
 cp ~/.ssh/*.pub config/generate/ssh-pubkeys
-
-# Agree to the terms of the configured ACME server
-# By default it's just a toy ACME server so this is fine, but if you're
-# using another ACME server like Let's Encrypt (LE) ensure you agree to their terms.
-# For LE, you can find them at https://letsencrypt.org/repository/.
-
-task config:generate -- acme
 ```
 
 Build image:
@@ -127,6 +120,9 @@ then uncomment the desired target platform e.g. qemu-virt-a72 in TARGET and run
 ```
 task build
 ```
+which makes u-bmc generate and use a selfsigned cert for TLS.
+If you want to use LetsEncrypt you need to agree to their terms.
+You can find them at https://letsencrypt.org/repository/
 
 Since u-bmc uses signed binaries it is important that you back up the
 contents of build/boot/keys/ after building as u-bmc will only accept updates
@@ -141,10 +137,6 @@ First select a Qemu target in the TARGET file then to launch it, run:
 # Build Qemu target
 
 task build
-
-# Launch a local ACME server in one terminal
-
-task pebble
 
 # Launch the u-bmc simulator in another terminal
 
@@ -176,8 +168,8 @@ go install github.com/u-root/u-bmc/cmd/ubmcctl
 # testing to accidentally become production
 
 curl https://localhost:14000/root --cacert config/generate/sim-pebble.crt > root.crt
-echo '127.0.1.2	ubmc.example.com' | sudo tee -a /etc/hosts
-SSL_CERT_FILE=root.crt ubmcctl -host ubmc.example.com:6443
+echo '127.0.1.2	ubmc.local' | sudo tee -a /etc/hosts
+SSL_CERT_FILE=root.crt ubmcctl -host ubmc.local:6443
 ```
 
 If you restart pebble you need to update root.crt.
