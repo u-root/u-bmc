@@ -1,0 +1,34 @@
+name: golangci-lint
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  golangci:
+    name: lint
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: [ '1.17.x' ]
+    steps:
+      - uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go-version }}
+      - uses: actions/checkout@v2
+      - name: Install TASK
+        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      - name: Generate config
+        run: |
+          echo qemu-virt-a72 > TARGET
+          task config:generate
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.42.1
+          skip-go-installation: true

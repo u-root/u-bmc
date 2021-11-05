@@ -35,7 +35,7 @@ func (p *platform) ThermometerMap() map[int]string {
 }
 
 func (p *platform) HostUart() (string, int) {
-	return "/dev/ttyAMA0", 115200
+	return "", 115200
 }
 
 func (p *platform) Close() {

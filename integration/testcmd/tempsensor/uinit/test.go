@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/u-root/u-bmc/integration/utils"
+	"github.com/u-root/u-bmc/integration/util"
 	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/platform"
+	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/platform"
 )
 
 type TempPlatform interface {
@@ -32,7 +32,7 @@ func verifyTemperature(p TempPlatform, i int, celcius int) error {
 		return err
 	}
 	if math.Abs(float64(millitemp-celcius*1000)) > 3000 {
-		return fmt.Errorf("Expected temperature to be %v +/- 3 C, was %v", celcius, millitemp)
+		return fmt.Errorf("expected temperature to be %v +/- 3 C, was %v", celcius, millitemp)
 	}
 	return nil
 }
@@ -65,8 +65,8 @@ func uinit() error {
 
 func main() {
 	if err := uinit(); err != nil {
-		utils.FailTest(err)
+		util.FailTest(err)
 	} else {
-		utils.PassTest()
+		util.PassTest()
 	}
 }

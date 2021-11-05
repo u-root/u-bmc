@@ -3,10 +3,10 @@ module github.com/u-root/u-bmc
 go 1.17
 
 require (
+	github.com/anatol/vmtest v0.0.0-20210922030747-b951d158b7cc
 	github.com/beevik/ntp v0.3.0
 	github.com/cleroux/rtc v0.1.1
 	github.com/cloudflare/roughtime v0.0.0-20210217223727-1fe56bcbcfd4
-	github.com/digitalocean/go-qemu v0.0.0-20210326154740-ac9e0b687001
 	github.com/fullstorydev/grpcurl v1.8.1
 	github.com/golang/protobuf v1.5.2
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -28,14 +28,13 @@ require (
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
+	golang.org/x/sys v0.0.0-20210817190340-bfb29a6856f2
 	google.golang.org/grpc v1.39.0
 )
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
-	github.com/digitalocean/go-libvirt v0.0.0-20201209184759-e2a69bcd5bd1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/google/go-cmp v0.5.6 // indirect
 	github.com/google/goexpect v0.0.0-20210430020637-ab937bf7fd6f // indirect

@@ -1,51 +1,35 @@
 version: '3'
 
 tasks:
-  # Meta task to generate go files containing configuration values
+  # Meta task to generate files containing configuration values
   generate:
     deps:
       - ssh-keys
-      - version
-      - acme
-      - sim-pebble
+      - sim-crt
+    dir: config/generate
     cmds:
+      - echo "Generating config..."
+      - |
+        go run \
+        -ldflags "\
+        -X main.gitVersion={{.GIT_VERSION}} \
+        -X main.gitHash={{.GIT_HASH}}" \
+        -tags "config {{.CLI_ARGS}}" \
+        .
       - echo "Config generated successfully!"
+    vars:
+      GIT_VERSION:
+        sh: git describe --tags --long --always
+      GIT_HASH:
+        sh: git rev-parse HEAD
 
-  # Generate list of allowed ssh public keys
+  # Make sure list of allowed ssh public keys exists
   ssh-keys:
-    dir: config
+    dir: config/generate
     cmds:
-      - touch ssh_keys.pub
-      - cat ssh_keys.pub | ./ssh_keys.sh > ssh_keys.go
-    sources:
-      - ssh_keys.sh
-    generates:
-      - ssh_keys.go
-
-  # Generate version file
-  version:
-    dir: config
-    cmds:
-      - ./version.sh > version.go
-    sources:
-      - version.sh
-    generates:
-      - version.go
-
-  # Generate acme file
-  acme:
-    dir: config
-    cmds:
-      - cp ./acme.go.tmpl acme.go
-    sources:
-      - acme.go.tmpl
-    generates:
-      - acme.go
+      - touch ssh-pubkeys
     status:
-      - test ! -f ../i_agree_to_the_acme_terms # Make non-blocking using 'status' #TODO use precondition and split up
-    #preconditions:
-    #  - sh: test -f ../i_agree_to_the_acme_terms
-    #    msg: You need to agree to the ACME terms to use the simulator
+      - ssh-pubkeys
 
   # Create pebble key
   sim-key:
@@ -53,12 +37,14 @@ tasks:
     cmds:
       - |
         openssl ecparam \
-        -name secp256r1 \
+        -name prime256v1 \
         -genkey \
         -noout \
         -out sim-pebble.key
+      - cp sim-pebble.key generate/sim-pebble.key
     status:
       - test -f sim-pebble.key
+      - test -f generate/sim-pebble.key
 
   # Create pebble certificate
   sim-crt:
@@ -75,22 +61,12 @@ tasks:
         -subj /CN=sim-pebble \
         -reqexts SAN \
         -extensions SAN \
-        -config ./sim-pebble.cnf \
+        -config sim-pebble.cnf \
         -sha256 \
         -days 36500
+      - cp sim-pebble.crt generate/sim-pebble.crt
     sources:
       - sim-pebble.cnf
     generates:
       - sim-pebble.crt
-
-  # Generate pebble configuration
-  sim-pebble:
-    deps:
-      - sim-crt
-    dir: config
-    cmds:
-      - ./sim_pebble.sh > sim_pebble.go
-    sources:
-      - sim_pebble.sh
-    generates:
-      - test -f sim_pebble.go
+      - generate/sim-pebble.crt

@@ -1,12 +1,9 @@
 build/*
 .task/*
-i_agree_to_the_acme_terms
 TARGET
-config/ssh_keys.pub
-config/ssh_keys.go
-config/version.go
-config/acme.go
-config/sim_pebble.go
+config/generate/ssh-pubkeys
+config/generate/sim-pebble.crt
+config/generate/sim-pebble.key
 config/sim-pebble.crt
 config/sim-pebble.key
-**/.bb
+config/generated.go

@@ -1,17 +1,18 @@
 version: '3'
 
+vars:
+  GO_SOURCE_DIRS: ./pkg/... ./platform/... ./cmd/... ./config/... ./helper/... ./boot/...
+
 tasks:
   # Call go test on all files
   all:
     cmds:
-      - rm -rf vendor/
-      - go test ./...
+      - go test {{.GO_SOURCE_DIRS}}
 
   # Call go test with coverage on all files
   coverage:
     cmds:
-      - rm -rf vendor/
-      - go test -cover ./...
+      - go test -cover {{.GO_SOURCE_DIRS}}
 
   # Run go test
   integration:
@@ -22,5 +23,4 @@ tasks:
   # Call go test with race condition detection
   race:
     cmds:
-      - rm -rf vendor
-      - go test -race ./...
+      - go test -race {{.GO_SOURCE_DIRS}}

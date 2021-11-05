@@ -8,46 +8,15 @@ package integration
 
 import (
 	"testing"
-
-	"github.com/u-root/u-root/pkg/qemu"
-	"github.com/u-root/u-root/pkg/uroot"
 )
 
 // Tries to access /metrics from a remote host
 func TestMetrics(t *testing.T) {
-	network := qemu.NewNetwork()
-	_, bmccleanup := BMCTest(t, &Options{
-		Name: "TestMetrics-BMC",
-		BuildOpts: uroot.Opts{
-			Commands: uroot.BusyBoxCmds(
-				"github.com/u-root/u-root/cmds/core/init",
-				"github.com/u-root/u-bmc/integration/testcmd/noop/uinit",
-			),
-		},
-		QEMUOpts: qemu.Options{
-			Devices: []qemu.Device{network.NewVM()},
-		},
-	})
+	bmc, bmccleanup := BMCTest(t, 64, "../integration/testcmd/metrics/*")
 	defer bmccleanup()
 
-	host, hostcleanup := NativeTest(t, &Options{
-		Name: "TestMetrics-Host",
-		BuildOpts: uroot.Opts{
-			Commands: uroot.BusyBoxCmds(
-				"github.com/u-root/u-root/cmds/core/init",
-				"github.com/u-root/u-root/cmds/core/wget",
-				// TODO(bluecmd): This could be a "Uinit" script probably when the u-root
-				// integration suite is a package
-				"github.com/u-root/u-bmc/integration/testcmd/metrics-native/uinit",
-			),
-		},
-		QEMUOpts: qemu.Options{
-			Devices: []qemu.Device{network.NewVM()},
-		},
-	})
-	defer hostcleanup()
-
-	if err := host.Expect("TEST_OK"); err != nil {
-		t.Fatal(`expected "TEST_OK" on host, got error: `, err)
+	err := bmc.ConsoleExpect("TEST_OK")
+	if err != nil {
+		t.Fatalf("expected 'TEST_OK' on host, got error: %v", err)
 	}
 }
