@@ -11,13 +11,13 @@ tasks:
       # The bootloader for ast2400 is something like 10KiB, and the DTB is 25 KiB.
       # Here we give the extra space a total of 100 KiB to have some space.
       - |
-        go run ../../helper/flash-layout/main.go \
+        go run ../../cmd/build/flash-layout/flash-layout.go \
         -extra 102400 \
         ../linux/zImage.boot \
         > ubmc-flash-layout.dtsi
       - echo "Done!"
     sources:
-      - ../../helper/flash-layout/main.go
+      - ../../cmd/build/flash-layout/*.go
       - ../linux/zImage.boot
     generates:
       - ubmc-flash-layout.dtsi
@@ -30,7 +30,7 @@ tasks:
     cmds:
       - echo "Building dummy dtb..."
       - |
-        go run ../helper/boot-config/main.go \
+        go run ../cmd/build/boot-config/boot-config.go \
         --ram-start {{.__RAM_START}} \
         --ram-size {{.__RAM_SIZE}} \
         --dtb /dev/null \
@@ -48,7 +48,7 @@ tasks:
         ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.boot.dummy -
       - echo "Done!"
     sources:
-      - ../helper/boot-config/*.go
+      - ../cmd/build/boot-config/*.go
       - ../platform/{{.__TARGET}}/platform.dts
     generates:
       - boot/boot-config.auto.h
@@ -62,7 +62,7 @@ tasks:
     cmds:
       - echo "Building LinuxBoot dtb..."
       - |
-        go run ../helper/boot-config/main.go \
+        go run ../cmd/build/boot-config/build-config.go \
         --ram-start {{.__RAM_START}} \
         --ram-size {{.__RAM_SIZE}} \
         --dtb boot/platform.dtb.boot.dummy \
@@ -80,7 +80,7 @@ tasks:
         ../platform/{{.__TARGET}}/platform.dts | dtc -O dtb -o boot/platform.dtb.boot -
       - echo "Done!"
     sources:
-      - ../helper/boot-config/*.go
+      - ../cmd/build/boot-config/*.go
       - ../platform/{{.__TARGET}}/platform.dts
       - boot/platform.dtb.boot.dummy
     generates:

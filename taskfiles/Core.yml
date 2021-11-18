@@ -1,44 +1,44 @@
 version: '3'
 
 tasks:
-  # Build the main go project file
-  u-bmc-build:
+  # Build busybox builder
+  busybox-build:
+    dir: build
     cmds:
-      - echo "Building u-bmc executable..."
-      - go build -o build/u-bmc
+      - echo "Building busybox builder..."
+      - cd ../cmd/build/busybox && go build -o ../../../build/busybox
       - echo "Done!"
     sources:
-      - u-bmc.go
-      - go.mod
+      - busybox.go
     generates:
-      - build/u-bmc
+      - build/busybox
 
   # Build the signer and let it generate a key pair
   signer:
     dir: build/boot
     cmds:
       - echo "Building signer and generating key pair..."
-      - cd ../../boot/signer && go build -o ../../build/boot/
+      - cd ../../cmd/boot/signer && go build -o ../../../build/boot/
       - mkdir -p keys/
       - ./signer -gen
       - echo "Done!"
     sources:
-      - ../../boot/signer/*.go
+      - ../../cmd/boot/signer/*.go
     generates:
       - signer
       - keys/u-bmc.key
       - keys/u-bmc.pub
 
   # Build the LinuxBoot bootloader
-  #TODO(MDr164) If size is critically important we could add upx here
+  #TODO(MDr164): If size is critically important we could add upx here
   loader:
     dir: build/boot
     cmds:
       - echo "Building LinuxBoot loader..."
-      - cd ../../boot/loader && GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../build/boot/
+      - cd ../../cmd/boot/loader && GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../../build/boot/
       - echo "Done!"
     sources:
-      - ../../boot/loader/*.go
+      - ../../cmd/boot/loader/*.go
     generates:
       - loader
 
@@ -47,14 +47,15 @@ tasks:
     dir: build/boot
     cmds:
       - echo "Building initramfs packer..."
-      - cd ../../boot/cpio && go build -o ../../build/boot/
+      - cd ../../cmd/boot/cpio && go build -o ../../../build/boot/
       - echo "Done!"
     sources:
-      - ../../boot/cpio/*.go
+      - ../../cmd/boot/cpio/*.go
     generates:
       - cpio
 
   # Build the ASPEED boot firmware
+  #TODO(MDr164): We could probably use TamaGo instead here
   aspeed-boot-bin:
     dir: build/boot
     cmds:

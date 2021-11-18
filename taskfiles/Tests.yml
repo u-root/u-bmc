@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  GO_SOURCE_DIRS: ./pkg/... ./platform/... ./cmd/... ./config/... ./helper/... ./boot/...
+  GO_SOURCE_DIRS: ./cmd/... ./config/... ./pkg/... ./platform/...
 
 tasks:
   # Call go test on all files

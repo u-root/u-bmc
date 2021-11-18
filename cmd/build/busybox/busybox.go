@@ -116,7 +116,7 @@ func Main() error {
 
 	// Resolve paths to all individual go commands for the busybox
 	urootcmds := urootAbsEach(urootWhitelist)
-	bmccmds, err := filepath.Glob("../cmd/*")
+	bmccmds, err := filepath.Glob("../cmd/runtime/*")
 	if err != nil {
 		return err
 	}

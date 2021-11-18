@@ -16,7 +16,7 @@ tasks:
   build-aspeed-ast2500evb:
     cmds:
       - task: :config:generate
-      - task: :core:u-bmc-build
+      - task: :core:busybox-build
       - task: :core:signer
       - task: :core:loader
       - task: :core:cpio
@@ -37,7 +37,7 @@ tasks:
   build-quanta-f06-leopard-ddr3:
     cmds:
       - task: :config:generate
-      - task: :core:u-bmc-build
+      - task: :core:busybox-build
       - task: :core:signer
       - task: :core:loader
       - task: :core:cpio
@@ -58,7 +58,7 @@ tasks:
   build-qemu-virt-a15:
     cmds:
       - task: :config:generate
-      - task: :core:u-bmc-build
+      - task: :core:busybox-build
       - task: :core:signer
       - task: :core:loader
       - task: :core:cpio
@@ -76,7 +76,7 @@ tasks:
   build-qemu-virt-a72:
     cmds:
       - task: :config:generate
-      - task: :core:u-bmc-build
+      - task: :core:busybox-build
       - task: :core:signer
       - task: :core:loader
       - task: :core:cpio
