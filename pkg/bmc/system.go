@@ -18,15 +18,17 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/cenkalti/backoff/v4"
 	"github.com/cleroux/rtc"
-	"github.com/golang/protobuf/proto"
-	"github.com/jpillora/backoff"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/pkg/acme"
 	"github.com/u-root/u-bmc/pkg/bmc/ttime"
-	pb "github.com/u-root/u-bmc/proto"
+	"github.com/u-root/u-bmc/pkg/grpc"
+	uproto "github.com/u-root/u-bmc/pkg/grpc/proto"
+	"github.com/u-root/u-bmc/pkg/metric"
+	"github.com/u-root/u-bmc/pkg/web"
 	"golang.org/x/sys/unix"
+	"google.golang.org/protobuf/proto"
 )
 
 const banner = `
@@ -39,31 +41,25 @@ const banner = `
  `
 
 var (
-	environ       []string
-	systemVersion = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: "ubmc",
-		Subsystem: "system",
-		Name:      "version",
-		Help:      "u-bmc version metric",
-	}, []string{"version"})
-	systemHasTime = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "ubmc",
-		Subsystem: "system",
-		Name:      "has_trusted_time",
-		Help:      "u-bmc has acquired trusted time",
-	})
+	environ []string
 
-	timeRetry   = &backoff.Backoff{Min: 1 * time.Second, Max: 1 * time.Hour, Factor: 5, Jitter: true}
-	timeRefresh = &backoff.Backoff{Min: 3 * time.Hour, Max: 6 * time.Hour, Factor: 2, Jitter: true}
+	timeRetry = backoff.ExponentialBackOff{
+		InitialInterval:     time.Second,
+		RandomizationFactor: 0.5,
+		Multiplier:          5,
+		MaxInterval:         time.Hour,
+		MaxElapsedTime:      0,
+		Clock:               backoff.SystemClock,
+	}
+	timeRefresh = backoff.ConstantBackOff{
+		Interval: 6 * time.Hour,
+	}
 )
 
 func init() {
 	environ = append(os.Environ(), "USER=root")
 	environ = append(environ, "HOME=/root")
 	environ = append(environ, "TZ=UTC")
-
-	prometheus.MustRegister(systemVersion)
-	prometheus.MustRegister(systemHasTime)
 }
 
 type Platform interface {
@@ -74,7 +70,7 @@ type Platform interface {
 }
 
 type RPCServer interface {
-	EnableRemote(*tls.Config) error
+	EnableRemote(*http.ServeMux, *tls.Config)
 }
 
 func createFile(file string, mode os.FileMode, c []byte) error {
@@ -121,11 +117,12 @@ func startSSH(ak []string) error {
 
 func acquireTime(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
 	var tt time.Time
+	timeRetry.Reset()
 	for {
 		t, err := ttime.AcquireTime(rs, ntps)
 		if err != nil {
 			log.Warnf("Failed to acquire trusted time: %v", err)
-			delay := timeRetry.Duration()
+			delay := timeRetry.NextBackOff()
 			log.Warnf("Waiting %v before retrying time acquisition", delay)
 			time.Sleep(delay)
 			continue
@@ -159,8 +156,9 @@ func seedRandomGenerator() {
 }
 
 func backgroundTimeSync(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
+	timeRefresh.Reset()
 	for {
-		delay := timeRefresh.Duration()
+		delay := timeRefresh.Interval
 		log.Infof("Scheduling time re-sync in %s", delay.String())
 		tmr := time.NewTimer(delay)
 		<-tmr.C
@@ -169,7 +167,7 @@ func backgroundTimeSync(rs []ttime.RoughtimeServer, ntps []ttime.NtpServer) {
 	}
 }
 
-func loadSysconf(path string) *pb.SystemConfig {
+func loadSysconf(path string) *uproto.SystemConfig {
 	f, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Warnf("Failed to read system configuration %s: %v", path, err)
@@ -177,8 +175,8 @@ func loadSysconf(path string) *pb.SystemConfig {
 		f = []byte{}
 	}
 
-	sysconf := &pb.SystemConfig{}
-	if err := proto.UnmarshalText(string(f), sysconf); err != nil {
+	sysconf := &uproto.SystemConfig{}
+	if err := proto.Unmarshal(f, sysconf); err != nil {
 		log.Warnf("Failed to unmarshal system configuration: %v", err)
 		log.Warnf("Using default system configuration")
 	}
@@ -193,7 +191,12 @@ func Startup(plat Platform) (error, chan error) {
 func StartupWithConfig(plat Platform, conf *config.Config) (error, chan error) {
 	fmt.Print("\n" + banner)
 	fmt.Printf("Welcome to u-bmc version %s\n\n", conf.Version.Version)
-	systemVersion.With(prometheus.Labels{"version": conf.Version.Version}).Inc()
+	systemVersion := metric.Counter(metric.MetricOpts{
+		Namespace: "ubmc",
+		Subsystem: "system",
+		Name:      "version",
+	}, []string{`version="` + conf.Version.Version + `"`})
+	systemVersion.Inc()
 
 	// Seed the non-crypto random generator using the crypto one (which is
 	// hardware based). The non-crypto generator is used for random back-off
@@ -282,27 +285,28 @@ func StartupWithConfig(plat Platform, conf *config.Config) (error, chan error) {
 		}
 	}
 
-	log.Info("Allocating web server")
-	webMux := http.NewServeMux()
-
-	log.Infof("Starting OpenMetrics interface")
-	if err := startMetrics(webMux); err != nil {
-		log.Errorf("startMetrics failed: %v", err)
+	log.Info("Allocating HTTP server")
+	httpServ := web.NewWebserver()
+	err = httpServ.SetServer("", "80", nil)
+	if err != nil {
+		log.Errorf("Setting HTTP server failed: %v", err)
 		return err, nil
 	}
 
 	log.Infof("Starting gRPC interface")
-	rpc, err := startGRPC(gpio, fan, uart, &conf.Version)
+	rpc, err := grpc.StartGRPC(httpServ, gpio, fan, uart, &conf.Version)
 	if err != nil {
 		log.Errorf("startGRPC failed: %v", err)
 		return err, nil
 	}
 
+	go httpServ.Serve()
+
 	// The rest of the startup depends on the system having the correct time,
 	// so initialize the rest in the background
 	startupResult := make(chan error)
 	go func() {
-		if err := asyncStartup(plat, conf, rpc, webMux, timeAcquired); err != nil {
+		if err := asyncStartup(plat, conf, rpc, timeAcquired, httpServ); err != nil {
 			startupResult <- err
 			return
 		}
@@ -312,19 +316,25 @@ func StartupWithConfig(plat Platform, conf *config.Config) (error, chan error) {
 	return nil, startupResult
 }
 
-func asyncStartup(plat Platform, conf *config.Config, rpc RPCServer, mux *http.ServeMux, t chan bool) error {
+func asyncStartup(plat Platform, conf *config.Config, rpc RPCServer, t chan bool, httpServ *web.WebServer) error {
 	// Before we enable remote calls, make sure we have acquired accurate time
 	<-t
-	systemHasTime.Set(1)
+	metric.Gauge(metric.MetricOpts{
+		Namespace: "ubmc",
+		Subsystem: "system",
+		Name:      "has_trusted_time",
+	}, nil, func() float64 {
+		return 1
+	})
 
 	// Start background time sync
 	go backgroundTimeSync(conf.RoughtimeServers, conf.NtpServers)
 
 	log.Infof("Time has been verified, loading system certificate")
 	var tlsConf *tls.Config
-	acmeConf := acme.ACMEConfig{conf.ACME}
+	acmeConf := acme.ACMEConfig(conf.ACME)
 	if conf.ACME.TermsAgreed {
-		t, err := acmeConf.GetManagedCert([]string{"ubmc.local"}, true, mux)
+		t, err := acmeConf.GetManagedCert([]string{"ubmc.local"}, true, httpServ)
 		if err != nil {
 			log.Error(err)
 			return err
@@ -338,11 +348,22 @@ func asyncStartup(plat Platform, conf *config.Config, rpc RPCServer, mux *http.S
 		}
 		tlsConf = t
 	}
-	log.Infof("Certificate available, enabling remote RPCs")
-	if err := rpc.EnableRemote(tlsConf); err != nil {
-		log.Errorf("rpc.EnableRemote failed: %v", err)
+
+	log.Info("Allocating HTTPS server")
+	httpsServ := web.NewWebserver()
+	err := httpsServ.SetServer("", "443", tlsConf)
+	if err != nil {
+		log.Errorf("Setting HTTPS server failed: %v", err)
 		return err
 	}
+
+	log.Infof("Starting OpenMetrics interface")
+	metric.StartMetrics(httpsServ.Mux)
+
+	log.Infof("Certificate available, enabling remote RPCs")
+	rpc.EnableRemote(httpsServ.Mux, tlsConf)
+
+	go httpsServ.Serve()
 
 	return nil
 }

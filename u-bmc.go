@@ -21,7 +21,6 @@ var (
 	urootWhitelist = []string{
 		"backoff",
 		"basename",
-		"bind",
 		"blkid",
 		"cat",
 		"chmod",
@@ -73,8 +72,6 @@ var (
 		"shutdown",
 		"sleep",
 		"sort",
-		"sshd", //TODO(MDr164) replace with in-process sshd
-		"strace",
 		"strings",
 		"stty",
 		"sync",

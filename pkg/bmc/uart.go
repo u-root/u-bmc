@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/tarm/serial"
+	"github.com/u-root/u-bmc/pkg/metric"
 )
 
 type Uart interface {
@@ -34,38 +34,34 @@ type writerStream struct {
 }
 
 var (
-	uartOverruns = prometheus.NewCounter(prometheus.CounterOpts{
+	// Number of UART reads that were dropped due to a slow client
+	uartOverruns = metric.Counter(metric.MetricOpts{
 		Namespace: "ubmc",
 		Subsystem: "uart",
 		Name:      "overrun_count",
-		Help:      "Number of UART reads that were dropped due to a slow client",
-	})
-	uartBufferedReads = prometheus.NewGauge(prometheus.GaugeOpts{
+	}, nil)
+	// Approximate number of UART reads that have not been read yet by a consumer
+	//TODO(MDr164): Set func correctly
+	uartBufferedReads = metric.Gauge(metric.MetricOpts{
 		Namespace: "ubmc",
 		Subsystem: "uart",
 		Name:      "buffered_read_count",
-		Help:      "Approximate number of UART reads that have not been read yet by a consumer",
-	})
-	uartConsumers = prometheus.NewGauge(prometheus.GaugeOpts{
+	}, nil, func() float64 { return 0 })
+	// How many UART consumers the system has
+	//TODO(MDr164): Set func correctly
+	uartConsumers = metric.Gauge(metric.MetricOpts{
 		Namespace: "ubmc",
 		Subsystem: "uart",
 		Name:      "consumer_count",
-		Help:      "How many UART consumers the system has",
-	})
+	}, nil, func() float64 { return 0 })
 )
-
-func init() {
-	prometheus.MustRegister(uartConsumers)
-	prometheus.MustRegister(uartOverruns)
-	prometheus.MustRegister(uartBufferedReads)
-}
 
 func (u *uartSystem) NewReader(done <-chan struct{}) <-chan []byte {
 	// TODO(bluecmd): Is buffering 128*1024 = 128 KiB data enough? Probably, some metrics
 	// to debug it would be nice. For now we will output console messages
 	// if this queue becomes full.
 	c := make(chan []byte, 1024)
-	uartConsumers.Inc()
+	//uartConsumers.Inc()
 	u.m.Lock()
 	defer u.m.Unlock()
 	reader := &readerStream{done, c}
@@ -73,7 +69,7 @@ func (u *uartSystem) NewReader(done <-chan struct{}) <-chan []byte {
 
 	go func(reader *readerStream) {
 		<-reader.done
-		uartConsumers.Dec()
+		//uartConsumers.Dec()
 		u.m.Lock()
 		defer u.m.Unlock()
 		var nr []*readerStream
@@ -133,7 +129,7 @@ func (u *uartSystem) uartReceiver() {
 			}
 			p += len(r.stream)
 		}
-		uartBufferedReads.Set(float64(p))
+		//uartBufferedReads.Set(float64(p))
 		// TODO(bluecmd): Consider saving a certain set of scrollback and
 		// implementing some form of sequence numbering to make it possible to
 		// save/restore serial data and request missed frames during network flaps

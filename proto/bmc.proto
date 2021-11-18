@@ -4,7 +4,9 @@
 
 syntax = "proto3";
 
-package bmc;
+option go_package = "github.com/u-root/u-bmc/pkg/grpc/proto";
+
+package proto;
 
 service ManagementService {
   rpc PressButton (ButtonPressRequest) returns (ButtonPressResponse) {}
@@ -46,7 +48,6 @@ message Fan {
 message GetFansResponse {
   repeated Fan fan = 1;
 }
-
 
 message ConsoleData {
   bytes data = 1;

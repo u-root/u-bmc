@@ -10,7 +10,7 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/u-root/u-bmc/proto"
+	"github.com/u-root/u-bmc/pkg/grpc/proto"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -156,10 +156,10 @@ func (n *network) AddressLifetime() time.Duration {
 	return time.Hour
 }
 
-func startNetwork(config *pb.Network) (*network, error) {
+func startNetwork(config *proto.Network) (*network, error) {
 	if config == nil {
 		log.Infof("No network configuration detected, using defaults")
-		config = &pb.Network{}
+		config = &proto.Network{}
 	}
 
 	// Fun story: if you don't have both IPv4 and IPv6 loopback configured

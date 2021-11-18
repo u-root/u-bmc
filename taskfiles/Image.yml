@@ -140,4 +140,5 @@ tasks:
     sources:
       - rootfs/**
     generates:
-      - img/rootfs.img      
+      - img/rootfs.img
+    method: timestamp    

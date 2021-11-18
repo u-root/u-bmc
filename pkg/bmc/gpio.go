@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	pb "github.com/u-root/u-bmc/proto"
+	"github.com/u-root/u-bmc/pkg/grpc/proto"
+	"github.com/u-root/u-bmc/pkg/metric"
 )
 
 const (
@@ -46,42 +46,36 @@ type gpioImpl interface {
 type GpioSystem struct {
 	p      GpioPlatform
 	impl   gpioImpl
-	button map[pb.Button]chan chan bool
+	button map[proto.Button]chan chan bool
 	m      sync.RWMutex
 }
 
 type GpioCallback func(line string, c chan bool, initial bool)
 
-var (
-	gpioLine = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+func LogGpio(line string, c chan bool, d bool) {
+	log.Infof("Monitoring GPIO line %-30s [initial value %v]", line, d)
+	var edge string
+	metric.Gauge(metric.MetricOpts{
 		Namespace: "ubmc",
 		Subsystem: "gpio",
 		Name:      "line",
-		Help:      "Monitored u-bmc GPIO line",
-	}, []string{"line"})
-)
-
-func init() {
-	prometheus.MustRegister(gpioLine)
-}
-
-func LogGpio(line string, c chan bool, d bool) {
-	log.Infof("Monitoring GPIO line %-30s [initial value %v]", line, d)
-	m := gpioLine.With(prometheus.Labels{"line": line})
-	if d {
-		m.Set(1)
-	}
-	for value := range c {
-		f := ""
-		if value {
-			m.Set(1)
-			f = "rising edge"
-		} else {
-			m.Set(0)
-			f = "falling edge"
+	}, []string{`line="` + line + `"`}, func() float64 {
+		if d {
+			return 1
 		}
-		log.Infof("%s: %s", line, f)
-	}
+		for value := range c {
+			if value {
+				edge = "rising edge"
+				return 1
+			} else {
+				edge = "falling edge"
+				return 0
+			}
+
+		}
+		return -1
+	})
+	log.Infof("%s: %s", line, edge)
 }
 
 func (g *GpioSystem) monitorOne(line string, cb GpioCallback) error {
@@ -169,7 +163,7 @@ func (g *GpioSystem) Hog(lines map[string]bool) {
 	}
 }
 
-func (g *GpioSystem) Button(b pb.Button) chan chan bool {
+func (g *GpioSystem) Button(b proto.Button) chan chan bool {
 	g.m.Lock()
 	defer g.m.Unlock()
 	_, found := g.button[b]
@@ -179,7 +173,7 @@ func (g *GpioSystem) Button(b pb.Button) chan chan bool {
 	return g.button[b]
 }
 
-func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32) (chan bool, error) {
+func (g *GpioSystem) PressButton(ctx context.Context, b proto.Button, durMs uint32) (chan bool, error) {
 	if durMs > 1000*10 {
 		return nil, fmt.Errorf("maximum allowed depress duration is 10 seconds")
 	}
@@ -215,7 +209,7 @@ func (g *GpioSystem) PressButton(ctx context.Context, b pb.Button, durMs uint32)
 	return cc, nil
 }
 
-func (g *GpioSystem) ManageButton(line string, b pb.Button, flags int) {
+func (g *GpioSystem) ManageButton(line string, b proto.Button, flags int) {
 	port, ok := g.p.GpioNameToPort(line)
 	if !ok {
 		log.Errorf("Could not resolve GPIO %s", line)
@@ -268,7 +262,7 @@ func NewGpioSystem(p GpioPlatform, impl gpioImpl) *GpioSystem {
 	g := GpioSystem{
 		p:      p,
 		impl:   impl,
-		button: map[pb.Button]chan chan bool{},
+		button: map[proto.Button]chan chan bool{},
 	}
 	return &g
 }

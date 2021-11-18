@@ -4,7 +4,9 @@
 
 syntax = "proto3";
 
-package bmc;
+option go_package = "github.com/u-root/u-bmc/pkg/grpc/proto";
+
+package proto;
 
 message Route {
   // Destination network

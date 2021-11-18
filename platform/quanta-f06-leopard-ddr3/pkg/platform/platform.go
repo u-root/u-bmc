@@ -9,10 +9,9 @@ import (
 
 	"github.com/u-root/u-bmc/pkg/aspeed"
 	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/pkg/grpc/proto"
 	"github.com/u-root/u-bmc/pkg/logger"
 	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/gpio"
-
-	pb "github.com/u-root/u-bmc/proto"
 )
 
 var log = logger.LogContainer.GetSimpleLogger()
@@ -70,8 +69,8 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"UNKN_Q4": false,
 	})
 
-	go g.ManageButton("BMC_PWR_BTN_OUT_N", pb.Button_BUTTON_POWER, bmc.GPIO_INVERTED)
-	go g.ManageButton("BMC_RST_BTN_OUT_N", pb.Button_BUTTON_RESET, bmc.GPIO_INVERTED)
+	go g.ManageButton("BMC_PWR_BTN_OUT_N", proto.Button_BUTTON_POWER, bmc.GPIO_INVERTED)
+	go g.ManageButton("BMC_RST_BTN_OUT_N", proto.Button_BUTTON_RESET, bmc.GPIO_INVERTED)
 	return nil
 }
 
@@ -83,7 +82,7 @@ func (p *platform) PowerButtonHandler(_ string, c chan bool, _ bool) {
 		if pressed {
 			log.Infof("Physical power button pressed")
 			pushc = make(chan bool)
-			p.g.Button(pb.Button_BUTTON_POWER) <- pushc
+			p.g.Button(proto.Button_BUTTON_POWER) <- pushc
 			pushc <- true
 		} else if pushc != nil {
 			log.Infof("Physical power button released")
@@ -101,7 +100,7 @@ func (p *platform) ResetButtonHandler(_ string, c chan bool, _ bool) {
 		if pressed {
 			log.Infof("Physical reset button triggered")
 			pushc := make(chan bool)
-			p.g.Button(pb.Button_BUTTON_RESET) <- pushc
+			p.g.Button(proto.Button_BUTTON_RESET) <- pushc
 			pushc <- true
 			time.Sleep(time.Duration(100) * time.Millisecond)
 			pushc <- false

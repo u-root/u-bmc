@@ -150,9 +150,10 @@ task virtual-host
 
 When simulating the following TCP/IP ports are set up:
 
- * 6053/udp: u-bmc DNS
+ * 6022/tcp: u-bmc SSH
+ * 6053/udp: u-bmc DNS (to be removed)
  * 6443/tcp: u-bmc gRPC
- * 9370/tcp: u-bmc OpenMetrics
+ * 6443/tcp: u-bmc OpenMetrics (under /metrics)
 
 When the u-bmc guest tries to access 10.0.2.100 a local service called
 ubmc-pebble is started which uses Let's Encrypt's pebble service to generate

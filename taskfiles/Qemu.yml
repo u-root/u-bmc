@@ -36,7 +36,7 @@ tasks:
         -kernel linux/zImage.boot \
         -display none \
         -chardev socket,id=host,path=host.uart,server=on,wait=off \
-        -nic user,hostfwd=tcp::6022-:22,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,hostfwd=tcp::9370-:9370,model=virtio \
+        -nic user,hostfwd=tcp::6022-:22,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,model=virtio \
         -drive file=img/rootfs.img,format=raw,if=virtio \
         -device virtio-rng \
         -device virtio-serial \
@@ -57,7 +57,7 @@ tasks:
         -kernel linux/zImage.boot \
         -display none \
         -chardev socket,id=host,path=host.uart,server=on,wait=off \
-        -nic user,hostfwd=tcp::6022-:22,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,hostfwd=tcp::9370-:9370,model=virtio \
+        -nic user,hostfwd=tcp::6022-:22,hostfwd=udp::6053-:53,hostfwd=tcp::6443-:443,model=virtio \
         -drive file=img/rootfs.img,format=raw,if=virtio \
         -device virtio-rng \
         -device virtio-serial \
