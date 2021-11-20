@@ -8,7 +8,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/u-root/u-bmc/pkg/logger"
+	"github.com/u-root/u-bmc/pkg/service/logger"
 	"google.golang.org/grpc"
 )
 

@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/aspeed"
-	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/pkg/hardware/aspeed"
+	"github.com/u-root/u-bmc/pkg/system"
 	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/platform"
 	"golang.org/x/sys/unix"
 )
@@ -21,7 +21,7 @@ func main() {
 	a := aspeed.Open()
 	defer a.Close()
 
-	if err, _ := bmc.Startup(p); err != nil {
+	if err, _ := system.Startup(p); err != nil {
 		fmt.Printf("TEST_FAILED: %v\n", err)
 	} else {
 		// Verify that the power button is set to an output for sanity

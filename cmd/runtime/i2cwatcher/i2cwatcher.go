@@ -8,7 +8,7 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/u-root/u-bmc/pkg/aspeed"
+	"github.com/u-root/u-bmc/pkg/hardware/aspeed"
 )
 
 var (

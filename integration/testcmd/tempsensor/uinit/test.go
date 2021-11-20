@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/u-root/u-bmc/integration/util"
-	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/pkg/system"
 	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/platform"
 )
 
@@ -41,7 +41,7 @@ func uinit() error {
 	p := platform.Platform()
 	defer p.Close()
 
-	if err, _ := bmc.Startup(p); err != nil {
+	if err, _ := system.Startup(p); err != nil {
 		return err
 	}
 

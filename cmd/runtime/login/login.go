@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/u-root/u-bmc/pkg/logger"
+	"github.com/u-root/u-bmc/pkg/service/logger"
 	"src.elv.sh/pkg/buildinfo"
 	"src.elv.sh/pkg/prog"
 	"src.elv.sh/pkg/shell"

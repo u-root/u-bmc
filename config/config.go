@@ -5,7 +5,7 @@
 package config
 
 import (
-	"github.com/u-root/u-bmc/pkg/bmc/ttime"
+	"github.com/u-root/u-bmc/pkg/network/ttime"
 )
 
 type Version struct {

@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 
 	"aead.dev/minisign"
-	"github.com/u-root/u-bmc/pkg/logger"
+	"github.com/u-root/u-bmc/pkg/service/logger"
 )
 
 var (

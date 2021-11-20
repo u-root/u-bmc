@@ -5,18 +5,18 @@
 package platform
 
 import (
-	"github.com/u-root/u-bmc/pkg/aspeed"
-	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/platform/aspeed-ast2500evb/pkg/gpio"
+	"github.com/u-root/u-bmc/pkg/hardware/aspeed"
+	"github.com/u-root/u-bmc/pkg/hardware/gpio"
+	pgpio "github.com/u-root/u-bmc/platform/aspeed-ast2500evb/pkg/gpio"
 )
 
 type platform struct {
 	a *aspeed.Ast
-	g *bmc.GpioSystem
-	gpio.Gpio
+	g *gpio.GpioSystem
+	pgpio.Gpio
 }
 
-func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
+func (p *platform) InitializeGpio(g *gpio.GpioSystem) error {
 	return nil
 }
 
@@ -52,6 +52,6 @@ func (p *platform) Close() {
 
 func Platform() *platform {
 	a := aspeed.Open()
-	p := platform{a, nil, gpio.Gpio{}}
+	p := platform{a, nil, pgpio.Gpio{}}
 	return &p
 }

@@ -13,8 +13,8 @@ import (
 
 	"github.com/caddyserver/certmagic"
 	"github.com/u-root/u-bmc/config"
-	"github.com/u-root/u-bmc/pkg/logger"
-	"github.com/u-root/u-bmc/pkg/web"
+	"github.com/u-root/u-bmc/pkg/network/web"
+	"github.com/u-root/u-bmc/pkg/service/logger"
 )
 
 var log = logger.LogContainer.GetLogger()

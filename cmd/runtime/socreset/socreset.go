@@ -7,7 +7,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/u-root/u-bmc/pkg/aspeed"
+	"github.com/u-root/u-bmc/pkg/hardware/aspeed"
 )
 
 func main() {

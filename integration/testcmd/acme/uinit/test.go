@@ -11,8 +11,8 @@ import (
 
 	"github.com/u-root/u-bmc/config"
 	"github.com/u-root/u-bmc/integration/util"
-	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/pkg/bmc/ttime"
+	"github.com/u-root/u-bmc/pkg/network/ttime"
+	"github.com/u-root/u-bmc/pkg/system"
 	"github.com/u-root/u-bmc/platform/qemu-virt-a72/pkg/platform"
 )
 
@@ -32,7 +32,7 @@ func uinit() error {
 	c.ACME.Directory = ca.Directory
 	c.ACME.TermsAgreed = true
 
-	err, sr := bmc.StartupWithConfig(p, c)
+	err, sr := system.StartupWithConfig(p, c)
 	if err != nil {
 		return err
 	}

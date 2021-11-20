@@ -5,16 +5,16 @@
 package platform
 
 import (
-	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/platform/qemu-virt-a15/pkg/gpio"
+	"github.com/u-root/u-bmc/pkg/hardware/gpio"
+	pgpio "github.com/u-root/u-bmc/platform/qemu-virt-a15/pkg/gpio"
 )
 
 type platform struct {
-	g *bmc.GpioSystem
-	gpio.Gpio
+	g *gpio.GpioSystem
+	pgpio.Gpio
 }
 
-func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
+func (p *platform) InitializeGpio(g *gpio.GpioSystem) error {
 	return nil
 }
 
@@ -43,6 +43,6 @@ func (p *platform) Close() {
 }
 
 func Platform() *platform {
-	p := platform{nil, gpio.Gpio{}}
+	p := platform{nil, pgpio.Gpio{}}
 	return &p
 }

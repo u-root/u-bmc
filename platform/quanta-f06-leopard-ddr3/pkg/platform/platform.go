@@ -7,53 +7,54 @@ package platform
 import (
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/aspeed"
-	"github.com/u-root/u-bmc/pkg/bmc"
-	"github.com/u-root/u-bmc/pkg/grpc/proto"
-	"github.com/u-root/u-bmc/pkg/logger"
-	"github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/gpio"
+	"github.com/u-root/u-bmc/pkg/hardware/aspeed"
+	"github.com/u-root/u-bmc/pkg/hardware/gpio"
+	"github.com/u-root/u-bmc/pkg/network/ncsi"
+	"github.com/u-root/u-bmc/pkg/service/grpc/proto"
+	"github.com/u-root/u-bmc/pkg/service/logger"
+	pgpio "github.com/u-root/u-bmc/platform/quanta-f06-leopard-ddr3/pkg/gpio"
 )
 
 var log = logger.LogContainer.GetSimpleLogger()
 
 type platform struct {
 	a *aspeed.Ast
-	g *bmc.GpioSystem
-	gpio.Gpio
+	g *gpio.GpioSystem
+	pgpio.Gpio
 }
 
-func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
+func (p *platform) InitializeGpio(g *gpio.GpioSystem) error {
 	p.g = g
-	g.Monitor(map[string]bmc.GpioCallback{
-		"CPU0_FIVR_FAULT_N":   bmc.LogGpio,
-		"CPU0_PROCHOT_N":      bmc.LogGpio,
-		"CPU0_THERMTRIP_N":    bmc.LogGpio,
-		"CPU1_FIVR_FAULT_N":   bmc.LogGpio,
-		"CPU1_PROCHOT_N":      bmc.LogGpio,
-		"CPU1_THERMTRIP_N":    bmc.LogGpio,
-		"CPU_CATERR_N":        bmc.LogGpio,
-		"MB_SLOT_ID":          bmc.LogGpio,
-		"MEMAB_MEMHOT_N":      bmc.LogGpio,
-		"MEMCD_MEMHOT_N":      bmc.LogGpio,
-		"MEMEF_MEMHOT_N":      bmc.LogGpio,
-		"MEMGH_MEMHOT_N":      bmc.LogGpio,
-		"NMI_BTN_N":           bmc.LogGpio,
-		"PCH_BMC_THERMTRIP_N": bmc.LogGpio,
-		"PCH_PWR_OK":          bmc.LogGpio,
+	g.Monitor(map[string]gpio.GpioCallback{
+		"CPU0_FIVR_FAULT_N":   gpio.LogGpio,
+		"CPU0_PROCHOT_N":      gpio.LogGpio,
+		"CPU0_THERMTRIP_N":    gpio.LogGpio,
+		"CPU1_FIVR_FAULT_N":   gpio.LogGpio,
+		"CPU1_PROCHOT_N":      gpio.LogGpio,
+		"CPU1_THERMTRIP_N":    gpio.LogGpio,
+		"CPU_CATERR_N":        gpio.LogGpio,
+		"MB_SLOT_ID":          gpio.LogGpio,
+		"MEMAB_MEMHOT_N":      gpio.LogGpio,
+		"MEMCD_MEMHOT_N":      gpio.LogGpio,
+		"MEMEF_MEMHOT_N":      gpio.LogGpio,
+		"MEMGH_MEMHOT_N":      gpio.LogGpio,
+		"NMI_BTN_N":           gpio.LogGpio,
+		"PCH_BMC_THERMTRIP_N": gpio.LogGpio,
+		"PCH_PWR_OK":          gpio.LogGpio,
 		"PWR_BTN_N":           p.PowerButtonHandler,
 		"RST_BTN_N":           p.ResetButtonHandler,
-		"SKU0":                bmc.LogGpio,
-		"SKU1":                bmc.LogGpio,
-		"SKU2":                bmc.LogGpio,
-		"SKU3":                bmc.LogGpio,
-		"SLP_S3_N":            bmc.LogGpio,
-		"SPI_SEL":             bmc.LogGpio,
-		"SYS_PWR_OK":          bmc.LogGpio,
-		"SYS_THROTTLE":        bmc.LogGpio,
-		"UART_SELECT0":        bmc.LogGpio,
-		"UART_SELECT1":        bmc.LogGpio,
-		"UNKN_BOOT0":          bmc.LogGpio,
-		"UNKN_BOOT1":          bmc.LogGpio,
+		"SKU0":                gpio.LogGpio,
+		"SKU1":                gpio.LogGpio,
+		"SKU2":                gpio.LogGpio,
+		"SKU3":                gpio.LogGpio,
+		"SLP_S3_N":            gpio.LogGpio,
+		"SPI_SEL":             gpio.LogGpio,
+		"SYS_PWR_OK":          gpio.LogGpio,
+		"SYS_THROTTLE":        gpio.LogGpio,
+		"UART_SELECT0":        gpio.LogGpio,
+		"UART_SELECT1":        gpio.LogGpio,
+		"UNKN_BOOT0":          gpio.LogGpio,
+		"UNKN_BOOT1":          gpio.LogGpio,
 	})
 
 	g.Hog(map[string]bool{
@@ -69,8 +70,8 @@ func (p *platform) InitializeGpio(g *bmc.GpioSystem) error {
 		"UNKN_Q4": false,
 	})
 
-	go g.ManageButton("BMC_PWR_BTN_OUT_N", proto.Button_BUTTON_POWER, bmc.GPIO_INVERTED)
-	go g.ManageButton("BMC_RST_BTN_OUT_N", proto.Button_BUTTON_RESET, bmc.GPIO_INVERTED)
+	go g.ManageButton("BMC_PWR_BTN_OUT_N", proto.Button_BUTTON_POWER, gpio.GPIO_INVERTED)
+	go g.ManageButton("BMC_RST_BTN_OUT_N", proto.Button_BUTTON_RESET, gpio.GPIO_INVERTED)
 	return nil
 }
 
@@ -136,7 +137,7 @@ func (p *platform) InitializeSystem() error {
 	p.a.Mem().MustWrite32(aspeed.SCU_BASE+0x0, 0x0)
 
 	log.Infof("Setting up Network Controller Sideband Interface (NC-SI) for eth0")
-	go bmc.StartNcsi("eth0")
+	go ncsi.StartNcsi("eth0")
 	return nil
 }
 
@@ -172,6 +173,6 @@ func (p *platform) Close() {
 
 func Platform() *platform {
 	a := aspeed.Open()
-	p := platform{a, nil, gpio.Gpio{}}
+	p := platform{a, nil, pgpio.Gpio{}}
 	return &p
 }

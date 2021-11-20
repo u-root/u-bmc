@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/u-root/u-bmc/pkg/bmc"
+	"github.com/u-root/u-bmc/pkg/hardware/gpio"
 )
 
 var (
@@ -41,7 +41,7 @@ func TestMain(t *testing.T) {
 
 func TestPowerButton(t *testing.T) {
 	p := platform{}
-	f := bmc.FakeGpioImpl(&p, map[uint32]bool{
+	f := gpio.FakeGpioImpl(&p, map[uint32]bool{
 		// Button is inverted, default is high
 		powerButtonN: true,
 		powerOutN:    true,
@@ -49,7 +49,7 @@ func TestPowerButton(t *testing.T) {
 		resetOutN:    true,
 	})
 
-	g := bmc.NewGpioSystem(&p, f)
+	g := gpio.NewGpioSystem(&p, f)
 	err := p.InitializeGpio(g)
 	if err != nil {
 		t.Fatalf("platform.InitializeGpio failed with %v", err)
@@ -73,7 +73,7 @@ func TestPowerButton(t *testing.T) {
 
 func TestResetButton(t *testing.T) {
 	p := platform{}
-	f := bmc.FakeGpioImpl(&p, map[uint32]bool{
+	f := gpio.FakeGpioImpl(&p, map[uint32]bool{
 		// Button is inverted, default is high
 		powerButtonN: true,
 		powerOutN:    true,
@@ -81,7 +81,7 @@ func TestResetButton(t *testing.T) {
 		resetOutN:    true,
 	})
 
-	g := bmc.NewGpioSystem(&p, f)
+	g := gpio.NewGpioSystem(&p, f)
 	err := p.InitializeGpio(g)
 	if err != nil {
 		t.Fatalf("platform.InitializeGpio failed with %v", err)

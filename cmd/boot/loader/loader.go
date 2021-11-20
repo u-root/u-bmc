@@ -21,7 +21,7 @@ import (
 	"path/filepath"
 
 	"aead.dev/minisign"
-	"github.com/u-root/u-bmc/pkg/logger"
+	"github.com/u-root/u-bmc/pkg/service/logger"
 	"github.com/u-root/u-root/pkg/boot"
 	"github.com/u-root/u-root/pkg/boot/kexec"
 	"github.com/u-root/u-root/pkg/kmodule"

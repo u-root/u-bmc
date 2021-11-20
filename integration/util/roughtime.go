@@ -12,7 +12,7 @@ import (
 
 	"github.com/cloudflare/roughtime/mjd"
 	"github.com/cloudflare/roughtime/protocol"
-	"github.com/u-root/u-bmc/pkg/bmc/ttime"
+	"github.com/u-root/u-bmc/pkg/network/ttime"
 	"golang.org/x/crypto/ed25519"
 )
 
