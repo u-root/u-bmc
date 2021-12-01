@@ -4,7 +4,7 @@
 
 .globl kernel_start
 kernel_start:
-	.incbin "../../build/boot/zImage.boot"
+	.incbin "../../build/linux/zImage.boot"
 	.align 2
 kernel_end:
 	.globl kernel_size
@@ -22,7 +22,7 @@ dtb_size:
 
 	.globl initrd_start
 initrd_start:
-	.incbin "../../build/boot/loader.cpio.gz"
+	.incbin "../../build/boot/bootldr.cpio.gz"
 	.align 2
 initrd_end:
 	.globl initrd_size

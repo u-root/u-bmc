@@ -92,6 +92,6 @@ mmu_disable_phys:
 	 */
 	mov	ip, lr		/* perserve link reg across call */
 	bl	lowlevel_init	/* go setup pll,mux,memory */
-  b	_main
+  	b	_main
 	/* Will never return */
 

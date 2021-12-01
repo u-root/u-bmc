@@ -34,6 +34,7 @@ tasks:
         --ram-start {{.__RAM_START}} \
         --ram-size {{.__RAM_SIZE}} \
         --dtb /dev/null \
+        --initrd /dev/null \
         > boot/boot-config.auto.h
       - |
         cpp \
@@ -62,10 +63,11 @@ tasks:
     cmds:
       - echo "Building LinuxBoot dtb..."
       - |
-        go run ../cmd/build/boot-config/build-config.go \
+        go run ../cmd/build/boot-config/boot-config.go \
         --ram-start {{.__RAM_START}} \
         --ram-size {{.__RAM_SIZE}} \
         --dtb boot/platform.dtb.boot.dummy \
+        --initrd boot/bootldr.cpio.gz \
         > boot/boot-config.auto.h
       - |
         cpp \

@@ -60,7 +60,7 @@ tasks:
       - rm -rf build/root
       - rm -rf build/*img
       - rm -rf build/rootfs
-      - rm -f build/u-bmc
+      - rm -f build/busybox
       - echo "Done!"
 
   # Removes the whole build folder

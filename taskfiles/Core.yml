@@ -64,6 +64,8 @@ tasks:
         {{.__TOOLCHAIN}}gcc -c -o data.o ../../soc/{{.__SOC}}/data.S
       - |
         {{.__TOOLCHAIN}}gcc \
+        -I ../../platform/{{.__TARGET}}/boot/ \
+        -I ./ \
         -Wl,--build-id=none \
         -Wl,-T ../../soc/{{.__SOC}}/boot.ld \
         -Wl,--no-dynamic-linker \
@@ -72,10 +74,7 @@ tasks:
         ../../soc/{{.__SOC}}/platform_g$(echo $__SOC | cut -c 5).S \
         ../../soc/{{.__SOC}}/main.S \
         data.o \
-        boot-config.auto.h \
-        ../../platform/{{.__TARGET}}/boot/config.h \
-        -I ../../platform/{{.__TARGET}}/boot/ \
-        -I ../../boot
+        -o boot.elf
       - |
         {{.__TOOLCHAIN}}objcopy --only-section=.text -O binary boot.elf boot.bin
       - echo "Done!"
