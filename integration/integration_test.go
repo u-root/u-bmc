@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/u-root/u-root/pkg/golang"
+	gbbgolang "github.com/u-root/gobusybox/src/pkg/golang"
 	"github.com/u-root/u-root/pkg/qemu"
 	"github.com/u-root/u-root/pkg/uroot"
 	"github.com/u-root/u-root/pkg/uroot/initramfs"
@@ -49,10 +49,10 @@ func BMCTest(t *testing.T, o *Options) (*TestVM, func()) {
 	}
 
 	// Env
-	env := golang.Default()
+	env := gbbgolang.Default()
 	env.CgoEnabled = false
 	env.GOARCH = "arm"
-	o.BuildOpts.Env = env
+	o.BuildOpts.Env = &env
 
 	_ = buildInitramfs(t, tmpDir, o)
 	flash := buildFlash(t, tmpDir, o)
@@ -110,9 +110,9 @@ func NativeTest(t *testing.T, o *Options) (*qemu.VM, func()) {
 	}
 
 	// Env
-	env := golang.Default()
+	env := gbbgolang.Default()
 	env.CgoEnabled = false
-	o.BuildOpts.Env = env
+	o.BuildOpts.Env = &env
 
 	i := buildInitramfs(t, tmpDir, o)
 	q := &qemu.Options{

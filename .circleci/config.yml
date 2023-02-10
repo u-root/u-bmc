@@ -132,7 +132,6 @@ jobs:
           command: |
             sudo apt update
             sudo apt install gcc-aarch64-linux-gnu fakeroot flex bison bc patch libssl-dev zlib1g-dev libelf-dev qemu-kvm
-            GO111MODULE=off go get github.com/u-root/u-root
             sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
       # Because the included version is too old and lacks the -U flag...
       - run:
