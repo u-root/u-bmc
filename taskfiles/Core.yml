@@ -46,7 +46,7 @@ tasks:
     dir: build/boot
     cmds:
       - echo "Building LinuxBoot loader..."
-      - cd ../../boot/loader && GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../build/boot/
+      - cd ../../boot/loader && GOOS=linux GOARM={{.__GOARM}} GOARCH={{.__ARCH}} go build -ldflags="-s -w" -o ../../build/boot/
       - echo "Done!"
     sources:
       - ../../boot/loader/*.go

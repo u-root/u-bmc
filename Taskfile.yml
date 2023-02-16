@@ -14,7 +14,13 @@ env:
 
 vars:
   CPUS:
-    sh: echo $(($(grep -c processor /proc/cpuinfo) / 2))
+    sh: |
+      if [[ "$(uname -s)" = "Linux" ]]; then
+        grep -c processor /proc/cpuinfo # Linux
+      else
+        getconf _NPROCESSORS_ONLN # fallback (including apple)
+      fi
+      exit $?
 
 dotenv: ['platform/{{.__TARGET}}/config.env', 'kernel.env']
 
@@ -48,7 +54,7 @@ tasks:
       - mkdir -p build
       - task: platform:build-{{.__TARGET}}
       - echo "Done!"
-      
+
   # Remove compiled files
   clean:
     desc: Cleans up compiled files

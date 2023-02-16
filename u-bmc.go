@@ -12,13 +12,19 @@ import (
 
 	"github.com/u-root/gobusybox/src/pkg/bb"
 	"github.com/u-root/gobusybox/src/pkg/golang"
+	"github.com/u-root/u-root/pkg/ulog"
 )
 
-// Flags for the gobusybox builder
 var (
-	// Using this explicit list we can easier restrict which commands
-	// end up in our busybox binary
-	urootWhitelist = []string{
+	bmcCmdNames = []string{
+		"fan",
+		"i2cwatcher",
+		"login",
+		"socreset",
+		"ubmcctl",
+	}
+
+	urootCmdNames = []string{
 		"backoff",
 		"basename",
 		"bind",
@@ -117,24 +123,20 @@ func Main() error {
 		env.CgoEnabled = false
 	}
 
-	// Resolve paths to all individual go commands for the busybox
-	urootcmds := urootAbsEach(urootWhitelist)
-	bmccmds, err := filepath.Glob("../cmd/*")
-	if err != nil {
-		return err
-	}
-	var extracmds []string
+	bmcCmds := prefixEach("github.com/u-root/u-bmc/cmd/", bmcCmdNames)
+	urootCmds := prefixEach("github.com/u-root/u-root/cmds/core/", urootCmdNames)
+	var extraCmds []string
 	for _, arg := range flag.Args() {
 		path, err := filepath.Glob(arg)
 		if err != nil {
 			continue
 		}
-		extracmds = append(extracmds, path...)
+		extraCmds = append(extraCmds, path...)
 	}
 	var commands []string
-	commands = append(commands, bmccmds...)
-	commands = append(commands, urootcmds...)
-	commands = append(commands, extracmds...)
+	commands = append(commands, bmcCmds...)
+	commands = append(commands, urootCmds...)
+	// commands = append(commands, extraCmds...)
 	pwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -154,7 +156,7 @@ func Main() error {
 	}
 
 	// Build the bb binary
-	err = bb.BuildBusybox(&opts)
+	err = bb.BuildBusybox(ulog.Log, &opts)
 	if err != nil {
 		return err
 	}
@@ -185,10 +187,10 @@ func Main() error {
 	return nil
 }
 
-func urootAbsEach(in []string) []string {
+func prefixEach(prefix string, in []string) []string {
 	out := make([]string, len(in))
 	for i, s := range in {
-		out[i], _ = filepath.Abs("../../u-root/cmds/core/" + s)
+		out[i] = prefix + s
 	}
 	return out
 }

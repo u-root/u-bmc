@@ -92,16 +92,8 @@ Get them for 32bit via e.g.:
 sudo apt install gcc-arm-none-eabi mtd-utils golang fakeroot flex bison device-tree-compiler bc libssl-dev libelf-dev qemu-kvm
 ```
 
-We also need both u-bmc and u-root in our GOPATH so install them with:
+Clone to any directory (Go modules are supported!):
 ```
-GO111MODULE=off go get github.com/u-root/u-root
-GO111MODULE=off go get github.com/u-root/u-bmc
-```
-Or use git clone:
-```
-mkdir $GOPATH/src/github.com/u-root
-cd $GOPATH/src/github.com/u-root
-git clone https://github.com/u-root/u-root
 git clone https://github.com/u-root/u-bmc
 ```
 
