@@ -18,7 +18,7 @@ require (
 	github.com/mdlayher/genetlink v1.0.0
 	github.com/mdlayher/netlink v1.4.1
 	github.com/miekg/dns v1.1.43
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/spf13/afero v1.6.0
 	github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07
 	github.com/u-root/gobusybox/src v0.0.0-20210529132627-adc854ea4425
